@@ -1,0 +1,19 @@
+{
+  "name": "frontend-delivery",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "node start.js",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "next": "14.2.35",
+    "react": "^18",
+    "react-dom": "^18"
+  },
+  "devDependencies": {
+    "qrcode-terminal": "^0.12.0"
+  }
+}

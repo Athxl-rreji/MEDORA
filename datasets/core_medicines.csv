@@ -1,0 +1,11 @@
+medicine_id,brand_name,generic_name,category,dosage,form,manufacturer,price_mrp,alternatives,side_effects,usage_indication
+MED001,Crocin Advance,Paracetamol,OTC,500mg,Tablet,GSK,15.00,"Dolo 650, Calpol 500","Nausea, Liver damage (rare)",Fever, Pain
+MED002,Dolo 650,Paracetamol,OTC,650mg,Tablet,Micro Labs,30.00,"Crocin Advance, Calpol 650",Nausea,Fever, Pain
+MED003,Augmentin 625,Amoxicillin and Clavulanate,Prescription,625mg,Tablet,GSK,175.50,"Moxikind-CV 625, Clavam 625","Diarrhea, Skin Rash",Bacterial Infection
+MED004,Moxikind-CV 625,Amoxicillin and Clavulanate,Prescription,625mg,Tablet,Mankind,120.00,"Augmentin 625, Clavam 625","Diarrhea, Skin Rash",Bacterial Infection
+MED005,Allegra 120,Fexofenadine,OTC,120mg,Tablet,Sanofi,200.00,"Fexofast 120, Hifen 120","Drowsiness (rare), Headache",Allergies
+MED006,Calpol 650,Paracetamol,OTC,650mg,Tablet,GSK,28.00,"Crocin Advance, Dolo 650",Nausea,Fever, Pain
+MED007,Alprax 0.5,Alprazolam,Restricted,0.5mg,Tablet,Torrent Pharma,60.00,"Restyl 0.5, Zolam 0.5","Drowsiness, Dizziness",Anxiety, Panic Disorders
+MED008,Ascoril D Plus,Dextromethorphan + CPM,OTC,100ml,Syrup,Glenmark,120.00,"Benadryl DR, Corex DX","Drowsiness, Dry Mouth",Dry Cough
+MED009,Telma 40,Telmisartan,Prescription,40mg,Tablet,Glenmark,110.00,"Telvas 40, Tazloc 40","Dizziness, Sinus Infection",Hypertension (High BP)
+MED010,Telmikind 40,Telmisartan,Prescription,40mg,Tablet,Mankind,45.00,"Telma 40, Telvas 40","Dizziness",Hypertension (High BP)

@@ -1,0 +1,16 @@
+{
+  "expo": {
+    "name": "MEDORA Rider",
+    "slug": "mobile-delivery",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.medora.rider"
+    },
+    "android": {
+      "package": "com.medora.rider"
+    }
+  }
+}

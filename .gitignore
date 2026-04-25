@@ -1,0 +1,25 @@
+node_modules/
+dist/
+build/
+.env
+.env.local
+*.log
+__pycache__/
+.venv/
+venv/
+
+# Offline AI models (never commit these)
+*.safetensors
+*.7z
+webui_forge*/
+
+# Next.js
+.next/
+out/
+
+# Expo
+.expo/
+
+# OS
+.DS_Store
+Thumbs.db
