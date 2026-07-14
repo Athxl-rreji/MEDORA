@@ -214,3 +214,12 @@ h1, h2, h3, h4 {
   position: relative;
   z-index: 10;
 }
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 1; }
+}
+
+.dot-typing {
+  animation: pulse 1.5s infinite ease-in-out;
+}

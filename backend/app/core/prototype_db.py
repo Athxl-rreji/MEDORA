@@ -44,12 +44,37 @@ class PrototypeDataStore:
             logger.error(f"Failed to load symptoms: file not found at {sym_path}")
 
     def search_medicines(self, query: str) -> List[dict]:
-        query = query.lower()
-        results = []
+        query = query.strip().lower()
+        if not query:
+            return []
+            
+        scored_results = []
         for med in self.medicines.values():
-            if query in med["brand_name"].lower() or query in med["generic_name"].lower():
-                results.append(med)
-        return results
+            brand = med["brand_name"].lower()
+            generic = med["generic_name"].lower()
+            usage = med.get("usage_indication", "").lower()
+            
+            score = 0
+            if brand == query:
+                score = 150
+            elif generic == query:
+                score = 140
+            elif brand.startswith(query):
+                score = 100
+            elif generic.startswith(query):
+                score = 80
+            elif query in brand:
+                score = 50
+            elif query in generic:
+                score = 40
+            elif query in usage:
+                score = 20
+                
+            if score > 0:
+                scored_results.append((score, med))
+                
+        scored_results.sort(key=lambda x: (-x[0], x[1]["brand_name"].lower()))
+        return [med for _, med in scored_results[:10]]
 
     def get_alternative(self, medicine_id: str) -> List[dict]:
         med = self.medicines.get(medicine_id)

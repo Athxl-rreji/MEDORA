@@ -1,5 +1,6 @@
 "use client";
 import React, { useState, useEffect } from 'react';
+import Tesseract from 'tesseract.js';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
 const USER_ID = "1";
@@ -67,11 +68,38 @@ export default function Home() {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [focusedIndex, setFocusedIndex] = useState(-1);
   const [cart, setCart] = useState([]);
   const [activeOrders, setActiveOrders] = useState([]);
-  const [symptoms, setSymptoms] = useState('');
-  const [aiAnalysis, setAiAnalysis] = useState(null);
-  const [isAiLoading, setIsAiLoading] = useState(false);
+  const [chatMessages, setChatMessages] = useState([
+    { role: 'assistant', content: "Hello! I am MEDORA's AI Virtual Doctor. What symptoms are you experiencing today?" }
+  ]);
+  const [chatInput, setChatInput] = useState('');
+  const [isChatLoading, setIsChatLoading] = useState(false);
+  const [chatFinished, setChatFinished] = useState(false);
+  const [chatSuggestedMedicines, setChatSuggestedMedicines] = useState([]);
+  const [isOcrLoading, setIsOcrLoading] = useState(false);
+  const [ocrResult, setOcrResult] = useState('');
+  const fileInputRef = React.useRef(null);
+
+  // Highlight matched query text
+  const highlightMatch = (text, query) => {
+    if (!query) return <span>{text}</span>;
+    const parts = text.split(new RegExp(`(${query.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')})`, 'gi'));
+    return (
+      <span>
+        {parts.map((part, i) => 
+          part.toLowerCase() === query.toLowerCase() ? (
+            <mark key={i} style={{ background: 'rgba(99, 102, 241, 0.4)', color: '#fff', borderRadius: '2px', padding: '0 2px', fontWeight: 'bold' }}>
+              {part}
+            </mark>
+          ) : (
+            part
+          )
+        )}
+      </span>
+    );
+  };
 
   // Live suggestions
   useEffect(() => {
@@ -83,12 +111,33 @@ export default function Home() {
           const data = await res.json();
           setSearchResults(data.results || []);
           setShowSuggestions(true);
+          setFocusedIndex(-1); // Reset index on new results
         }
       } catch (err) { console.error("Backend offline", err); }
     };
     const t = setTimeout(fetchSuggestions, 300);
     return () => clearTimeout(t);
   }, [searchQuery]);
+
+  // Handle keyboard events in search bar
+  const handleKeyDown = (e) => {
+    if (!showSuggestions || searchResults.length === 0) return;
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setFocusedIndex(prev => (prev + 1) % searchResults.length);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setFocusedIndex(prev => (prev - 1 + searchResults.length) % searchResults.length);
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      if (focusedIndex >= 0 && focusedIndex < searchResults.length) {
+        addToCart(searchResults[focusedIndex]);
+      }
+    } else if (e.key === 'Escape') {
+      setShowSuggestions(false);
+    }
+  };
 
   // Poll user's own orders for live tracking
   useEffect(() => {
@@ -146,21 +195,113 @@ export default function Home() {
     }
   };
 
-  const processSymptoms = async () => {
-    if (!symptoms) return;
-    setIsAiLoading(true);
+  const sendChatMessage = async (e) => {
+    e.preventDefault();
+    if (!chatInput.trim() || isChatLoading || chatFinished) return;
+
+    const userMessage = { role: 'user', content: chatInput };
+    const updatedMessages = [...chatMessages, userMessage];
+    
+    setChatMessages(updatedMessages);
+    setChatInput('');
+    setIsChatLoading(true);
+
     try {
-      const res = await fetch('http://127.0.0.1:8001/analyze', {
+      const res = await fetch('http://127.0.0.1:8001/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user_id: USER_ID, symptoms })
+        body: JSON.stringify({
+          user_id: USER_ID,
+          messages: updatedMessages
+        })
       });
-      const data = await res.json();
-      setAiAnalysis(data);
-    } catch {
-      setAiAnalysis({ message: "AI Service unavailable. Ensure port 8001 is running." });
+      
+      if (res.ok) {
+        const data = await res.json();
+        setChatMessages(prev => [...prev, { role: 'assistant', content: data.content }]);
+        if (data.session_finished) {
+          setChatFinished(true);
+          setChatSuggestedMedicines(data.suggested_medicines || []);
+        }
+      } else {
+        setChatMessages(prev => [...prev, { role: 'assistant', content: "I am having trouble connecting to my diagnostic system. Please try again." }]);
+      }
+    } catch (err) {
+      setChatMessages(prev => [...prev, { role: 'assistant', content: "Error connecting to AI service. Please make sure the service is running on port 8001." }]);
+    } finally {
+      setIsChatLoading(false);
     }
-    setIsAiLoading(false);
+  };
+
+  const resetChat = () => {
+    setChatMessages([
+      { role: 'assistant', content: "Hello! I am MEDORA's AI Virtual Doctor. What symptoms are you experiencing today?" }
+    ]);
+    setChatInput('');
+    setChatFinished(false);
+    setChatSuggestedMedicines([]);
+  };
+
+  const addChatSuggestedToCart = async () => {
+    if (chatSuggestedMedicines.length === 0) return;
+    
+    for (const medName of chatSuggestedMedicines) {
+      try {
+        const res = await fetch(`${API}/api/v1/medicines/search?q=${medName}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.results && data.results.length > 0) {
+            const bestMatch = data.results[0];
+            addToCart(bestMatch);
+          } else {
+            addToCart({
+              medicine_id: `MED_OTC_${Math.floor(Math.random() * 1000)}`,
+              brand_name: medName,
+              generic_name: medName,
+              price_mrp: "20.00",
+              dosage: "1 Unit"
+            });
+          }
+        }
+      } catch (e) {
+        addToCart({
+          medicine_id: `MED_OTC_${Math.floor(Math.random() * 1000)}`,
+          brand_name: medName,
+          generic_name: medName,
+          price_mrp: "20.00",
+          dosage: "1 Unit"
+        });
+      }
+    }
+    
+    alert(`Added ${chatSuggestedMedicines.join(', ')} to cart! Check your cart above.`);
+    resetChat();
+  };
+
+  const handleFileUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsOcrLoading(true);
+    setOcrResult('');
+
+    try {
+      // Run Tesseract entirely in the browser for Vercel compatibility
+      const result = await Tesseract.recognize(file, 'eng');
+      const text = result.data.text;
+      
+      if (text && text.trim().length > 0) {
+        setOcrResult(text);
+      } else {
+        setOcrResult("No text detected in the image.");
+      }
+    } catch (err) {
+      console.error("Local OCR error:", err);
+      setOcrResult("Failed to process image locally. Please try again.");
+    } finally {
+      setIsOcrLoading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
   };
 
   return (
@@ -185,6 +326,7 @@ export default function Home() {
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
               onFocus={() => { if (searchQuery.length > 1) setShowSuggestions(true); }}
+              onKeyDown={handleKeyDown}
               style={{ background: 'transparent', border: 'none', boxShadow: 'none' }}
             />
             <button type="submit" className="btn-primary" style={{ padding: '1rem 2rem' }}>Search</button>
@@ -194,18 +336,35 @@ export default function Home() {
           {showSuggestions && searchResults.length > 0 && (
             <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 50, marginTop: '10px', background: 'rgba(15,23,42,0.98)', border: '1px solid var(--primary)', borderRadius: '12px', padding: '1rem', backdropFilter: 'blur(10px)', maxHeight: '400px', overflowY: 'auto' }}>
               <h4 style={{ marginBottom: '10px', color: 'var(--secondary)' }}>Live Matches:</h4>
-              {searchResults.map((med, idx) => (
-                <div key={idx} style={{ padding: '1rem', background: 'rgba(0,0,0,0.4)', borderRadius: '8px', marginBottom: '0.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div>
-                    <strong style={{ fontSize: '1.1rem' }}>{med.brand_name}</strong> ({med.dosage})<br />
-                    <span style={{ fontSize: '0.85rem', color: '#94a3b8' }}>Salt: {med.generic_name} • {med.usage_indication}</span>
+              {searchResults.map((med, idx) => {
+                const isFocused = idx === focusedIndex;
+                return (
+                  <div key={idx} style={{ 
+                    padding: '1rem', 
+                    background: isFocused ? 'rgba(99, 102, 241, 0.25)' : 'rgba(0,0,0,0.4)', 
+                    border: isFocused ? '1px solid var(--primary)' : '1px solid transparent',
+                    borderRadius: '8px', 
+                    marginBottom: '0.5rem', 
+                    display: 'flex', 
+                    justifyContent: 'space-between', 
+                    alignItems: 'center',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease'
+                  }}
+                  onClick={() => addToCart(med)}
+                  onMouseEnter={() => setFocusedIndex(idx)}
+                  >
+                    <div>
+                      <strong style={{ fontSize: '1.1rem' }}>{highlightMatch(med.brand_name, searchQuery)}</strong> ({med.dosage})<br />
+                      <span style={{ fontSize: '0.85rem', color: '#94a3b8' }}>Salt: {highlightMatch(med.generic_name, searchQuery)} • {med.usage_indication}</span>
+                    </div>
+                    <div style={{ textAlign: 'right', flexShrink: 0, marginLeft: '1rem' }} onClick={(e) => e.stopPropagation()}>
+                      <span style={{ color: '#10b981', fontWeight: 'bold', display: 'block' }}>₹{med.price_mrp}</span>
+                      <button type="button" onClick={() => addToCart(med)} className="btn-secondary" style={{ padding: '0.3rem 0.8rem', marginTop: '4px', fontSize: '0.8rem' }}>Add To Cart</button>
+                    </div>
                   </div>
-                  <div style={{ textAlign: 'right', flexShrink: 0, marginLeft: '1rem' }}>
-                    <span style={{ color: '#10b981', fontWeight: 'bold', display: 'block' }}>₹{med.price_mrp}</span>
-                    <button type="button" onClick={() => addToCart(med)} className="btn-secondary" style={{ padding: '0.3rem 0.8rem', marginTop: '4px', fontSize: '0.8rem' }}>Add To Cart</button>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
@@ -261,47 +420,194 @@ export default function Home() {
 
       {/* Feature Cards */}
       <section className="features-grid">
-        {/* AI Symptom Card */}
-        <div className="feature-card glass-panel" style={{ gridColumn: 'span 2' }}>
-          <div className="icon-wrapper" style={{ background: 'rgba(99, 102, 241, 0.2)' }}>🤖</div>
-          <h3 className="card-title">AI Symptom Assistant</h3>
-          <p className="card-desc">Describe how you're feeling. Our AI cross-references your medical profile safely.</p>
-          <textarea
-            className="input-field"
-            placeholder="E.g. I have a severe chest pain and shortness of breath..."
-            rows="3" value={symptoms}
-            onChange={e => setSymptoms(e.target.value)}
-            style={{ marginTop: '1rem', resize: 'none' }}
-          />
-          <button onClick={processSymptoms} className="btn-primary" style={{ marginTop: '1rem', width: 'fit-content' }}>
-            {isAiLoading ? 'Analyzing...' : 'Analyze Symptoms'}
-          </button>
-          {aiAnalysis && (
-            <div style={{
-              marginTop: '1.5rem', padding: '1.5rem', borderRadius: '12px',
-              background: aiAnalysis.critical ? 'rgba(239,68,68,0.1)' : 'rgba(16,185,129,0.1)',
-              border: `1px solid ${aiAnalysis.critical ? '#ef4444' : '#10b981'}`
-            }}>
-              <h4 style={{ color: aiAnalysis.critical ? '#fca5a5' : '#6ee7b7', marginBottom: '0.5rem' }}>
-                {aiAnalysis.critical ? '⚠️ CRITICAL RED FLAG DETECTED' : '✅ AI Assessment Complete'}
-              </h4>
-              <p style={{ whiteSpace: 'pre-wrap' }}>{aiAnalysis.message}</p>
-              {aiAnalysis.suggested_otc_medicines?.length > 0 && (
-                <div style={{ marginTop: '1rem' }}>
-                  <strong>Recommend checking: </strong>
-                  <span style={{ color: 'var(--primary)' }}>{aiAnalysis.suggested_otc_medicines.join(', ')}</span>
+        {/* AI Virtual Doctor Chat */}
+        <div className="feature-card glass-panel" style={{ gridColumn: 'span 2', display: 'flex', flexDirection: 'column', minHeight: '500px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              <div className="icon-wrapper" style={{ background: 'rgba(99, 102, 241, 0.2)', margin: 0 }}>🩺</div>
+              <div>
+                <h3 className="card-title" style={{ margin: 0 }}>AI Virtual Doctor</h3>
+                <p className="card-desc" style={{ margin: 0 }}>Step-by-step clinical symptom diagnosis & consultation</p>
+              </div>
+            </div>
+            <button onClick={resetChat} className="btn-secondary" style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem' }}>Reset Consultation</button>
+          </div>
+
+          <div style={{
+            flex: 1,
+            background: 'rgba(15, 23, 42, 0.6)',
+            borderRadius: '12px',
+            border: '1px solid rgba(255, 255, 255, 0.05)',
+            padding: '1.25rem',
+            overflowY: 'auto',
+            maxHeight: '350px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '1rem',
+            marginBottom: '1rem'
+          }}>
+            {chatMessages.map((msg, idx) => {
+              const isUser = msg.role === 'user';
+              return (
+                <div key={idx} style={{
+                  display: 'flex',
+                  justifyContent: isUser ? 'flex-end' : 'flex-start',
+                  width: '100%'
+                }}>
+                  <div style={{
+                    display: 'flex',
+                    flexDirection: isUser ? 'row-reverse' : 'row',
+                    alignItems: 'flex-start',
+                    gap: '0.75rem',
+                    maxWidth: '85%'
+                  }}>
+                    <div style={{
+                      width: '32px', height: '32px', borderRadius: '50%',
+                      background: isUser ? 'linear-gradient(135deg, #6366f1, #4f46e5)' : 'linear-gradient(135deg, #374151, #1f2937)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontSize: '0.9rem', flexShrink: 0,
+                      boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
+                    }}>
+                      {isUser ? '👤' : '🩺'}
+                    </div>
+                    
+                    <div style={{
+                      padding: '0.85rem 1.1rem',
+                      borderRadius: isUser ? '16px 4px 16px 16px' : '4px 16px 16px 16px',
+                      background: isUser ? 'linear-gradient(135deg, #4f46e5, #3730a3)' : 'rgba(30, 41, 59, 0.85)',
+                      border: isUser ? '1px solid rgba(99, 102, 241, 0.3)' : '1px solid rgba(255, 255, 255, 0.05)',
+                      color: '#f8fafc',
+                      fontSize: '0.95rem',
+                      lineHeight: '1.45',
+                      whiteSpace: 'pre-wrap',
+                      boxShadow: '0 4px 10px rgba(0,0,0,0.15)'
+                    }}>
+                      {msg.content}
+                    </div>
+                  </div>
                 </div>
-              )}
+              );
+            })}
+            
+            {isChatLoading && (
+              <div style={{ display: 'flex', justifyContent: 'flex-start', width: '100%' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                  <div style={{
+                    width: '32px', height: '32px', borderRadius: '50%',
+                    background: 'linear-gradient(135deg, #374151, #1f2937)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.9rem'
+                  }}>🩺</div>
+                  <div style={{
+                    padding: '0.75rem 1rem', borderRadius: '4px 16px 16px 16px',
+                    background: 'rgba(30, 41, 59, 0.85)', border: '1px solid rgba(255, 255, 255, 0.05)'
+                  }}>
+                    <span className="dot-typing" style={{ color: '#94a3b8' }}>Doctor is analyzing...</span>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {chatFinished && chatSuggestedMedicines.length > 0 && (
+            <div style={{
+              background: 'rgba(16, 185, 129, 0.1)',
+              border: '1px solid #10b981',
+              borderRadius: '12px',
+              padding: '1.25rem',
+              marginBottom: '1rem',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '0.75rem',
+              animation: 'fadeIn 0.5s ease-out'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <span style={{ fontSize: '1.3rem' }}>💊</span>
+                <strong style={{ color: '#6ee7b7', fontSize: '1.1rem' }}>Prescribed Remedies:</strong>
+              </div>
+              <p style={{ margin: 0, fontSize: '0.9rem', color: '#cbd5e1' }}>
+                The virtual doctor has suggested adding the following medicines to your cart:
+              </p>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', margin: '0.25rem 0' }}>
+                {chatSuggestedMedicines.map((med, idx) => (
+                  <span key={idx} style={{
+                    background: 'rgba(16, 185, 129, 0.2)',
+                    color: '#6ee7b7',
+                    border: '1px solid rgba(16, 185, 129, 0.4)',
+                    padding: '3px 10px',
+                    borderRadius: '99px',
+                    fontSize: '0.85rem',
+                    fontWeight: 'bold'
+                  }}>{med}</span>
+                ))}
+              </div>
+              <button 
+                onClick={addChatSuggestedToCart}
+                className="btn-primary" 
+                style={{ background: '#10b981', border: 'none', padding: '0.75rem 1.5rem', alignSelf: 'flex-start', cursor: 'pointer', borderRadius: '8px', fontSize: '0.9rem', fontWeight: 'bold' }}
+              >
+                Add Suggested Medicines to Cart
+              </button>
             </div>
           )}
+
+          <form onSubmit={sendChatMessage} style={{ display: 'flex', gap: '0.75rem' }}>
+            <input
+              type="text"
+              className="input-field"
+              placeholder={chatFinished ? "Consultation completed. Click Reset to start over." : "Describe your symptom, reply to the doctor, etc..."}
+              value={chatInput}
+              onChange={e => setChatInput(e.target.value)}
+              disabled={chatFinished || isChatLoading}
+              style={{ flex: 1, borderRadius: '8px' }}
+            />
+            <button 
+              type="submit" 
+              className="btn-primary" 
+              disabled={chatFinished || isChatLoading || !chatInput.trim()}
+              style={{ padding: '0.75rem 1.5rem', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+            >
+              Send
+            </button>
+          </form>
         </div>
 
         {/* Vision Card */}
-        <div className="feature-card glass-panel" style={{ alignSelf: 'flex-start' }}>
+        <div className="feature-card glass-panel" style={{ alignSelf: 'flex-start', display: 'flex', flexDirection: 'column' }}>
           <div className="icon-wrapper" style={{ background: 'rgba(16, 185, 129, 0.1)', color: 'var(--secondary)' }}>📷</div>
           <h3 className="card-title">Vision Verification</h3>
           <p className="card-desc">Upload prescription. OCR validates against doctor's orders.</p>
-          <button type="button" onClick={() => alert("✅ Document Scanner Active!")} className="btn-primary" style={{ marginTop: 'auto', alignSelf: 'flex-start', background: 'var(--secondary)' }}>Upload Rx</button>
+          
+          <input 
+            type="file" 
+            accept="image/*" 
+            ref={fileInputRef}
+            onChange={handleFileUpload}
+            style={{ display: 'none' }} 
+          />
+          
+          <button 
+            type="button" 
+            onClick={() => fileInputRef.current?.click()} 
+            disabled={isOcrLoading}
+            className="btn-primary" 
+            style={{ marginTop: 'auto', alignSelf: 'flex-start', background: 'var(--secondary)', opacity: isOcrLoading ? 0.7 : 1, cursor: isOcrLoading ? 'not-allowed' : 'pointer' }}
+          >
+            {isOcrLoading ? 'Scanning...' : 'Upload Rx'}
+          </button>
+
+          {ocrResult && (
+            <div style={{
+              marginTop: '1.5rem', padding: '1rem', borderRadius: '12px',
+              background: 'rgba(0,0,0,0.2)',
+              border: '1px solid rgba(16, 185, 129, 0.3)',
+              maxHeight: '200px', overflowY: 'auto',
+              fontSize: '0.85rem', whiteSpace: 'pre-wrap', color: '#cbd5e1',
+              width: '100%'
+            }}>
+              <strong style={{ display: 'block', marginBottom: '8px', color: '#10b981' }}>Extracted Text:</strong>
+              {ocrResult}
+            </div>
+          )}
         </div>
       </section>
     </main>

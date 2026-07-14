@@ -23,3 +23,9 @@ out/
 # OS
 .DS_Store
 Thumbs.db
+
+# Swc binaries folder
+@next/
+
+# Google Cloud Credentials
+medora-ocr-service-2c5ef3591c5d.json
