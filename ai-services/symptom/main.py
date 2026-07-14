@@ -147,6 +147,7 @@ async def chat_diagnose(request: ChatRequest):
     
     openai_key = os.environ.get("OPENAI_API_KEY")
     gemini_key = os.environ.get("GEMINI_API_KEY")
+    openrouter_key = os.environ.get("OPENROUTER_API_KEY")
     
     system_prompt = (
         "You are a professional medical doctor. You are conducting a patient consultation in a chat window. "
@@ -162,9 +163,44 @@ async def chat_diagnose(request: ChatRequest):
         "5. Keep responses relatively concise (1-3 sentences) suitable for a chat bubble, until the final diagnosis."
     )
     
-    if openai_key or gemini_key:
+    if openrouter_key or gemini_key or openai_key:
         try:
-            if gemini_key:
+            if openrouter_key:
+                import openai
+                openai_messages = [{"role": "system", "content": system_prompt}]
+                for m in messages:
+                    openai_messages.append({"role": m["role"], "content": m["content"]})
+                
+                model_name = os.environ.get("OPENROUTER_MODEL", "meta-llama/llama-3-8b-instruct:free")
+                
+                if hasattr(openai, "ChatCompletion") and not hasattr(openai, "OpenAI"):
+                    openai.api_base = "https://openrouter.ai/api/v1"
+                    openai.api_key = openrouter_key
+                    response = openai.ChatCompletion.create(
+                        model=model_name,
+                        messages=openai_messages,
+                        headers={
+                            "HTTP-Referer": "https://github.com/Athxl-rreji/MEDORA",
+                            "X-Title": "MEDORA AI Pharmacy"
+                        }
+                    )
+                    reply = response.choices[0].message.content
+                else:
+                    from openai import OpenAI
+                    client = OpenAI(
+                        base_url="https://openrouter.ai/api/v1",
+                        api_key=openrouter_key,
+                        default_headers={
+                            "HTTP-Referer": "https://github.com/Athxl-rreji/MEDORA",
+                            "X-Title": "MEDORA AI Pharmacy"
+                        }
+                    )
+                    response = client.chat.completions.create(
+                        model=model_name,
+                        messages=openai_messages
+                    )
+                    reply = response.choices[0].message.content
+            elif gemini_key:
                 import urllib.request
                 import json
                 
@@ -198,7 +234,7 @@ async def chat_diagnose(request: ChatRequest):
                 for m in messages:
                     openai_messages.append({"role": m["role"], "content": m["content"]})
                 
-                if hasattr(openai, "ChatCompletion"):
+                if hasattr(openai, "ChatCompletion") and not hasattr(openai, "OpenAI"):
                     openai.api_key = openai_key
                     response = openai.ChatCompletion.create(
                         model="gpt-3.5-turbo",
@@ -234,6 +270,7 @@ async def chat_diagnose(request: ChatRequest):
                 suggested_medicines=suggested_medicines
             )
         except Exception as e:
+            print(f"LLM API failure: {e}")
             pass
 
     user_msgs = [m for m in messages if m["role"] == "user"]
