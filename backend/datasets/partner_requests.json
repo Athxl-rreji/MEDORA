@@ -1,5 +1,25 @@
 [
   {
+    "id": "req_deliv_5db59d",
+    "partner_type": "delivery",
+    "full_name": "adhwaith",
+    "email": "23g02.adhwaith@sjec.ac.in",
+    "phone": "7468479464",
+    "status": "approved",
+    "submitted_at": "2026-09-29T09:07:59.017999",
+    "store_name": "",
+    "license_no": "",
+    "store_address": "",
+    "latitude": null,
+    "longitude": null,
+    "vehicle_type": "Electric Scooter",
+    "driving_license": "954616546",
+    "shop_upi_id": null,
+    "shop_upi_qr": null,
+    "approved_at": "2026-09-29T09:08:38.613563",
+    "temp_password": "Delivery123"
+  },
+  {
     "id": "req_pharm_ffb70d",
     "partner_type": "pharmacy",
     "full_name": "Dr. Sharma",
