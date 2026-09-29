@@ -3,6 +3,7 @@ import json
 import base64
 import uuid
 import urllib.request
+from urllib.parse import quote, quote_plus
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Query, File, UploadFile
 from supabase import Client
@@ -784,6 +785,13 @@ class LiveTerminalQrPayload(BaseModel):
     terminal_label: Optional[str] = "Counter POS Soundbox"
     expires_in_minutes: Optional[int] = 30
 
+class UpdateStoreUpiPayload(BaseModel):
+    pharmacy_id: str = "PHARM_001"
+    shop_upi_id: str
+    pharmacy_name: Optional[str] = None
+    shop_upi_qr: Optional[str] = None
+    terminal_label: Optional[str] = None
+
 @router.post("/pharmacy/live-terminal-qr")
 def upload_live_terminal_qr(
     payload: LiveTerminalQrPayload,
@@ -803,7 +811,8 @@ def upload_live_terminal_qr(
     is_clearing = not payload.live_upi_qr or payload.live_upi_qr.strip() in ("", "clear", "reset")
     mock_db.pharmacy_metadata[pharm_id]["live_terminal_qr"] = None if is_clearing else payload.live_upi_qr
     mock_db.pharmacy_metadata[pharm_id]["live_terminal_qr_time"] = None if is_clearing else datetime.now().isoformat()
-    mock_db.pharmacy_metadata[pharm_id]["terminal_label"] = payload.terminal_label
+    if payload.terminal_label:
+        mock_db.pharmacy_metadata[pharm_id]["terminal_label"] = payload.terminal_label
 
     logger.info(f"Pharmacy {pharm_id} {'cleared' if is_clearing else 'broadcasted'} live terminal QR snapshot")
     return {
@@ -814,30 +823,111 @@ def upload_live_terminal_qr(
         "timestamp": datetime.now().isoformat()
     }
 
-@router.get("/pharmacy/live-terminal-qr")
-def get_live_terminal_qr(
-    pharmacy_id: str = "PHARM_001",
+@router.post("/pharmacy/update-upi")
+def update_pharmacy_upi(
+    payload: UpdateStoreUpiPayload,
     mock_db: PrototypeDataStore = Depends(get_datastore)
 ):
     """
-    Customers in checkout retrieve the store's live POS terminal photo if available,
-    or fall back to the store's static UPI QR code uploaded during registration.
+    Update the store's verified permanent UPI ID (VPA), permanent QR sticker, and POS terminal label.
+    Automatically generates a high-resolution NPCI standard UPI QR if a custom sticker is not provided.
     """
-    pharm = mock_db.pharmacy_metadata.get(pharmacy_id, {})
-    live_qr = pharm.get("live_terminal_qr")
-    shop_qr = pharm.get("shop_upi_qr")
-    shop_upi_id = pharm.get("shop_upi_id", "vamanjoor.pharmacy@upi")
+    pharm_id = payload.pharmacy_id or "PHARM_001"
+    clean_upi_id = payload.shop_upi_id.strip()
+    if not clean_upi_id or "@" not in clean_upi_id:
+        raise HTTPException(status_code=400, detail="Invalid UPI ID. Must be in the format username@bank (e.g. store@okaxis).")
+
+    if pharm_id not in mock_db.pharmacy_metadata:
+        mock_db.pharmacy_metadata[pharm_id] = {
+            "id": pharm_id,
+            "name": payload.pharmacy_name or "Vamanjoor Express Pharmacy",
+            "shop_upi_id": clean_upi_id
+        }
+
+    pharm = mock_db.pharmacy_metadata[pharm_id]
+    if payload.pharmacy_name:
+        pharm["name"] = payload.pharmacy_name
+    pharm["shop_upi_id"] = clean_upi_id
+    if payload.terminal_label:
+        pharm["terminal_label"] = payload.terminal_label
+
+    store_name = pharm.get("name", "Express Pharmacy")
     
+    # Auto-generate dynamic standard QR URL if not custom image uploaded
+    if payload.shop_upi_qr and payload.shop_upi_qr.strip():
+        pharm["shop_upi_qr"] = payload.shop_upi_qr
+    else:
+        upi_pay_url = f"upi://pay?pa={clean_upi_id}&pn={quote(store_name)}&cu=INR"
+        pharm["shop_upi_qr"] = f"https://api.qrserver.com/v1/create-qr-code/?size=300x300&data={quote_plus(upi_pay_url)}"
+
+    pharm["updated_at"] = datetime.now().isoformat()
+    logger.info(f"Updated store UPI settings for {pharm_id}: VPA={clean_upi_id}, Terminal={pharm.get('terminal_label')}")
+
+    return {
+        "status": "success",
+        "message": f"Store UPI settings synchronized successfully for {store_name}!",
+        "pharmacy_id": pharm_id,
+        "pharmacy_name": store_name,
+        "shop_upi_id": clean_upi_id,
+        "shop_upi_qr": pharm["shop_upi_qr"],
+        "terminal_label": pharm.get("terminal_label", "Counter POS Soundbox"),
+        "timestamp": datetime.now().isoformat()
+    }
+
+@router.get("/pharmacy/live-terminal-qr")
+def get_live_terminal_qr(
+    pharmacy_id: str = "PHARM_001",
+    amount: Optional[float] = None,
+    mock_db: PrototypeDataStore = Depends(get_datastore)
+):
+    """
+    Customers in checkout retrieve the dispatching store's live POS terminal photo if active,
+    or the store's verified permanent UPI QR code.
+    If amount is provided, dynamically generates an exact amount-encoded UPI Intent URL and QR code.
+    """
+    pharm = mock_db.pharmacy_metadata.get(pharmacy_id)
+    if not pharm:
+        if mock_db.pharmacy_metadata:
+            pharm = next(iter(mock_db.pharmacy_metadata.values()))
+            pharmacy_id = pharm.get("id", "PHARM_001")
+        else:
+            pharm = {
+                "id": "PHARM_001",
+                "name": "Vamanjoor Express Pharmacy",
+                "shop_upi_id": "vamanjoor.pharmacy@upi"
+            }
+
+    live_qr = pharm.get("live_terminal_qr")
+    shop_upi_id = pharm.get("shop_upi_id", "vamanjoor.pharmacy@upi")
+    pharm_name = pharm.get("name", "Express Pharmacy")
+    shop_qr = pharm.get("shop_upi_qr")
+
+    # Generate standard amount-encoded dynamic UPI intent
+    order_ref = f"MEDORA-{uuid.uuid4().hex[:6].upper()}"
+    if amount and amount > 0:
+        dynamic_upi_intent = f"upi://pay?pa={shop_upi_id}&pn={quote(pharm_name)}&am={amount:.2f}&cu=INR&tn={order_ref}"
+        dynamic_upi_qr = f"https://api.qrserver.com/v1/create-qr-code/?size=300x300&data={quote_plus(dynamic_upi_intent)}"
+    else:
+        dynamic_upi_intent = f"upi://pay?pa={shop_upi_id}&pn={quote(pharm_name)}&cu=INR&tn=MEDORA-Order"
+        dynamic_upi_qr = shop_qr or f"https://api.qrserver.com/v1/create-qr-code/?size=300x300&data={quote_plus(dynamic_upi_intent)}"
+
+    if not shop_qr:
+        shop_qr = dynamic_upi_qr
+
     return {
         "status": "success",
         "pharmacy_id": pharmacy_id,
-        "pharmacy_name": pharm.get("name", "Express Pharmacy"),
+        "pharmacy_name": pharm_name,
+        "shop_upi_id": shop_upi_id,
+        "shop_upi_qr": shop_qr,
+        "dynamic_upi_qr": dynamic_upi_qr,
+        "upi_intent": dynamic_upi_intent,
+        "amount": amount,
         "live_upi_qr": live_qr,
         "live_terminal_qr_time": pharm.get("live_terminal_qr_time"),
-        "terminal_label": pharm.get("terminal_label", "Counter POS Terminal"),
-        "shop_upi_qr": shop_qr,
-        "shop_upi_id": shop_upi_id,
-        "has_live_scanner_qr": bool(live_qr)
+        "terminal_label": pharm.get("terminal_label", "Counter POS Soundbox"),
+        "has_live_scanner_qr": bool(live_qr),
+        "synced_at": datetime.now().isoformat()
     }
 
 

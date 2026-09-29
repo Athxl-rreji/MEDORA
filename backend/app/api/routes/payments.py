@@ -17,7 +17,7 @@ class CreatePaymentIntentRequest(BaseModel):
     user_id: str
     amount: float
     currency: str = "INR"
-    payment_method: str = "upi"  # upi, card, cod, mock_gateway
+    payment_method: str = "upi"  # upi, cod
     notes: Optional[dict] = None
 
 class VerifyPaymentRequest(BaseModel):
@@ -25,44 +25,28 @@ class VerifyPaymentRequest(BaseModel):
     payment_id: str
     razorpay_order_id: Optional[str] = None
     razorpay_signature: Optional[str] = None
-    payment_method: str = "mock_gateway"
+    payment_method: str = "upi"
 
 @router.get("/methods")
 def get_payment_methods():
-    """Retrieve supported payment methods for checkout."""
+    """Retrieve supported payment methods for checkout. Strictly limited to Store UPI and Cash on Delivery."""
     return {
         "status": "success",
         "methods": [
             {
                 "id": "upi",
-                "name": "Instant UPI / QR Code",
-                "description": "Google Pay, PhonePe, Paytm, BHIM",
+                "name": "Instant Store UPI / Soundbox QR",
+                "description": "Google Pay, PhonePe, Paytm, BHIM with Store QR Sync",
                 "icon": "⚡",
-                "badge": "Popular",
-                "enabled": True
-            },
-            {
-                "id": "card",
-                "name": "Credit / Debit Card",
-                "description": "Visa, Mastercard, RuPay, Maestro",
-                "icon": "💳",
-                "badge": "Instant",
-                "enabled": True
-            },
-            {
-                "id": "mock_gateway",
-                "name": "MEDORA Secure Sandbox",
-                "description": "Simulated Gateway for fast testing",
-                "icon": "🛡️",
-                "badge": "Dev Ready",
+                "badge": "Instant Zero-Fee",
                 "enabled": True
             },
             {
                 "id": "cod",
                 "name": "Cash on Delivery (COD)",
-                "description": "Pay cash or UPI upon delivery",
+                "description": "Pay cash or UPI scan to rider at doorstep",
                 "icon": "💵",
-                "badge": "Pay Later",
+                "badge": "Pay at Doorstep",
                 "enabled": True
             }
         ]
@@ -79,6 +63,12 @@ def create_payment_intent(payload: CreatePaymentIntentRequest):
     
     intent_id = f"pay_intent_{uuid.uuid4().hex[:12]}"
     
+    if payload.payment_method not in ("upi", "cod"):
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Unsupported payment method '{payload.payment_method}'. Only 'upi' and 'cod' are accepted on MEDORA."
+        )
+
     # Check if using Cash on Delivery
     if payload.payment_method == "cod":
         return {

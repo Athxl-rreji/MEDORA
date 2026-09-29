@@ -72,6 +72,10 @@ export default function PharmacyDashboard() {
   const [cameraFacing, setCameraFacing] = useState('environment'); // 'environment' | 'user'
   const [capturedMachinePhoto, setCapturedMachinePhoto] = useState(null);
   const [terminalLabel, setTerminalLabel] = useState('Counter UPI Soundbox Display');
+  const [customUpiId, setCustomUpiId] = useState('');
+  const [customUpiQr, setCustomUpiQr] = useState('');
+  const [isSavingUpiSettings, setIsSavingUpiSettings] = useState(false);
+  const [upiSettingsNotice, setUpiSettingsNotice] = useState(null);
   const [isBroadcasting, setIsBroadcasting] = useState(false);
   const [scannerNotice, setScannerNotice] = useState(null);
   const [cameraError, setCameraError] = useState(null);
@@ -561,10 +565,59 @@ export default function PharmacyDashboard() {
       if (res.ok) {
         const data = await res.json();
         setLiveTerminalInfo(data);
+        if (data.shop_upi_id && !customUpiId) {
+          setCustomUpiId(data.shop_upi_id);
+        }
+        if (data.terminal_label) {
+          setTerminalLabel(data.terminal_label);
+        }
       }
     } catch (e) {
       console.warn("Could not fetch live terminal status:", e);
     }
+  };
+
+  const savePermanentUpiSettings = async () => {
+    if (!customUpiId || !customUpiId.includes('@')) {
+      return alert("Please enter a valid UPI VPA (e.g. yourstore@okaxis, 9876543210@paytm).");
+    }
+    setIsSavingUpiSettings(true);
+    setUpiSettingsNotice(null);
+    try {
+      const res = await fetch(`${API}/api/v1/medicines/pharmacy/update-upi`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          pharmacy_id: PHARMACY_ID,
+          shop_upi_id: customUpiId.trim(),
+          pharmacy_name: PHARMACY_DISPLAY_NAME,
+          shop_upi_qr: customUpiQr || null,
+          terminal_label: terminalLabel.trim()
+        })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setUpiSettingsNotice("✅ Store UPI VPA & QR settings synchronized with all customer checkouts!");
+        fetchLiveTerminalStatus();
+      } else {
+        alert(data.detail || "Failed to save UPI settings.");
+      }
+    } catch (e) {
+      alert("Error updating UPI settings: " + e.message);
+    } finally {
+      setIsSavingUpiSettings(false);
+    }
+  };
+
+  const handlePermanentQrUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      setCustomUpiQr(ev.target.result);
+      setUpiSettingsNotice("📷 New Store Permanent QR sticker selected! Click 'Save & Sync Store UPI' below to apply.");
+    };
+    reader.readAsDataURL(file);
   };
 
   useEffect(() => {
@@ -2780,6 +2833,116 @@ export default function PharmacyDashboard() {
                   <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '2px' }}>
                     Stored in KYC registry • Served automatically as robust fallback
                   </div>
+                </div>
+              </div>
+
+              {/* Permanent Store UPI & QR Configuration Panel */}
+              <div style={{
+                marginTop: '1.25rem',
+                background: 'rgba(255,255,255,0.02)',
+                border: '1px solid rgba(255,255,255,0.08)',
+                borderRadius: '14px',
+                padding: '1.25rem'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '6px' }}>
+                  <h4 style={{ margin: 0, fontSize: '0.92rem', color: '#fff', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span>⚙️</span> Store Permanent UPI & Soundbox Settings
+                  </h4>
+                  <span style={{ fontSize: '0.72rem', background: 'rgba(13, 148, 136, 0.15)', color: 'var(--primary)', padding: '2px 8px', borderRadius: '6px', fontWeight: 'bold' }}>
+                    Customer Sync Active
+                  </span>
+                </div>
+
+                {upiSettingsNotice && (
+                  <div style={{ background: 'rgba(16, 185, 129, 0.15)', border: '1px solid rgba(16, 185, 129, 0.3)', borderRadius: '8px', padding: '8px 12px', fontSize: '0.78rem', color: '#34d399', marginBottom: '1rem', fontWeight: '600' }}>
+                    {upiSettingsNotice}
+                  </div>
+                )}
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.74rem', color: '#94a3b8', marginBottom: '4px', fontWeight: '700' }}>
+                      Store Merchant UPI VPA / ID:
+                    </label>
+                    <input
+                      type="text"
+                      className="input-field"
+                      value={customUpiId}
+                      onChange={e => setCustomUpiId(e.target.value)}
+                      placeholder="e.g. vamanjoor.express@okaxis or 9876543210@paytm"
+                      style={{ width: '100%', padding: '0.65rem 0.85rem', fontFamily: 'monospace' }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.74rem', color: '#94a3b8', marginBottom: '4px', fontWeight: '700' }}>
+                      Counter POS / Soundbox Label:
+                    </label>
+                    <input
+                      type="text"
+                      className="input-field"
+                      value={terminalLabel}
+                      onChange={e => setTerminalLabel(e.target.value)}
+                      placeholder="e.g. Counter UPI Soundbox #1"
+                      style={{ width: '100%', padding: '0.65rem 0.85rem' }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.74rem', color: '#94a3b8', marginBottom: '4px', fontWeight: '700' }}>
+                      Permanent Store QR Sticker (Optional Custom File):
+                    </label>
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                      <label style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        background: 'rgba(255,255,255,0.06)',
+                        border: '1px solid rgba(255,255,255,0.15)',
+                        padding: '6px 12px',
+                        borderRadius: '8px',
+                        color: '#cbd5e1',
+                        fontSize: '0.78rem',
+                        fontWeight: '600',
+                        cursor: 'pointer'
+                      }}>
+                        <span>📁</span> Upload Official Sticker
+                        <input
+                          type="file"
+                          accept="image/*"
+                          style={{ display: 'none' }}
+                          onChange={handlePermanentQrUpload}
+                        />
+                      </label>
+                      <span style={{ fontSize: '0.72rem', color: '#64748b' }}>
+                        {customUpiQr ? 'Custom image loaded' : 'Auto-generates NPCI standard QR if empty'}
+                      </span>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={savePermanentUpiSettings}
+                    disabled={isSavingUpiSettings}
+                    style={{
+                      background: 'linear-gradient(135deg, #0d9488 0%, #059669 100%)',
+                      color: '#ffffff',
+                      border: 'none',
+                      padding: '10px 16px',
+                      borderRadius: '10px',
+                      fontWeight: '800',
+                      fontSize: '0.85rem',
+                      cursor: isSavingUpiSettings ? 'not-allowed' : 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '8px',
+                      marginTop: '4px',
+                      boxShadow: '0 4px 14px rgba(13, 148, 136, 0.3)'
+                    }}
+                  >
+                    <span>💾</span>
+                    <span>{isSavingUpiSettings ? 'Saving & Syncing...' : 'Save & Sync Store UPI'}</span>
+                  </button>
                 </div>
               </div>
 
