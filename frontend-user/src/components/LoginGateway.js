@@ -826,18 +826,18 @@ export default function LoginGateway({ onLoginSuccess }) {
               <input type="text" className="input-field" value={regFullName} onChange={e => setRegFullName(e.target.value)} placeholder="" required style={{ padding: '0.7rem 0.9rem' }} />
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.75rem' }}>
               <div>
                 <label style={{ display: 'block', fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '4px', fontWeight: '600' }}>Email Address:</label>
-                <input type="email" className="input-field" value={regEmail} onChange={e => setRegEmail(e.target.value)} placeholder="" required style={{ padding: '0.7rem 0.9rem' }} />
+                <input type="email" className="input-field" value={regEmail} onChange={e => setRegEmail(e.target.value)} placeholder="e.g. name@gmail.com" required style={{ padding: '0.7rem 0.9rem' }} />
               </div>
               <div>
                 <label style={{ display: 'block', fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '4px', fontWeight: '600' }}>Phone Number:</label>
-                <input type="text" className="input-field" value={regPhone} onChange={e => setRegPhone(e.target.value)} placeholder="" required style={{ padding: '0.7rem 0.9rem' }} />
+                <input type="tel" inputMode="tel" className="input-field" value={regPhone} onChange={e => setRegPhone(e.target.value)} placeholder="10-digit mobile" required style={{ padding: '0.7rem 0.9rem' }} />
               </div>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.75rem' }}>
               <div>
                 <label style={{ display: 'block', fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '4px', fontWeight: '600' }}>Password (8-14 chars, letters & numbers):</label>
                 <input type="password" className="input-field" value={regPassword} onChange={e => setRegPassword(e.target.value)} placeholder="••••••••" minLength={8} maxLength={14} required style={{ padding: '0.7rem 0.9rem' }} />
@@ -1050,14 +1050,14 @@ export default function LoginGateway({ onLoginSuccess }) {
               />
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.75rem' }}>
               <div>
                 <label style={{ display: 'block', fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '4px', fontWeight: '600' }}>New Password:</label>
-                <input type="password" className="input-field" value={forgotNewPassword} onChange={e => setForgotNewPassword(e.target.value)} placeholder="••••••••" required style={{ padding: '0.75rem' }} />
+                <input type="password" className="input-field" value={forgotNewPassword} onChange={e => setForgotNewPassword(e.target.value)} placeholder="••••••••" minLength={8} maxLength={14} required style={{ padding: '0.75rem' }} />
               </div>
               <div>
                 <label style={{ display: 'block', fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '4px', fontWeight: '600' }}>Confirm New Password:</label>
-                <input type="password" className="input-field" value={forgotConfirmPassword} onChange={e => setForgotConfirmPassword(e.target.value)} placeholder="••••••••" required style={{ padding: '0.75rem' }} />
+                <input type="password" className="input-field" value={forgotConfirmPassword} onChange={e => setForgotConfirmPassword(e.target.value)} placeholder="••••••••" minLength={8} maxLength={14} required style={{ padding: '0.75rem' }} />
               </div>
             </div>
 
