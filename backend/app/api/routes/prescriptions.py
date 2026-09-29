@@ -145,6 +145,8 @@ async def scan_prescription_ai(
                         break
             except Exception as e:
                 logger.warning(f"Gemini {model_name} scan attempt error: {e}")
+                if "401" in str(e) or "403" in str(e):
+                    break
                 continue
 
     # 2. Fallback to OpenRouter Multimodal Vision if Gemini is unavailable

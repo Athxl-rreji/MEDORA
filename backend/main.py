@@ -9,7 +9,7 @@ from fastapi.exceptions import RequestValidationError
 dotenv_path = os.path.join(os.path.dirname(__file__), '.env')
 dotenv.load_dotenv(dotenv_path)
 
-from app.api.routes import auth, medicines, orders, prescriptions, payments, admin
+from app.api.routes import auth, medicines, orders, prescriptions, payments, admin, ai
 from app.core.logger import logger
 
 app = FastAPI(
@@ -46,6 +46,9 @@ app.include_router(medicines.router, prefix="/api/v1/medicines", tags=["Medicine
 app.include_router(orders.router, prefix="/api/v1/orders", tags=["Orders"])
 app.include_router(prescriptions.router, prefix="/api/v1/prescriptions", tags=["Prescriptions"])
 app.include_router(payments.router, prefix="/api/v1/payments", tags=["Payments"])
+app.include_router(ai.router, prefix="/api/v1/ai", tags=["AI"])
+app.include_router(ai.router, prefix="/api/v1", tags=["AI"]) # supports /api/v1/chat
+app.include_router(ai.router, prefix="", tags=["AI"])       # supports /chat
 
 @app.get("/health")
 def health_check():

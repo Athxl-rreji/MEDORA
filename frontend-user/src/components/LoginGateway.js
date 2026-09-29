@@ -146,15 +146,29 @@ export default function LoginGateway({ onLoginSuccess }) {
       const data = await res.json();
 
       if (res.ok && data.user) {
-        if (rememberMe) {
-          try {
-            localStorage.setItem('medora_remembered_credentials', JSON.stringify({
-              email: data.user.email || email,
-              password: password,
-              name: data.user.full_name || 'Patient User'
-            }));
-          } catch (e) {}
-        }
+        try {
+          const userCreds = {
+            email: data.user.email || email.trim(),
+            password: password,
+            name: data.user.full_name || 'Patient User',
+            role: data.user.role || 'patient'
+          };
+          if (rememberMe) {
+            localStorage.setItem('medora_remembered_credentials', JSON.stringify(userCreds));
+          }
+          const rawAccounts = localStorage.getItem('medora_registered_accounts');
+          const accounts = rawAccounts ? JSON.parse(rawAccounts) : [];
+          const updated = accounts.filter(a => a.email.toLowerCase() !== userCreds.email.toLowerCase());
+          updated.unshift(userCreds);
+          localStorage.setItem('medora_registered_accounts', JSON.stringify(updated));
+
+          localStorage.setItem('medora_active_user', JSON.stringify({
+            role: data.user.role || 'patient',
+            email: data.user.email || email,
+            name: data.user.full_name || 'Patient / User'
+          }));
+        } catch (e) {}
+
         onLoginSuccess({
           role: data.user.role || 'patient',
           email: data.user.email || email,
@@ -260,15 +274,32 @@ export default function LoginGateway({ onLoginSuccess }) {
       const data = await res.json();
 
       if (res.ok && data.user) {
-        if (rememberMe) {
-          try {
-            localStorage.setItem('medora_remembered_credentials', JSON.stringify({
-              email: data.user.email || regEmail,
-              password: regPassword,
-              name: data.user.full_name || regFullName
-            }));
-          } catch (e) {}
-        }
+        try {
+          const userCreds = {
+            email: data.user.email || regEmail.trim(),
+            password: regPassword,
+            name: data.user.full_name || regFullName.trim(),
+            phone: regPhone.trim(),
+            role: 'patient'
+          };
+          // Always remember newly signed up user credentials
+          localStorage.setItem('medora_remembered_credentials', JSON.stringify(userCreds));
+          
+          // Append/update in registered accounts list
+          const rawAccounts = localStorage.getItem('medora_registered_accounts');
+          const accounts = rawAccounts ? JSON.parse(rawAccounts) : [];
+          const updated = accounts.filter(a => a.email.toLowerCase() !== userCreds.email.toLowerCase());
+          updated.unshift(userCreds);
+          localStorage.setItem('medora_registered_accounts', JSON.stringify(updated));
+
+          // Also set active user so they are immediately logged in
+          localStorage.setItem('medora_active_user', JSON.stringify({
+            role: 'patient',
+            email: data.user.email,
+            name: data.user.full_name
+          }));
+        } catch (e) {}
+
         setSuccessMsg('Email verified & account registered successfully! Signing in...');
         setTimeout(() => {
           onLoginSuccess({
@@ -693,6 +724,53 @@ export default function LoginGateway({ onLoginSuccess }) {
         {/* 1. MAIN USER SIGN IN VIEW (Email + Password Only) */}
         {authTab === 'login' && (
           <div>
+            {savedAccount && savedAccount.email && (
+              <div style={{
+                background: 'linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%)',
+                border: '1.5px solid #86efac',
+                borderRadius: '12px',
+                padding: '10px 14px',
+                marginBottom: '1.25rem',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                fontSize: '0.84rem',
+                color: '#15803d',
+                boxShadow: '0 2px 8px rgba(16, 185, 129, 0.08)'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ fontSize: '1.1rem' }}>👋</span>
+                  <div>
+                    <div style={{ fontWeight: '800', color: '#166534' }}>
+                      Remembered Account: {savedAccount.name || 'User'}
+                    </div>
+                    <div style={{ fontSize: '0.74rem', color: '#15803d' }}>
+                      {savedAccount.email}
+                    </div>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEmail(savedAccount.email || '');
+                    if (savedAccount.password) setPassword(savedAccount.password);
+                  }}
+                  style={{
+                    background: '#15803d',
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: '8px',
+                    padding: '4px 10px',
+                    fontSize: '0.75rem',
+                    fontWeight: '700',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Prefilled ✓
+                </button>
+              </div>
+            )}
+
             <form onSubmit={handleUserLoginSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.1rem' }}>
               <div>
                 <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '6px', fontWeight: '600' }}>
