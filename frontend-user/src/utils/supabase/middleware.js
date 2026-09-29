@@ -12,6 +12,10 @@ export const createClient = (request) => {
     },
   });
 
+  if (!supabaseUrl || !supabaseKey) {
+    return { supabase: null, supabaseResponse };
+  }
+
   const supabase = createServerClient(
     supabaseUrl,
     supabaseKey,

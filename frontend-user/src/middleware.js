@@ -3,8 +3,13 @@ import { createClient } from "./utils/supabase/middleware";
 export async function middleware(request) {
   const { supabase, supabaseResponse } = createClient(request);
 
-  // Refresh session if expired
-  await supabase.auth.getUser();
+  if (supabase) {
+    try {
+      await supabase.auth.getUser();
+    } catch (e) {
+      // ignore
+    }
+  }
 
   return supabaseResponse;
 }
