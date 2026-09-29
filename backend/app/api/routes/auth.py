@@ -264,6 +264,13 @@ def login(
     """
     Authenticates user via Email + Password or Partner login.
     """
+    clean_id = payload.identifier.strip().lower()
+    if clean_id in mock_db.deleted_users:
+        raise HTTPException(
+            status_code=404,
+            detail="This account has been permanently deleted by the administrator."
+        )
+
     user = mock_db.find_user(payload.identifier)
     
     if payload.auth_mode == "otp":
@@ -381,6 +388,9 @@ def register(
 
 @router.get("/user-status")
 def check_user_status(identifier: str, mock_db: PrototypeDataStore = Depends(get_datastore)):
+    clean_id = identifier.strip().lower()
+    if clean_id in mock_db.deleted_users:
+        return {"exists": False, "status": "deleted"}
     user = mock_db.find_user(identifier)
     if not user:
         return {"exists": False, "status": "deleted"}

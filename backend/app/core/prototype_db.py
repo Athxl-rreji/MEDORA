@@ -21,6 +21,7 @@ _candidate_dirs = [
 DATASETS_DIR = next((d for d in _candidate_dirs if os.path.exists(d) and os.path.exists(os.path.join(d, 'core_medicines.csv'))), _candidate_dirs[0])
 REGISTERED_USERS_CSV = os.path.join(DATASETS_DIR, 'registered_users.csv')
 PARTNER_REQUESTS_JSON = os.path.join(DATASETS_DIR, 'partner_requests.json')
+DELETED_USERS_JSON = os.path.join(DATASETS_DIR, 'deleted_users.json')
 
 
 class PrototypeDataStore:
@@ -32,6 +33,7 @@ class PrototypeDataStore:
         self.orders: List[dict] = []
         self.pending_registrations: Dict[str, dict] = {}
         self.users: List[dict] = []
+        self.deleted_users: Dict[str, dict] = {}
         self.partner_requests: List[dict] = []
         self.otps: Dict[str, str] = {}
         self.missing_medicine_requests: List[dict] = []
@@ -88,6 +90,7 @@ class PrototypeDataStore:
             "Vicks", "Montair"
         ]
 
+        self.load_deleted_users()
         self.load_users()
         self.load_data()
         self.load_partner_requests()
@@ -116,6 +119,58 @@ class PrototypeDataStore:
             return "20-25 mins"
         else:
             return "30-40 mins"
+
+    def get_all_dataset_dirs(self) -> List[str]:
+        """Returns all existing dataset directories across backend-local and repo-root."""
+        dirs = []
+        for d in _candidate_dirs:
+            abs_d = os.path.abspath(d)
+            if os.path.exists(abs_d) and abs_d not in dirs:
+                dirs.append(abs_d)
+        if not dirs:
+            dirs.append(DATASETS_DIR)
+        return dirs
+
+    def load_deleted_users(self):
+        """Loads tombstone records of permanently deleted user accounts."""
+        self.deleted_users = {}
+        candidate_paths = [
+            os.path.join(d, 'deleted_users.json') for d in self.get_all_dataset_dirs()
+        ]
+        candidate_paths.append('/tmp/medora_deleted_users.json')
+
+        for path in candidate_paths:
+            if os.path.exists(path):
+                try:
+                    with open(path, 'r', encoding='utf-8') as f:
+                        data = json.load(f)
+                        if isinstance(data, dict):
+                            self.deleted_users.update(data)
+                        elif isinstance(data, list):
+                            for item in data:
+                                if isinstance(item, str):
+                                    self.deleted_users[item.strip().lower()] = {"deleted_at": datetime.now().isoformat()}
+                                elif isinstance(item, dict) and "identifier" in item:
+                                    self.deleted_users[item["identifier"].strip().lower()] = item
+                except Exception as e:
+                    logger.error(f"Error loading deleted users from {path}: {e}")
+
+    def save_deleted_users(self):
+        """Persists deleted user tombstones across all dataset locations."""
+        for d in self.get_all_dataset_dirs():
+            path = os.path.join(d, 'deleted_users.json')
+            try:
+                with open(path, 'w', encoding='utf-8') as f:
+                    json.dump(self.deleted_users, f, indent=2)
+            except Exception as e:
+                logger.error(f"Failed to save deleted users to {path}: {e}")
+        
+        # Also persist to /tmp for serverless environments
+        try:
+            with open('/tmp/medora_deleted_users.json', 'w', encoding='utf-8') as f:
+                json.dump(self.deleted_users, f, indent=2)
+        except Exception:
+            pass
 
     def load_users(self):
         """Loads registered users from CSV to remember credentials even across server termination."""
@@ -182,17 +237,39 @@ class PrototypeDataStore:
             }
         ]
 
-        if not os.path.exists(REGISTERED_USERS_CSV):
-            self.users = list(default_users)
+        # Always ensure tombstones are loaded first
+        self.load_deleted_users()
+
+        # Check if /tmp has newer credentials (serverless) or load from registered_users.csv
+        csv_source = REGISTERED_USERS_CSV
+        if os.path.exists('/tmp/medora_registered_users.csv'):
+            csv_source = '/tmp/medora_registered_users.csv'
+
+        if not os.path.exists(csv_source):
+            self.users = [
+                d for d in default_users 
+                if d["email"].lower() not in self.deleted_users 
+                and d["id"].lower() not in self.deleted_users
+                and d["username"].lower() not in self.deleted_users
+            ]
             self.save_users_to_csv()
-            logger.info(f"Initialized registered_users.csv with {len(self.users)} default credentials at {REGISTERED_USERS_CSV}")
+            logger.info(f"Initialized registered_users.csv with {len(self.users)} non-deleted default credentials at {REGISTERED_USERS_CSV}")
             return
 
         loaded_users = []
         try:
-            with open(REGISTERED_USERS_CSV, mode='r', encoding='utf-8') as f:
+            with open(csv_source, mode='r', encoding='utf-8') as f:
                 reader = csv.DictReader(f)
                 for row in reader:
+                    uid = str(row.get("id", "")).strip().lower()
+                    uemail = str(row.get("email", "")).strip().lower()
+                    uname = str(row.get("username", "")).strip().lower()
+
+                    # PERMANENT PURGE: If user is marked as deleted in tombstones, skip completely
+                    if uid in self.deleted_users or uemail in self.deleted_users or uname in self.deleted_users:
+                        logger.info(f"Skipping permanently deleted user account: {uemail} ({uid})")
+                        continue
+
                     if not row.get("status"):
                         row["status"] = "active"
                     # Ensure admin password can always be 'admin'
@@ -202,10 +279,18 @@ class PrototypeDataStore:
         except Exception as e:
             logger.error(f"Error reading registered_users.csv: {e}")
 
-        # Ensure default accounts are present
+        # Ensure default accounts are present ONLY IF NOT DELETED
         existing_emails = {u.get("email", "").lower() for u in loaded_users}
         for d in default_users:
-            if d["email"].lower() not in existing_emails:
+            d_email = d["email"].lower()
+            d_id = d.get("id", "").lower()
+            d_uname = d.get("username", "").lower()
+
+            # NEVER RESTORE A DELETED USER ACCOUNT
+            if d_email in self.deleted_users or d_id in self.deleted_users or d_uname in self.deleted_users:
+                continue
+
+            if d_email not in existing_emails:
                 loaded_users.append(d)
 
         self.users = loaded_users
@@ -213,23 +298,44 @@ class PrototypeDataStore:
         logger.info(f"Loaded {len(self.users)} registered user accounts from {REGISTERED_USERS_CSV}")
 
     def save_users_to_csv(self):
-        """Flushes user credentials to registered_users.csv for durable persistence."""
+        """Flushes user credentials to registered_users.csv across all dataset directories for durable persistence."""
         fieldnames = [
             "id", "full_name", "role", "email", "phone", 
             "username", "password", "status", "address", "pharmacy_license", 
             "vehicle_type", "driving_license", "created_at"
         ]
+        clean_users = [
+            u for u in self.users
+            if str(u.get("id", "")).strip().lower() not in self.deleted_users
+            and str(u.get("email", "")).strip().lower() not in self.deleted_users
+            and str(u.get("username", "")).strip().lower() not in self.deleted_users
+        ]
+
+        for d in self.get_all_dataset_dirs():
+            path = os.path.join(d, 'registered_users.csv')
+            try:
+                with open(path, mode='w', newline='', encoding='utf-8') as f:
+                    writer = csv.DictWriter(f, fieldnames=fieldnames, extrasaction='ignore')
+                    writer.writeheader()
+                    for u in clean_users:
+                        if not u.get("status"):
+                            u["status"] = "active"
+                        writer.writerow(u)
+                logger.info(f"Durable credentials persisted: {len(clean_users)} accounts saved to {path}")
+            except Exception as e:
+                logger.error(f"Failed to persist users to CSV at {path}: {e}")
+
+        # Also persist to /tmp for serverless environments
         try:
-            with open(REGISTERED_USERS_CSV, mode='w', newline='', encoding='utf-8') as f:
+            with open('/tmp/medora_registered_users.csv', mode='w', newline='', encoding='utf-8') as f:
                 writer = csv.DictWriter(f, fieldnames=fieldnames, extrasaction='ignore')
                 writer.writeheader()
-                for u in self.users:
+                for u in clean_users:
                     if not u.get("status"):
                         u["status"] = "active"
                     writer.writerow(u)
-            logger.info(f"Durable credentials persisted: {len(self.users)} accounts saved to {REGISTERED_USERS_CSV}")
-        except Exception as e:
-            logger.error(f"Failed to persist users to CSV: {e}")
+        except Exception:
+            pass
 
     def load_data(self):
         med_path = os.path.join(DATASETS_DIR, 'core_medicines.csv')
@@ -594,10 +700,19 @@ class PrototypeDataStore:
     def find_user(self, identifier: str) -> Optional[dict]:
         if not identifier: return None
         identifier_clean = identifier.strip().lower()
+        if identifier_clean in self.deleted_users:
+            return None
         for u in self.users:
-            if (u.get("email", "").lower() == identifier_clean or
-                u.get("username", "").lower() == identifier_clean or
-                u.get("phone", "").replace(" ", "").replace("-", "") == identifier_clean.replace(" ", "").replace("-", "")):
+            uid = str(u.get("id", "")).strip().lower()
+            uemail = str(u.get("email", "")).strip().lower()
+            uname = str(u.get("username", "")).strip().lower()
+            uphone = str(u.get("phone", "")).replace(" ", "").replace("-", "")
+            clean_phone = identifier_clean.replace(" ", "").replace("-", "")
+
+            if uid in self.deleted_users or uemail in self.deleted_users or uname in self.deleted_users:
+                continue
+
+            if (uemail == identifier_clean or uname == identifier_clean or (clean_phone and uphone == clean_phone)):
                 return u
         return None
 
@@ -608,6 +723,14 @@ class PrototypeDataStore:
         if existing:
             raise ValueError("An account with this email, username, or phone number already exists.")
         
+        # If this email or username was previously in deleted_users, clear it now for fresh registration
+        clean_email = email.strip().lower()
+        clean_uname = (username or email.split("@")[0]).strip().lower()
+        if clean_email in self.deleted_users or clean_uname in self.deleted_users:
+            self.deleted_users.pop(clean_email, None)
+            self.deleted_users.pop(clean_uname, None)
+            self.save_deleted_users()
+
         new_user = {
             "id": f"usr_{uuid.uuid4().hex[:8]}",
             "full_name": full_name,
@@ -682,6 +805,14 @@ class PrototypeDataStore:
             remaining = 5 - pending["attempts"]
             raise ValueError(f"Invalid 6-digit OTP code. {remaining} attempt(s) remaining.")
 
+        # Clear from deleted_users if previously deleted
+        clean_email = pending["email"].strip().lower()
+        clean_uname = pending["username"].strip().lower()
+        if clean_email in self.deleted_users or clean_uname in self.deleted_users:
+            self.deleted_users.pop(clean_email, None)
+            self.deleted_users.pop(clean_uname, None)
+            self.save_deleted_users()
+
         new_user = {
             "id": f"usr_{uuid.uuid4().hex[:8]}",
             "full_name": pending["full_name"],
@@ -753,11 +884,18 @@ class PrototypeDataStore:
         self.save_partner_requests()
 
     def save_partner_requests(self):
+        for d in self.get_all_dataset_dirs():
+            path = os.path.join(d, 'partner_requests.json')
+            try:
+                with open(path, 'w', encoding='utf-8') as f:
+                    json.dump(self.partner_requests, f, indent=2)
+            except Exception as e:
+                logger.error(f"Error saving partner requests to {path}: {e}")
         try:
-            with open(PARTNER_REQUESTS_JSON, 'w', encoding='utf-8') as f:
+            with open('/tmp/medora_partner_requests.json', 'w', encoding='utf-8') as f:
                 json.dump(self.partner_requests, f, indent=2)
-        except Exception as e:
-            logger.error(f"Error saving partner requests: {e}")
+        except Exception:
+            pass
 
     def create_partner_request(self, partner_type: str, full_name: str, email: str, phone: str, details: dict) -> dict:
         req_id = f"req_{partner_type[:5]}_{uuid.uuid4().hex[:6]}"
@@ -962,9 +1100,16 @@ class PrototypeDataStore:
 
     # ─── ADMIN USER ACCOUNT MANAGEMENT ───
     def get_all_users(self) -> List[dict]:
-        """Returns all registered users with sanitized password fields."""
+        """Returns all registered users with sanitized password fields, excluding permanently deleted accounts."""
         sanitized = []
         for u in self.users:
+            uid = str(u.get("id", "")).strip().lower()
+            uemail = str(u.get("email", "")).strip().lower()
+            uname = str(u.get("username", "")).strip().lower()
+
+            if uid in self.deleted_users or uemail in self.deleted_users or uname in self.deleted_users:
+                continue
+
             sanitized.append({
                 "id": u.get("id"),
                 "full_name": u.get("full_name"),
@@ -992,6 +1137,10 @@ class PrototypeDataStore:
             uid = str(u.get("id", "")).strip().lower()
             uemail = str(u.get("email", "")).strip().lower()
             uname = str(u.get("username", "")).strip().lower()
+
+            if uid in self.deleted_users or uemail in self.deleted_users or uname in self.deleted_users:
+                continue
+
             if uid == clean_id or uemail == clean_id or uname == clean_id:
                 if u.get("role") == "admin":
                     raise ValueError("Cannot deactivate the master system administrator account.")
@@ -1002,7 +1151,7 @@ class PrototypeDataStore:
         raise ValueError(f"User account '{user_id}' not found.")
 
     def delete_user_account(self, user_id: str) -> bool:
-        """Removes a user account permanently."""
+        """Removes a user account permanently and records a persistent tombstone so it stays deleted across restarts."""
         clean_id = user_id.strip().lower()
         target_user = None
         for u in self.users:
@@ -1014,17 +1163,53 @@ class PrototypeDataStore:
                 break
 
         if not target_user:
+            # If already marked as deleted in tombstones, treat as successfully deleted
+            if clean_id in self.deleted_users:
+                return True
             raise ValueError(f"User account '{user_id}' not found.")
+
         if target_user.get("role") == "admin":
             raise ValueError("Cannot delete the master system administrator account.")
 
+        # Record persistent tombstone in deleted_users
+        del_metadata = {
+            "id": target_user.get("id"),
+            "email": str(target_user.get("email", "")).lower(),
+            "username": str(target_user.get("username", "")).lower(),
+            "role": target_user.get("role"),
+            "deleted_at": datetime.now().isoformat() + "Z"
+        }
+        if target_user.get("id"):
+            self.deleted_users[str(target_user.get("id")).strip().lower()] = del_metadata
+        if target_user.get("email"):
+            self.deleted_users[str(target_user.get("email")).strip().lower()] = del_metadata
+        if target_user.get("username"):
+            self.deleted_users[str(target_user.get("username")).strip().lower()] = del_metadata
+
+        # Save tombstones permanently across all dataset locations
+        self.save_deleted_users()
+
+        # Remove from in-memory active users
         self.users = [
             u for u in self.users 
             if str(u.get("id", "")).strip().lower() != str(target_user.get("id", "")).strip().lower()
             and str(u.get("email", "")).strip().lower() != str(target_user.get("email", "")).strip().lower()
+            and str(u.get("username", "")).strip().lower() != str(target_user.get("username", "")).strip().lower()
         ]
+        
+        # Flush to CSV across all dataset directories and /tmp
         self.save_users_to_csv()
-        logger.info(f"Deleted user account {target_user['email']} (ID: {target_user.get('id')})")
+
+        # Clean up any pending partner requests for this user as well
+        req_email = str(target_user.get("email", "")).strip().lower()
+        if req_email:
+            self.partner_requests = [
+                pr for pr in self.partner_requests 
+                if str(pr.get("email", "")).strip().lower() != req_email
+            ]
+            self.save_partner_requests()
+
+        logger.info(f"Permanently deleted user account {target_user['email']} (ID: {target_user.get('id')}) with tombstone recorded.")
         return True
 
     # ─── ESSENTIAL CHEMICAL COMPOUNDS INVENTORY SETUP (QUIZ) ───
