@@ -62,6 +62,10 @@ class PartnerRequest(BaseModel):
     longitude: Optional[float] = None
     vehicle_type: Optional[str] = None
     driving_license: Optional[str] = None
+    vehicle_number: Optional[str] = None
+    delivery_zone: Optional[str] = None
+    shift_preference: Optional[str] = None
+    rider_upi_id: Optional[str] = None
     shop_upi_id: Optional[str] = None
     shop_upi_qr: Optional[str] = None
 
@@ -221,6 +225,10 @@ def partner_request(
         "longitude": payload.longitude,
         "vehicle_type": payload.vehicle_type,
         "driving_license": payload.driving_license,
+        "vehicle_number": payload.vehicle_number,
+        "delivery_zone": payload.delivery_zone,
+        "shift_preference": payload.shift_preference,
+        "rider_upi_id": payload.rider_upi_id,
         "shop_upi_id": payload.shop_upi_id,
         "shop_upi_qr": payload.shop_upi_qr
     }

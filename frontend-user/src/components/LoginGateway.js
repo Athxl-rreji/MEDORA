@@ -1,7 +1,7 @@
 "use client";
 import React, { useState, useEffect } from 'react';
 
-const API = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
+const API = process.env.NEXT_PUBLIC_API_URL || 'https://backend-three-kappa-38.vercel.app';
 
 export default function LoginGateway({ onLoginSuccess }) {
   const [authTab, setAuthTab] = useState('login'); // 'login' | 'register' | 'forgot-password'
@@ -43,6 +43,11 @@ export default function LoginGateway({ onLoginSuccess }) {
   const [isLocatingShop, setIsLocatingShop] = useState(false);
   const [partnerVehicleType, setPartnerVehicleType] = useState('Electric Scooter');
   const [partnerDrivingLicense, setPartnerDrivingLicense] = useState('');
+  const [partnerDeliveryZone, setPartnerDeliveryZone] = useState('');
+  const [partnerVehicleNumber, setPartnerVehicleNumber] = useState('');
+  const [partnerShiftPreference, setPartnerShiftPreference] = useState('Full Time (Express 10-Min)');
+  const [partnerRiderUpi, setPartnerRiderUpi] = useState('');
+  const [partnerBagConfirmed, setPartnerBagConfirmed] = useState(true);
 
   // Partner Login States
   const [partnerLoginRole, setPartnerLoginRole] = useState('pharmacy'); // 'pharmacy' | 'delivery'
@@ -419,6 +424,14 @@ export default function LoginGateway({ onLoginSuccess }) {
         setErrorMsg('Please provide your Driving License Number for rider onboarding.');
         return;
       }
+      if (!partnerVehicleNumber.trim()) {
+        setErrorMsg('Please provide your Vehicle Registration / Plate Number.');
+        return;
+      }
+      if (!partnerDeliveryZone.trim()) {
+        setErrorMsg('Please enter your preferred Delivery Operational City / Area.');
+        return;
+      }
     }
 
     clearMessages();
@@ -433,13 +446,17 @@ export default function LoginGateway({ onLoginSuccess }) {
           full_name: partnerName.trim(),
           email: partnerEmail.trim(),
           phone: partnerPhone.trim(),
-          store_name: partnerStoreName.trim(),
-          license_no: partnerLicense.trim(),
-          store_address: partnerStoreAddress.trim(),
+          store_name: partnerType === 'pharmacy' ? partnerStoreName.trim() : null,
+          license_no: partnerType === 'pharmacy' ? partnerLicense.trim() : null,
+          store_address: partnerType === 'pharmacy' ? partnerStoreAddress.trim() : null,
           latitude: partnerType === 'pharmacy' ? parseFloat(partnerLat) : null,
           longitude: partnerType === 'pharmacy' ? parseFloat(partnerLng) : null,
-          vehicle_type: partnerVehicleType,
-          driving_license: partnerDrivingLicense.trim(),
+          vehicle_type: partnerType === 'delivery' ? partnerVehicleType : null,
+          driving_license: partnerType === 'delivery' ? partnerDrivingLicense.trim() : null,
+          vehicle_number: partnerType === 'delivery' ? partnerVehicleNumber.trim() : null,
+          delivery_zone: partnerType === 'delivery' ? partnerDeliveryZone.trim() : null,
+          shift_preference: partnerType === 'delivery' ? partnerShiftPreference : null,
+          rider_upi_id: partnerType === 'delivery' ? (partnerRiderUpi.trim() || null) : null,
           shop_upi_id: partnerType === 'pharmacy' ? (partnerShopUpiId.trim() || `${partnerStoreName.toLowerCase().replace(/\s+/g, '')}@upi`) : null,
           shop_upi_qr: partnerType === 'pharmacy' ? (partnerShopUpiQr || `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=upi://pay?pa=${encodeURIComponent(partnerShopUpiId.trim() || 'vamanjoor.pharmacy@upi')}%26pn=${encodeURIComponent(partnerStoreName)}%26cu=INR`) : null
         })

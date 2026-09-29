@@ -8,7 +8,7 @@ import AdminView from '../components/AdminView';
 import SwiggyAddressDrawer from '../components/SwiggyAddressDrawer';
 import LivePerimeterRadar from '../components/LivePerimeterRadar';
 
-const API = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
+const API = process.env.NEXT_PUBLIC_API_URL || 'https://backend-three-kappa-38.vercel.app';
 const USER_ID = "1";
 
 // Order lifecycle stages
