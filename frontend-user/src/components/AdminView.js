@@ -144,6 +144,8 @@ export default function AdminView() {
 
   const handleApprove = async (req) => {
     setProcessingId(req.id);
+    // Optimistically remove from list immediately
+    setRequests(prev => prev.filter(r => r.id !== req.id));
     try {
       const res = await fetch(`${API}/api/v1/admin/partner-requests/${req.id}/approve`, {
         method: 'POST',
@@ -151,13 +153,16 @@ export default function AdminView() {
       });
       const data = await res.json();
       if (res.ok) {
-        showToast(`✅ Approved ${req.full_name}! Login credentials (${data.temp_password}) emailed to ${req.email}.`);
+        showToast(`✅ Approved ${req.full_name}! Login credentials (${data.temp_password}) emailed to ${req.email}. Removed from onboarding.`);
         fetchRequests();
+        fetchUsers();
       } else {
         showToast(data.detail || 'Approval failed.', true);
+        fetchRequests();
       }
     } catch (err) {
       showToast(`Server error: ${err.message}`, true);
+      fetchRequests();
     } finally {
       setProcessingId(null);
     }
@@ -174,24 +179,57 @@ export default function AdminView() {
       return;
     }
 
-    setProcessingId(selectedReqForReject.id);
+    const rejectId = selectedReqForReject.id;
+    const applicantName = selectedReqForReject.full_name;
+    const applicantEmail = selectedReqForReject.email;
+
+    setProcessingId(rejectId);
+    // Optimistically remove from list immediately
+    setRequests(prev => prev.filter(r => r.id !== rejectId));
+    setSelectedReqForReject(null);
+    setRejectReason('');
+
     try {
-      const res = await fetch(`${API}/api/v1/admin/partner-requests/${selectedReqForReject.id}/reject`, {
+      const res = await fetch(`${API}/api/v1/admin/partner-requests/${rejectId}/reject`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ reason: trimmedReason })
       });
       const data = await res.json();
       if (res.ok) {
-        showToast(`❌ Rejected application for ${selectedReqForReject.full_name}. Official rejection email with reason dispatched to ${selectedReqForReject.email}!`);
-        setSelectedReqForReject(null);
-        setRejectReason('');
+        showToast(`❌ Rejected application for ${applicantName}. Official rejection email with reason dispatched to ${applicantEmail}! Removed from list.`);
         fetchRequests();
       } else {
         showToast(data.detail || 'Rejection failed.', true);
+        fetchRequests();
       }
     } catch (err) {
       showToast(`Server error: ${err.message}`, true);
+      fetchRequests();
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
+  const handleDeletePartnerRequest = async (req) => {
+    setProcessingId(req.id);
+    // Optimistically remove from list immediately
+    setRequests(prev => prev.filter(r => r.id !== req.id));
+    try {
+      const res = await fetch(`${API}/api/v1/admin/partner-requests/${req.id}`, {
+        method: 'DELETE'
+      });
+      const data = await res.json();
+      if (res.ok) {
+        showToast(`🗑️ Partner application for ${req.full_name} removed from onboarding list.`);
+        fetchRequests();
+      } else {
+        showToast(data.detail || 'Failed to remove partner request.', true);
+        fetchRequests();
+      }
+    } catch (err) {
+      showToast(`Server error: ${err.message}`, true);
+      fetchRequests();
     } finally {
       setProcessingId(null);
     }
@@ -620,14 +658,15 @@ export default function AdminView() {
                   </div>
                 )}
 
-                {/* Action Buttons for Pending Requests */}
-                {req.status === 'pending' && (
-                  <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.25rem' }}>
+                {/* Action Buttons for Requests */}
+                {req.status === 'pending' ? (
+                  <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.25rem', flexWrap: 'wrap' }}>
                     <button
                       onClick={() => handleApprove(req)}
                       disabled={processingId === req.id}
                       style={{
                         flex: 1,
+                        minWidth: '220px',
                         background: '#10b981',
                         color: '#fff',
                         border: 'none',
@@ -642,7 +681,7 @@ export default function AdminView() {
                         gap: '6px'
                       }}
                     >
-                      {processingId === req.id ? 'Processing Approval...' : '✅ Approve Application & Mail Credentials'}
+                      {processingId === req.id ? 'Processing Approval...' : '✅ Approve & Mail Credentials'}
                     </button>
 
                     <button
@@ -659,7 +698,44 @@ export default function AdminView() {
                         cursor: 'pointer'
                       }}
                     >
-                      ❌ Reject Application
+                      ❌ Reject
+                    </button>
+
+                    <button
+                      onClick={() => handleDeletePartnerRequest(req)}
+                      disabled={processingId === req.id}
+                      title="Remove this application from onboarding list"
+                      style={{
+                        background: 'rgba(255, 255, 255, 0.05)',
+                        color: '#94a3b8',
+                        border: '1px solid rgba(255, 255, 255, 0.12)',
+                        padding: '0.75rem 1rem',
+                        borderRadius: '8px',
+                        fontWeight: 'bold',
+                        fontSize: '0.85rem',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      🗑️ Remove from List
+                    </button>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
+                    <button
+                      onClick={() => handleDeletePartnerRequest(req)}
+                      disabled={processingId === req.id}
+                      style={{
+                        background: 'rgba(239, 68, 68, 0.1)',
+                        color: '#f87171',
+                        border: '1px solid rgba(239, 68, 68, 0.3)',
+                        padding: '6px 14px',
+                        borderRadius: '8px',
+                        fontWeight: 'bold',
+                        fontSize: '0.8rem',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      🗑️ Remove from List
                     </button>
                   </div>
                 )}

@@ -7,6 +7,7 @@ import difflib
 import random
 import time
 import math
+import tempfile
 from datetime import datetime
 from typing import List, Dict, Optional, Tuple
 from app.core.logger import logger
@@ -35,6 +36,7 @@ class PrototypeDataStore:
         self.users: List[dict] = []
         self.deleted_users: Dict[str, dict] = {}
         self.partner_requests: List[dict] = []
+        self.deleted_partner_requests: Dict[str, dict] = {}
         self.otps: Dict[str, str] = {}
         self.missing_medicine_requests: List[dict] = []
         
@@ -93,6 +95,7 @@ class PrototypeDataStore:
         self.load_deleted_users()
         self.load_users()
         self.load_data()
+        self.load_deleted_partner_requests()
         self.load_partner_requests()
 
     def calculate_distance(self, lat1: float, lon1: float, lat2: float, lon2: float) -> float:
@@ -843,59 +846,167 @@ class PrototypeDataStore:
         logger.info(f"Updated password and saved to CSV for user {user['email']}")
         return True
 
-    def load_partner_requests(self):
-        if os.path.exists(PARTNER_REQUESTS_JSON):
-            try:
-                with open(PARTNER_REQUESTS_JSON, 'r', encoding='utf-8') as f:
-                    self.partner_requests = json.load(f)
-                    logger.info(f"Loaded {len(self.partner_requests)} partner requests from {PARTNER_REQUESTS_JSON}")
-                    return
-            except Exception as e:
-                logger.error(f"Error loading partner requests: {e}")
-        
-        # Default starter partner requests if none exist
-        self.partner_requests = [
-            {
-                "id": "req_pharm_demo1",
-                "partner_type": "pharmacy",
-                "full_name": "Dr. Rajesh Pai",
-                "email": "rajesh.pai@medoralabs.in",
-                "phone": "+91 98450 12345",
-                "status": "pending",
-                "submitted_at": "2026-09-29T06:00:00Z",
-                "store_name": "Pai Apex Chemist & Care",
-                "license_no": "KA-MAN-2024-99881",
-                "store_address": "City Light Circle, Kadri, Mangalore",
-                "latitude": 19.0820,
-                "longitude": 72.8850
-            },
-            {
-                "id": "req_deliv_demo2",
-                "partner_type": "delivery",
-                "full_name": "Suresh Gowda",
-                "email": "suresh.gowda@gmail.com",
-                "phone": "+91 97412 88877",
-                "status": "pending",
-                "submitted_at": "2026-09-29T06:15:00Z",
-                "vehicle_type": "Electric Scooter",
-                "driving_license": "DL-KA19-2022-77665"
-            }
+    def load_deleted_partner_requests(self):
+        """Loads tombstone records of removed, rejected, or approved partner applications."""
+        self.deleted_partner_requests = {}
+        candidate_paths = [
+            os.path.join(d, 'deleted_partner_requests.json') for d in self.get_all_dataset_dirs()
         ]
-        self.save_partner_requests()
+        candidate_paths.append(os.path.join(tempfile.gettempdir(), 'medora_deleted_partner_requests.json'))
+        candidate_paths.append('/tmp/medora_deleted_partner_requests.json')
+
+        for path in candidate_paths:
+            if os.path.exists(path):
+                try:
+                    with open(path, 'r', encoding='utf-8') as f:
+                        data = json.load(f)
+                        if isinstance(data, dict):
+                            self.deleted_partner_requests.update(data)
+                        elif isinstance(data, list):
+                            for item in data:
+                                if isinstance(item, str):
+                                    self.deleted_partner_requests[item.strip()] = {"deleted_at": datetime.now().isoformat()}
+                                elif isinstance(item, dict) and "id" in item:
+                                    self.deleted_partner_requests[item["id"].strip()] = item
+                except Exception as e:
+                    logger.error(f"Error loading deleted partner requests from {path}: {e}")
+
+    def save_deleted_partner_requests(self):
+        """Persists deleted partner request tombstones across all dataset locations."""
+        for d in self.get_all_dataset_dirs():
+            path = os.path.join(d, 'deleted_partner_requests.json')
+            try:
+                with open(path, 'w', encoding='utf-8') as f:
+                    json.dump(self.deleted_partner_requests, f, indent=2)
+            except Exception as e:
+                logger.error(f"Failed to save deleted partner requests to {path}: {e}")
+        
+        temp_paths = [
+            os.path.join(tempfile.gettempdir(), 'medora_deleted_partner_requests.json'),
+            '/tmp/medora_deleted_partner_requests.json'
+        ]
+        for tpath in temp_paths:
+            try:
+                os.makedirs(os.path.dirname(tpath), exist_ok=True)
+                with open(tpath, 'w', encoding='utf-8') as f:
+                    json.dump(self.deleted_partner_requests, f, indent=2)
+            except Exception:
+                pass
+
+    def load_partner_requests(self):
+        # Always ensure tombstones are loaded first
+        self.load_deleted_partner_requests()
+
+        candidate_paths = [
+            os.path.join(tempfile.gettempdir(), 'medora_partner_requests.json'),
+            '/tmp/medora_partner_requests.json',
+            PARTNER_REQUESTS_JSON
+        ]
+        for d in self.get_all_dataset_dirs():
+            p = os.path.join(d, 'partner_requests.json')
+            if p not in candidate_paths:
+                candidate_paths.append(p)
+
+        loaded_requests = []
+        seen_ids = set()
+        for path in candidate_paths:
+            if os.path.exists(path):
+                try:
+                    with open(path, 'r', encoding='utf-8') as f:
+                        data = json.load(f)
+                        if isinstance(data, list) and len(data) > 0:
+                            for item in data:
+                                if isinstance(item, dict) and "id" in item:
+                                    req_id = item["id"]
+                                    # Never resurrect requests that have been deleted, rejected, or approved
+                                    if req_id in self.deleted_partner_requests:
+                                        continue
+                                    if req_id not in seen_ids:
+                                        seen_ids.add(req_id)
+                                        loaded_requests.append(item)
+                except Exception as e:
+                    logger.error(f"Error loading partner requests from {path}: {e}")
+
+        # Filter in-memory partner requests to purge any deleted IDs
+        self.partner_requests = [
+            r for r in self.partner_requests
+            if r.get("id") and r.get("id") not in self.deleted_partner_requests
+        ]
+
+        # Merge with in-memory requests so newly created requests are never dropped
+        if not self.partner_requests and not loaded_requests:
+            # Default starter partner requests if none exist anywhere
+            demo_requests = [
+                {
+                    "id": "req_pharm_demo1",
+                    "partner_type": "pharmacy",
+                    "full_name": "Dr. Rajesh Pai",
+                    "email": "rajesh.pai@medoralabs.in",
+                    "phone": "+91 98450 12345",
+                    "status": "pending",
+                    "submitted_at": "2026-09-29T06:00:00Z",
+                    "store_name": "Pai Apex Chemist & Care",
+                    "license_no": "KA-MAN-2024-99881",
+                    "store_address": "City Light Circle, Kadri, Mangalore",
+                    "latitude": 19.0820,
+                    "longitude": 72.8850
+                },
+                {
+                    "id": "req_deliv_demo2",
+                    "partner_type": "delivery",
+                    "full_name": "Suresh Gowda",
+                    "email": "suresh.gowda@gmail.com",
+                    "phone": "+91 97412 88877",
+                    "status": "pending",
+                    "submitted_at": "2026-09-29T06:15:00Z",
+                    "vehicle_type": "Electric Scooter",
+                    "driving_license": "DL-KA19-2022-77665"
+                }
+            ]
+            self.partner_requests = [
+                dr for dr in demo_requests if dr["id"] not in self.deleted_partner_requests
+            ]
+            self.save_partner_requests()
+        elif not self.partner_requests and loaded_requests:
+            self.partner_requests = [
+                lr for lr in loaded_requests if lr.get("id") not in self.deleted_partner_requests
+            ]
+        elif self.partner_requests and loaded_requests:
+            existing_ids = {r.get("id") for r in self.partner_requests}
+            for lr in loaded_requests:
+                req_id = lr.get("id")
+                if req_id and req_id not in existing_ids and req_id not in self.deleted_partner_requests:
+                    self.partner_requests.append(lr)
+                    existing_ids.add(req_id)
 
     def save_partner_requests(self):
+        # Filter before saving
+        clean_requests = [
+            r for r in self.partner_requests
+            if r.get("id") and r.get("id") not in self.deleted_partner_requests
+        ]
+        self.partner_requests = clean_requests
+
         for d in self.get_all_dataset_dirs():
             path = os.path.join(d, 'partner_requests.json')
             try:
                 with open(path, 'w', encoding='utf-8') as f:
-                    json.dump(self.partner_requests, f, indent=2)
+                    json.dump(clean_requests, f, indent=2)
             except Exception as e:
                 logger.error(f"Error saving partner requests to {path}: {e}")
-        try:
-            with open('/tmp/medora_partner_requests.json', 'w', encoding='utf-8') as f:
-                json.dump(self.partner_requests, f, indent=2)
-        except Exception:
-            pass
+        
+        # Save cross-platform temp copies
+        temp_paths = [
+            os.path.join(tempfile.gettempdir(), 'medora_partner_requests.json'),
+            '/tmp/medora_partner_requests.json'
+        ]
+        for tpath in temp_paths:
+            try:
+                os.makedirs(os.path.dirname(tpath), exist_ok=True)
+                with open(tpath, 'w', encoding='utf-8') as f:
+                    json.dump(clean_requests, f, indent=2)
+            except Exception:
+                pass
 
     def create_partner_request(self, partner_type: str, full_name: str, email: str, phone: str, details: dict) -> dict:
         req_id = f"req_{partner_type[:5]}_{uuid.uuid4().hex[:6]}"
@@ -916,18 +1027,38 @@ class PrototypeDataStore:
 
     def get_partner_requests(self, status: str = None, partner_type: str = None) -> List[dict]:
         self.load_partner_requests()
-        results = self.partner_requests
+        results = [
+            r for r in self.partner_requests
+            if r.get("id") and r.get("id") not in self.deleted_partner_requests
+        ]
         if status and status != 'all':
             results = [r for r in results if r.get('status') == status]
         if partner_type and partner_type != 'all':
             results = [r for r in results if r.get('partner_type') == partner_type]
         return results
 
+    def delete_partner_request(self, req_id: str) -> bool:
+        """Permanently removes a partner application from the onboarding KYC list."""
+        self.deleted_partner_requests[req_id] = {
+            "id": req_id,
+            "action": "removed",
+            "timestamp": datetime.now().isoformat()
+        }
+        initial_len = len(self.partner_requests)
+        self.partner_requests = [
+            r for r in self.partner_requests
+            if r.get("id") != req_id and r.get("id") not in self.deleted_partner_requests
+        ]
+        self.save_partner_requests()
+        self.save_deleted_partner_requests()
+        logger.info(f"Deleted partner request {req_id} from onboarding list and recorded tombstone.")
+        return True
+
     def approve_partner_request(self, req_id: str) -> dict:
         req = next((r for r in self.partner_requests if r["id"] == req_id), None)
         if not req:
             raise ValueError("Partner request not found.")
-        if req["status"] == "approved":
+        if req.get("status") == "approved":
             raise ValueError("This application has already been approved.")
 
         role = "pharmacy" if req["partner_type"] == "pharmacy" else "delivery"
@@ -981,8 +1112,21 @@ class PrototypeDataStore:
         req["status"] = "approved"
         req["approved_at"] = datetime.now().isoformat()
         req["temp_password"] = temp_pass
+
+        # Permanently record tombstone so approved partner request is immediately removed from list
+        self.deleted_partner_requests[req_id] = {
+            "id": req_id,
+            "action": "approved",
+            "timestamp": datetime.now().isoformat(),
+            "email": req["email"]
+        }
+        self.partner_requests = [
+            r for r in self.partner_requests
+            if r.get("id") != req_id and r.get("id") not in self.deleted_partner_requests
+        ]
         self.save_partner_requests()
-        logger.info(f"Approved partner request {req_id} for {req['full_name']}. Created user: {user['email']}")
+        self.save_deleted_partner_requests()
+        logger.info(f"Approved partner request {req_id} for {req['full_name']} and removed from onboarding list. Created user: {user['email']}")
         return {"request": req, "user": user, "temp_password": temp_pass}
 
     def reject_partner_request(self, req_id: str, reason: str = "Application credentials could not be verified.") -> dict:
@@ -993,8 +1137,22 @@ class PrototypeDataStore:
         req["status"] = "rejected"
         req["rejected_at"] = datetime.now().isoformat()
         req["rejection_reason"] = reason
+
+        # Permanently record tombstone so rejected partner request is immediately removed from list
+        self.deleted_partner_requests[req_id] = {
+            "id": req_id,
+            "action": "rejected",
+            "reason": reason,
+            "timestamp": datetime.now().isoformat(),
+            "email": req["email"]
+        }
+        self.partner_requests = [
+            r for r in self.partner_requests
+            if r.get("id") != req_id and r.get("id") not in self.deleted_partner_requests
+        ]
         self.save_partner_requests()
-        logger.info(f"Rejected partner request {req_id} for {req['full_name']}. Reason: {reason}")
+        self.save_deleted_partner_requests()
+        logger.info(f"Rejected partner request {req_id} for {req['full_name']} and removed from onboarding list. Reason: {reason}")
         return req
 
     def get_pharmacy_full_catalog(self, pharmacy_id: str = "PHARM_001") -> List[dict]:

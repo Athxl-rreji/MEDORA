@@ -95,6 +95,28 @@ def reject_partner_request(
         logger.error(f"Rejection error for {req_id}: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to reject partner request: {str(e)}")
 
+@router.delete("/partner-requests/{req_id}")
+def delete_partner_request(
+    req_id: str,
+    mock_db: PrototypeDataStore = Depends(get_datastore)
+):
+    """
+    Permanently removes a partner application from the onboarding KYC list.
+    """
+    try:
+        deleted = mock_db.delete_partner_request(req_id)
+        if not deleted:
+            raise HTTPException(status_code=404, detail="Partner request not found.")
+        return {
+            "status": "success",
+            "message": f"Partner request {req_id} removed from onboarding list successfully."
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Delete partner request error for {req_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to delete partner request: {str(e)}")
+
 # ─── USER ACCOUNTS MANAGEMENT ───
 class UserStatusPayload(BaseModel):
     status: str # 'active' | 'deactivated'

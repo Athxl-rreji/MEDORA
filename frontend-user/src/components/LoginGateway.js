@@ -449,8 +449,8 @@ export default function LoginGateway({ onLoginSuccess }) {
         return;
       }
       if (!partnerLat || !partnerLng || isNaN(parseFloat(partnerLat)) || isNaN(parseFloat(partnerLng))) {
-        setErrorMsg('Compulsory Shop GPS Coordinates required! Click "Auto-Detect Current Shop GPS Location" or enter coordinates.');
-        return;
+        setPartnerLat('19.0760');
+        setPartnerLng('72.8777');
       }
     } else {
       if (!partnerDrivingLicense.trim()) {
@@ -892,23 +892,41 @@ export default function LoginGateway({ onLoginSuccess }) {
               </button>
             </form>
 
-            {/* Hyperlink below Sign In button for Pharmacy or Rider Sign In */}
-            <div style={{ textAlign: 'center', marginTop: '1.5rem', display: 'flex', flexDirection: 'column', gap: '0.6rem', alignItems: 'center' }}>
-              <button
-                type="button"
-                onClick={() => { setShowPartnerLoginModal(true); clearMessages(); }}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  color: 'var(--primary)',
-                  fontSize: '0.85rem',
-                  fontWeight: '600',
-                  cursor: 'pointer',
-                  textDecoration: 'underline'
-                }}
-              >
-                Pharmacy or Rider Sign In
-              </button>
+            {/* Hyperlinks below Sign In button */}
+            <div style={{ textAlign: 'center', marginTop: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.65rem', alignItems: 'center' }}>
+              <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', justifyContent: 'center' }}>
+                <button
+                  type="button"
+                  onClick={() => { setShowPartnerLoginModal(true); clearMessages(); }}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: 'var(--primary)',
+                    fontSize: '0.85rem',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    textDecoration: 'underline'
+                  }}
+                >
+                  Pharmacy or Rider Sign In
+                </button>
+                <span style={{ color: '#cbd5e1' }}>•</span>
+                <button
+                  type="button"
+                  onClick={() => { setShowPartnerRequestModal(true); clearMessages(); }}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: '#10b981',
+                    fontSize: '0.85rem',
+                    fontWeight: '700',
+                    cursor: 'pointer',
+                    textDecoration: 'underline'
+                  }}
+                >
+                  🏥 Partner Onboarding / Signup
+                </button>
+              </div>
               <button
                 type="button"
                 onClick={() => { setEmail('admin@medora.com'); setPassword('admin123'); clearMessages(); }}
@@ -1539,15 +1557,14 @@ export default function LoginGateway({ onLoginSuccess }) {
 
                     <div>
                       <label style={{ display: 'block', fontSize: '0.72rem', color: '#94a3b8', marginBottom: '4px', fontWeight: '600' }}>
-                        Shop UPI VPA / Handle: <span style={{ color: '#ef4444' }}>*</span>
+                        Shop UPI VPA / Handle (e.g. for payments):
                       </label>
                       <input
                         type="text"
                         className="input-field"
                         value={partnerShopUpiId}
                         onChange={e => setPartnerShopUpiId(e.target.value)}
-                        placeholder="e.g. storename@okhdfcbank or 9820011223@upi"
-                        required
+                        placeholder="e.g. storename@okhdfcbank or auto-generated"
                         style={{ padding: '0.65rem 0.8rem', fontSize: '0.85rem' }}
                       />
                     </div>
@@ -2046,6 +2063,28 @@ export default function LoginGateway({ onLoginSuccess }) {
                 <button type="submit" disabled={isLoading} className="btn-primary" style={{ width: '100%', justifyContent: 'center', padding: '0.9rem', fontSize: '0.95rem', fontWeight: 'bold' }}>
                   {isLoading ? 'Signing In...' : `Sign In to ${partnerLoginRole === 'pharmacy' ? 'Pharmacy' : 'Rider'} Dashboard ➔`}
                 </button>
+
+                <div style={{ textAlign: 'center', marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowPartnerLoginModal(false);
+                      setShowPartnerRequestModal(true);
+                      clearMessages();
+                    }}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: 'var(--primary)',
+                      fontSize: '0.84rem',
+                      fontWeight: '600',
+                      cursor: 'pointer',
+                      textDecoration: 'underline'
+                    }}
+                  >
+                    ✨ New Partner? Apply for Pharmacy Store or Rider Onboarding ➔
+                  </button>
+                </div>
               </form>
             )}
           </div>

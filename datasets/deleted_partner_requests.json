@@ -1,0 +1,20 @@
+{
+  "req_pharm_f8b18f": {
+    "id": "req_pharm_f8b18f",
+    "action": "approved",
+    "timestamp": "2026-09-29T12:21:31.733554",
+    "email": "testchem@medora.com"
+  },
+  "req_deliv_d1a948": {
+    "id": "req_deliv_d1a948",
+    "action": "rejected",
+    "reason": "Invalid license",
+    "timestamp": "2026-09-29T12:21:31.743828",
+    "email": "riderrej@medora.com"
+  },
+  "req_pharm_5848fc": {
+    "id": "req_pharm_5848fc",
+    "action": "removed",
+    "timestamp": "2026-09-29T12:21:31.748018"
+  }
+}
