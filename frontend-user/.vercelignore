@@ -1,0 +1,7 @@
+# Exclude 1.5GB heavy local animation frames and dev assets from Vercel uploads
+public/Animation/
+Animation/
+*.log
+*.map
+.git/
+.agents/

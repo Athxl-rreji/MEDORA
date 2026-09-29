@@ -7,6 +7,7 @@ import RiderView from '../components/RiderView';
 import AdminView from '../components/AdminView';
 import SwiggyAddressDrawer from '../components/SwiggyAddressDrawer';
 import LivePerimeterRadar from '../components/LivePerimeterRadar';
+import CartoonBootup from '../components/CartoonBootup';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'https://backend-three-kappa-38.vercel.app';
 const USER_ID = "1";
@@ -77,11 +78,18 @@ function TrackingBar({ status }) {
 
 export default function Home() {
   const [mounted, setMounted] = useState(false);
+  const [showBootup, setShowBootup] = useState(true);
   const [activeUser, setActiveUser] = useState(null);
 
   useEffect(() => {
     setMounted(true);
     if (typeof window !== 'undefined') {
+      try {
+        const played = sessionStorage.getItem('medora_bootup_played');
+        if (played) {
+          setShowBootup(false);
+        }
+      } catch (e) {}
       const saved = localStorage.getItem('medora_active_user');
       if (saved) {
         try {
@@ -1522,9 +1530,9 @@ export default function Home() {
             <span>{activeMainView === 'radar' ? 'Home Shelf' : `Radar (${perimeterKm}km)`}</span>
           </button>
 
-          {/* Interactive Presentation Showcase Tour link */}
-          <a
-            href="/splash"
+          {/* Live Cartoon Bootup Presentation Replay */}
+          <button
+            onClick={() => setShowBootup(true)}
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -1536,15 +1544,15 @@ export default function Home() {
               borderRadius: '20px',
               fontWeight: '700',
               fontSize: '0.78rem',
-              textDecoration: 'none',
+              cursor: 'pointer',
               boxShadow: '0 2px 6px rgba(13, 148, 136, 0.08)',
               transition: 'all 0.2s ease'
             }}
-            title="Watch Interactive Video Presentation"
+            title="Watch Live Cartoon Bootup Animation"
           >
             <span>🎬</span>
-            <span>Showcase Tour</span>
-          </a>
+            <span>Live Cartoon</span>
+          </button>
         </div>
       )}
 
@@ -1614,6 +1622,19 @@ export default function Home() {
       }}>
         🧬 Loading MEDORA...
       </div>
+    );
+  }
+
+  if (showBootup) {
+    return (
+      <CartoonBootup
+        onComplete={() => {
+          setShowBootup(false);
+          try {
+            sessionStorage.setItem('medora_bootup_played', 'true');
+          } catch (e) {}
+        }}
+      />
     );
   }
 
@@ -2402,7 +2423,7 @@ export default function Home() {
               </div>
 
               {/* Swiggy Instamart Delivery Header Banner */}
-              <div style={{
+              <div id="instamart-shelf-section" style={{
                 background: 'linear-gradient(135deg, rgba(255, 107, 0, 0.08) 0%, rgba(13, 148, 136, 0.08) 100%)',
                 border: '1px solid rgba(255, 107, 0, 0.25)',
                 borderRadius: '20px',
@@ -4289,6 +4310,65 @@ export default function Home() {
         onSelectAddress={handleSelectAddress}
         activeUser={activeUser}
       />
+
+      {/* Mobile Sticky Bottom Navigation Bar */}
+      <nav className="medora-mobile-nav">
+        <button
+          className={`medora-nav-item ${activeMainView === 'shelf' ? 'active' : ''}`}
+          onClick={() => {
+            setActiveMainView('shelf');
+            if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+        >
+          <span className="medora-nav-icon">🏠</span>
+          <span className="medora-nav-label">Home</span>
+        </button>
+
+        <button
+          className="medora-nav-item"
+          onClick={() => {
+            setActiveMainView('shelf');
+            const el = document.getElementById('instamart-shelf-section');
+            if (el) el.scrollIntoView({ behavior: 'smooth' });
+          }}
+        >
+          <span className="medora-nav-icon">⚡</span>
+          <span className="medora-nav-label">Instamart</span>
+        </button>
+
+        <button
+          className={`medora-nav-item ${activeMainView === 'radar' ? 'active' : ''}`}
+          onClick={() => {
+            setActiveMainView(activeMainView === 'radar' ? 'shelf' : 'radar');
+          }}
+        >
+          <span className="medora-nav-icon">📡</span>
+          <span className="medora-nav-label">Radar</span>
+        </button>
+
+        <button
+          className="medora-nav-item"
+          onClick={() => {
+            if (activeOrders.length > 0) {
+              setPaymentStep('order_success');
+              setIsCartOpen(true);
+            } else {
+              showToast('No active orders right now', '📦');
+            }
+          }}
+        >
+          <span className="medora-nav-icon">📦</span>
+          <span className="medora-nav-label">Orders</span>
+        </button>
+
+        <button
+          className="medora-nav-item"
+          onClick={() => setShowBootup(true)}
+        >
+          <span className="medora-nav-icon">🎬</span>
+          <span className="medora-nav-label">Cartoon</span>
+        </button>
+      </nav>
     </>
   );
 }

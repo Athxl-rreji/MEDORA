@@ -1,9 +1,11 @@
 "use client";
 import React, { useState, useEffect } from 'react';
+import CartoonBootup from './CartoonBootup';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'https://backend-three-kappa-38.vercel.app';
 
 export default function LoginGateway({ onLoginSuccess }) {
+  const [showBootupToon, setShowBootupToon] = useState(false);
   const [authTab, setAuthTab] = useState('login'); // 'login' | 'register' | 'forgot-password'
   const [showPartnerRequestModal, setShowPartnerRequestModal] = useState(false);
   const [showPartnerLoginModal, setShowPartnerLoginModal] = useState(false);
@@ -650,25 +652,58 @@ export default function LoginGateway({ onLoginSuccess }) {
   };
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: '2rem 1rem',
-      background: 'var(--bg-body)',
-      backgroundImage: 'radial-gradient(circle at 50% 30%, rgba(184, 247, 228, 0.08) 0%, transparent 60%)'
-    }}>
-      <div className="glass-panel" style={{ width: '100%', maxWidth: '540px', padding: '2.5rem', borderRadius: '24px' }}>
-        
-        {/* Logo Header */}
-        <div style={{ textAlign: 'center', marginBottom: '1.75rem' }}>
-          <div style={{ fontSize: '3rem', marginBottom: '0.3rem' }}>🧬</div>
-          <h1 className="gradient-text" style={{ fontSize: '2.2rem', margin: 0 }}>MEDORA</h1>
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.88rem', marginTop: '0.4rem' }}>
-            Unified Health & Quick-Commerce Ecosystem
-          </p>
-        </div>
+    <>
+      {showBootupToon && <CartoonBootup onComplete={() => setShowBootupToon(false)} />}
+      <div style={{
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '1.5rem 0.85rem',
+        background: 'var(--bg-body)',
+        backgroundImage: 'radial-gradient(circle at 50% 30%, rgba(184, 247, 228, 0.14) 0%, transparent 60%)'
+      }}>
+        <div className="glass-panel" style={{
+          width: '100%',
+          maxWidth: '540px',
+          padding: 'clamp(1.25rem, 4vw, 2.5rem)',
+          borderRadius: '24px',
+          boxShadow: '0 20px 60px rgba(0, 0, 0, 0.08), 0 0 30px rgba(13, 148, 136, 0.1)'
+        }}>
+          
+          {/* Logo & Cartoon Quick Launch */}
+          <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '0.6rem' }}>
+              <button
+                type="button"
+                onClick={() => setShowBootupToon(true)}
+                style={{
+                  background: 'linear-gradient(135deg, rgba(13, 148, 136, 0.12) 0%, rgba(45, 212, 191, 0.22) 100%)',
+                  border: '1px solid rgba(45, 212, 191, 0.45)',
+                  color: 'var(--primary)',
+                  padding: '5px 14px',
+                  borderRadius: '99px',
+                  fontSize: '0.78rem',
+                  fontWeight: '800',
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  transition: 'all 0.25s ease',
+                  boxShadow: '0 2px 10px rgba(13, 148, 136, 0.12)'
+                }}
+                title="Watch Live Cartoon Bootup"
+              >
+                <span>🎬 Watch Live Cartoon</span>
+                <span style={{ fontSize: '0.9rem' }}>✨</span>
+              </button>
+            </div>
+            <div style={{ fontSize: '3rem', marginBottom: '0.2rem', filter: 'drop-shadow(0 6px 16px rgba(13, 148, 136, 0.25))' }}>🧬</div>
+            <h1 className="gradient-text" style={{ fontSize: 'clamp(1.8rem, 4vw, 2.3rem)', margin: 0 }}>MEDORA</h1>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.86rem', marginTop: '0.35rem' }}>
+              Unified Health & Quick-Commerce Ecosystem
+            </p>
+          </div>
 
         {/* Navigation Tabs: Sign In vs Register */}
         {authTab !== 'forgot-password' && (
@@ -2018,5 +2053,6 @@ export default function LoginGateway({ onLoginSuccess }) {
       )}
 
     </div>
+    </>
   );
 }

@@ -1,0 +1,11 @@
+# Root Vercel ignore
+Animation/
+frontend-user/public/Animation/
+**/public/Animation/
+datasets/
+tests/
+*.safetensors
+*.7z
+webui_forge*/
+*.log
+.agents/
