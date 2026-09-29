@@ -38,3 +38,5 @@ frontend-user/public/Animation/
 # Local MCP and Agent configurations
 .agents/
 
+# Splash screen animation CSS (splash removed)
+frontend-user/src/app/splash/splash.module.css
