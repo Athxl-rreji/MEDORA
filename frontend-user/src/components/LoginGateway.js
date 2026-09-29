@@ -1112,278 +1112,555 @@ export default function LoginGateway({ onLoginSuccess }) {
       {showPartnerRequestModal && (
         <div style={{
           position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: 'rgba(0,0,0,0.85)',
-          backdropFilter: 'blur(8px)',
+          inset: 0,
+          background: 'rgba(3, 7, 18, 0.88)',
+          backdropFilter: 'blur(10px)',
+          WebkitBackdropFilter: 'blur(10px)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          zIndex: 999,
-          padding: '1rem'
+          zIndex: 9999,
+          padding: '0.75rem',
+          overflowY: 'auto',
+          WebkitOverflowScrolling: 'touch'
         }}>
-          <div className="glass-panel" style={{ width: '100%', maxWidth: '520px', padding: '2rem', borderRadius: '20px', border: '1px solid rgba(184, 247, 228, 0.2)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
-              <h2 style={{ fontSize: '1.25rem', color: 'var(--primary)', margin: 0 }}>
-                📋 Request to be Rider or Pharmacy
-              </h2>
-              <button onClick={() => setShowPartnerRequestModal(false)} style={{ background: 'none', border: 'none', color: '#fff', fontSize: '1.4rem', cursor: 'pointer' }}>✕</button>
-            </div>
-            <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginBottom: '1.25rem' }}>
-              Your application request will be submitted directly to <strong>medora2k26@gmail.com</strong> for review.
-            </p>
-
-            <form onSubmit={handlePartnerRequestSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
+          <div className="glass-panel" style={{
+            width: '100%',
+            maxWidth: '560px',
+            maxHeight: '92vh',
+            display: 'flex',
+            flexDirection: 'column',
+            overflowY: 'auto',
+            WebkitOverflowScrolling: 'touch',
+            padding: '1.5rem 1.25rem',
+            borderRadius: '22px',
+            border: '1px solid rgba(16, 185, 129, 0.35)',
+            background: 'linear-gradient(180deg, #0e1726 0%, #070e18 100%)',
+            boxShadow: '0 25px 60px rgba(0,0,0,0.85), 0 0 35px rgba(16, 185, 129, 0.12)',
+            margin: 'auto'
+          }}>
+            {/* Modal Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '0.85rem' }}>
               <div>
-                <label style={{ display: 'block', fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '4px', fontWeight: '600' }}>Select Partner Role:</label>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: 'rgba(16, 185, 129, 0.15)', border: '1px solid rgba(16, 185, 129, 0.3)', borderRadius: '20px', padding: '3px 10px', fontSize: '0.72rem', color: '#10b981', fontWeight: 'bold', marginBottom: '6px' }}>
+                  <span>✨</span> MEDORA PARTNER NETWORK
+                </div>
+                <h2 style={{ fontSize: '1.3rem', color: '#f8fafc', margin: 0, fontWeight: '800', letterSpacing: '-0.02em' }}>
+                  Partner Registration
+                </h2>
+                <p style={{ fontSize: '0.8rem', color: '#94a3b8', margin: '4px 0 0 0', lineHeight: '1.3' }}>
+                  Submit application for instant review & dashboard credentials.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => { setShowPartnerRequestModal(false); clearMessages(); }}
+                style={{
+                  background: 'rgba(255,255,255,0.08)',
+                  border: '1px solid rgba(255,255,255,0.12)',
+                  color: '#e2e8f0',
+                  width: '36px',
+                  height: '36px',
+                  borderRadius: '50%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '1.1rem',
+                  cursor: 'pointer',
+                  flexShrink: 0,
+                  transition: 'background 0.2s ease'
+                }}
+                aria-label="Close dialog"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handlePartnerRequestSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              {/* Role Toggle */}
+              <div>
+                <label style={{ display: 'block', fontSize: '0.78rem', color: '#94a3b8', marginBottom: '6px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  Select Partner Category:
+                </label>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.6rem' }}>
                   <button
                     type="button"
-                    onClick={() => setPartnerType('pharmacy')}
+                    onClick={() => { setPartnerType('pharmacy'); clearMessages(); }}
                     style={{
-                      padding: '0.65rem',
-                      borderRadius: '10px',
-                      border: partnerType === 'pharmacy' ? '2px solid var(--primary)' : '1px solid rgba(255,255,255,0.08)',
-                      background: partnerType === 'pharmacy' ? 'rgba(184, 247, 228, 0.12)' : 'rgba(0,0,0,0.3)',
-                      color: '#fff',
-                      fontWeight: 'bold',
-                      fontSize: '0.85rem',
-                      cursor: 'pointer'
+                      padding: '0.85rem 0.75rem',
+                      borderRadius: '14px',
+                      border: partnerType === 'pharmacy' ? '2px solid #10b981' : '1px solid rgba(255,255,255,0.1)',
+                      background: partnerType === 'pharmacy' ? 'linear-gradient(135deg, rgba(16, 185, 129, 0.2) 0%, rgba(13, 148, 136, 0.15) 100%)' : 'rgba(255,255,255,0.03)',
+                      color: partnerType === 'pharmacy' ? '#ffffff' : '#94a3b8',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      gap: '4px',
+                      cursor: 'pointer',
+                      boxShadow: partnerType === 'pharmacy' ? '0 0 20px rgba(16, 185, 129, 0.25)' : 'none',
+                      transition: 'all 0.2s ease'
                     }}
                   >
-                    🏥 Pharmacy Store
+                    <span style={{ fontSize: '1.4rem' }}>🏥</span>
+                    <span style={{ fontWeight: '700', fontSize: '0.9rem' }}>Pharmacy Store</span>
+                    <span style={{ fontSize: '0.68rem', color: partnerType === 'pharmacy' ? '#6ee7b7' : '#64748b' }}>Dark-Store & Retail</span>
                   </button>
                   <button
                     type="button"
-                    onClick={() => setPartnerType('delivery')}
+                    onClick={() => { setPartnerType('delivery'); clearMessages(); }}
                     style={{
-                      padding: '0.65rem',
-                      borderRadius: '10px',
-                      border: partnerType === 'delivery' ? '2px solid var(--primary)' : '1px solid rgba(255,255,255,0.08)',
-                      background: partnerType === 'delivery' ? 'rgba(184, 247, 228, 0.12)' : 'rgba(0,0,0,0.3)',
-                      color: '#fff',
-                      fontWeight: 'bold',
-                      fontSize: '0.85rem',
-                      cursor: 'pointer'
+                      padding: '0.85rem 0.75rem',
+                      borderRadius: '14px',
+                      border: partnerType === 'delivery' ? '2px solid #38bdf8' : '1px solid rgba(255,255,255,0.1)',
+                      background: partnerType === 'delivery' ? 'linear-gradient(135deg, rgba(56, 189, 248, 0.2) 0%, rgba(14, 165, 233, 0.15) 100%)' : 'rgba(255,255,255,0.03)',
+                      color: partnerType === 'delivery' ? '#ffffff' : '#94a3b8',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      gap: '4px',
+                      cursor: 'pointer',
+                      boxShadow: partnerType === 'delivery' ? '0 0 20px rgba(56, 189, 248, 0.25)' : 'none',
+                      transition: 'all 0.2s ease'
                     }}
                   >
-                    🛵 Delivery Rider
+                    <span style={{ fontSize: '1.4rem' }}>🛵</span>
+                    <span style={{ fontWeight: '700', fontSize: '0.9rem' }}>Delivery Rider</span>
+                    <span style={{ fontSize: '0.68rem', color: partnerType === 'delivery' ? '#7dd3fc' : '#64748b' }}>Express 10-Min Fleet</span>
                   </button>
                 </div>
               </div>
 
+              {/* Applicant Name */}
               <div>
-                <label style={{ display: 'block', fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '4px', fontWeight: '600' }}>Applicant / Owner Name:</label>
-                <input type="text" className="input-field" value={partnerName} onChange={e => setPartnerName(e.target.value)} placeholder="" required style={{ padding: '0.7rem' }} />
+                <label style={{ display: 'block', fontSize: '0.78rem', color: '#94a3b8', marginBottom: '4px', fontWeight: '600' }}>
+                  {partnerType === 'pharmacy' ? 'Store Owner / Pharmacist Name:' : 'Rider Full Legal Name:'} <span style={{ color: '#ef4444' }}>*</span>
+                </label>
+                <input
+                  type="text"
+                  className="input-field"
+                  value={partnerName}
+                  onChange={e => setPartnerName(e.target.value)}
+                  placeholder={partnerType === 'pharmacy' ? 'e.g. Dr. Rajesh Kumar' : 'e.g. Rahul Sharma'}
+                  required
+                  style={{ padding: '0.75rem 0.85rem', fontSize: '0.9rem' }}
+                />
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+              {/* Email & Phone - Responsive Grid */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '0.75rem' }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '4px', fontWeight: '600' }}>Email Address:</label>
-                  <input type="email" className="input-field" value={partnerEmail} onChange={e => setPartnerEmail(e.target.value)} placeholder="e.g. name@gmail.com" required style={{ padding: '0.7rem' }} />
+                  <label style={{ display: 'block', fontSize: '0.78rem', color: '#94a3b8', marginBottom: '4px', fontWeight: '600' }}>
+                    Email Address: <span style={{ color: '#ef4444' }}>*</span>
+                  </label>
+                  <input
+                    type="email"
+                    className="input-field"
+                    value={partnerEmail}
+                    onChange={e => setPartnerEmail(e.target.value)}
+                    placeholder="e.g. applicant@gmail.com"
+                    required
+                    style={{ padding: '0.75rem 0.85rem', fontSize: '0.9rem' }}
+                  />
                   {partnerEmail.length > 3 && (
                     <div style={{ fontSize: '0.72rem', marginTop: '3px', fontWeight: 'bold' }}>
                       {isValidEmail(partnerEmail) ? (
-                        <span style={{ color: 'var(--green)' }}>✓ Valid Email Format</span>
+                        <span style={{ color: '#10b981' }}>✓ Valid Email Format</span>
                       ) : (
-                        <span style={{ color: 'var(--red)' }}>⚠️ Invalid format (e.g. user@gmail.com)</span>
+                        <span style={{ color: '#f87171' }}>⚠️ Enter valid email (e.g. name@domain.com)</span>
                       )}
                     </div>
                   )}
                 </div>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '4px', fontWeight: '600' }}>Phone Number:</label>
-                  <input type="text" className="input-field" value={partnerPhone} onChange={e => setPartnerPhone(e.target.value)} placeholder="" required style={{ padding: '0.7rem' }} />
+                  <label style={{ display: 'block', fontSize: '0.78rem', color: '#94a3b8', marginBottom: '4px', fontWeight: '600' }}>
+                    Mobile Phone Number: <span style={{ color: '#ef4444' }}>*</span>
+                  </label>
+                  <input
+                    type="tel"
+                    inputMode="tel"
+                    className="input-field"
+                    value={partnerPhone}
+                    onChange={e => setPartnerPhone(e.target.value)}
+                    placeholder="10-digit mobile number"
+                    required
+                    style={{ padding: '0.75rem 0.85rem', fontSize: '0.9rem' }}
+                  />
                 </div>
               </div>
 
-              {partnerType === 'pharmacy' ? (
+              {/* PHARMACY SPECIFIC FIELDS */}
+              {partnerType === 'pharmacy' && (
                 <>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '0.75rem' }}>
                     <div>
-                      <label style={{ display: 'block', fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '4px', fontWeight: '600' }}>
-                        Pharmacy Store Name: <span style={{ color: 'var(--red)' }}>*</span>
+                      <label style={{ display: 'block', fontSize: '0.78rem', color: '#94a3b8', marginBottom: '4px', fontWeight: '600' }}>
+                        Pharmacy Store Name: <span style={{ color: '#ef4444' }}>*</span>
                       </label>
-                      <input type="text" className="input-field" value={partnerStoreName} onChange={e => setPartnerStoreName(e.target.value)} placeholder="e.g. City Life Pharmacy" required style={{ padding: '0.7rem' }} />
+                      <input
+                        type="text"
+                        className="input-field"
+                        value={partnerStoreName}
+                        onChange={e => setPartnerStoreName(e.target.value)}
+                        placeholder="e.g. Medora Care Pharmacy"
+                        required
+                        style={{ padding: '0.75rem 0.85rem', fontSize: '0.9rem' }}
+                      />
                     </div>
                     <div>
-                      <label style={{ display: 'block', fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '4px', fontWeight: '600' }}>
-                        Drug License No.: <span style={{ color: 'var(--red)' }}>*</span>
+                      <label style={{ display: 'block', fontSize: '0.78rem', color: '#94a3b8', marginBottom: '4px', fontWeight: '600' }}>
+                        Drug License No. (DL): <span style={{ color: '#ef4444' }}>*</span>
                       </label>
-                      <input type="text" className="input-field" value={partnerLicense} onChange={e => setPartnerLicense(e.target.value)} placeholder="e.g. KA-MAN-2024-99881" required style={{ padding: '0.7rem' }} />
+                      <input
+                        type="text"
+                        className="input-field"
+                        value={partnerLicense}
+                        onChange={e => setPartnerLicense(e.target.value)}
+                        placeholder="e.g. KA-2024-DL9881"
+                        required
+                        style={{ padding: '0.75rem 0.85rem', fontSize: '0.9rem' }}
+                      />
                     </div>
                   </div>
 
                   <div>
-                    <label style={{ display: 'block', fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '4px', fontWeight: '600' }}>
-                      Store Physical Location Address: <span style={{ color: 'var(--red)' }}>*</span>
+                    <label style={{ display: 'block', fontSize: '0.78rem', color: '#94a3b8', marginBottom: '4px', fontWeight: '600' }}>
+                      Store Physical Location Address: <span style={{ color: '#ef4444' }}>*</span>
                     </label>
-                    <input type="text" className="input-field" value={partnerStoreAddress} onChange={e => setPartnerStoreAddress(e.target.value)} placeholder="e.g. Shop #4, Airport Road, Vamanjoor" required style={{ padding: '0.7rem' }} />
+                    <input
+                      type="text"
+                      className="input-field"
+                      value={partnerStoreAddress}
+                      onChange={e => setPartnerStoreAddress(e.target.value)}
+                      placeholder="e.g. Shop #4, Ground Floor, Vamanjoor Junction"
+                      required
+                      style={{ padding: '0.75rem 0.85rem', fontSize: '0.9rem' }}
+                    />
                   </div>
 
-                  {/* 📍 Compulsory GPS Location Feature for Identifying Shop Location */}
+                  {/* Compulsory GPS Module */}
                   <div style={{
-                    background: 'rgba(184, 247, 228, 0.05)',
-                    border: '1px solid rgba(184, 247, 228, 0.25)',
-                    borderRadius: '12px',
+                    background: 'rgba(16, 185, 129, 0.06)',
+                    border: '1px solid rgba(16, 185, 129, 0.3)',
+                    borderRadius: '14px',
                     padding: '0.9rem',
                     display: 'flex',
                     flexDirection: 'column',
-                    gap: '0.65rem'
+                    gap: '0.7rem'
                   }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ fontSize: '0.8rem', color: 'var(--primary)', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <span>📍</span> Compulsory Shop GPS Location <span style={{ color: 'var(--red)' }}>*</span>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                      <span style={{ fontSize: '0.82rem', color: '#10b981', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span>📍</span> Compulsory Store GPS Coordinates <span style={{ color: '#ef4444' }}>*</span>
                       </span>
                       <button
                         type="button"
                         onClick={handleDetectShopLocation}
                         disabled={isLocatingShop}
                         style={{
-                          background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(13, 148, 136, 0.3))',
-                          border: '1px solid #10b981',
-                          color: '#10b981',
+                          background: 'linear-gradient(135deg, #10b981 0%, #0d9488 100%)',
+                          border: 'none',
+                          color: '#ffffff',
                           borderRadius: '8px',
-                          padding: '4px 10px',
-                          fontSize: '0.75rem',
-                          fontWeight: 'bold',
-                          cursor: 'pointer',
-                          display: 'flex',
+                          padding: '6px 12px',
+                          fontSize: '0.76rem',
+                          fontWeight: '700',
+                          cursor: isLocatingShop ? 'wait' : 'pointer',
+                          display: 'inline-flex',
                           alignItems: 'center',
-                          gap: '4px'
+                          gap: '6px',
+                          boxShadow: '0 2px 8px rgba(16, 185, 129, 0.3)',
+                          minHeight: '36px'
                         }}
                       >
-                        {isLocatingShop ? 'Acquiring GPS Fix...' : '🛰️ Auto-Detect Shop GPS'}
+                        {isLocatingShop ? '🛰️ Locking GPS...' : '🛰️ Auto-Detect Shop GPS'}
                       </button>
                     </div>
 
-                    <p style={{ margin: 0, fontSize: '0.72rem', color: 'var(--text-muted)', lineHeight: '1.3' }}>
-                      Required by MEDORA Hyperlocal Dark-Store Engine to route instant express deliveries from your shop.
+                    <p style={{ margin: 0, fontSize: '0.72rem', color: '#94a3b8', lineHeight: '1.4' }}>
+                      Required for MEDORA's Hyperlocal 10-Minute Dispatch Engine to route express courier pickups from your shop.
                     </p>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.6rem' }}>
                       <div>
-                        <label style={{ display: 'block', fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: '3px' }}>Latitude (°N):</label>
+                        <label style={{ display: 'block', fontSize: '0.72rem', color: '#94a3b8', marginBottom: '3px' }}>Latitude (°N):</label>
                         <input
                           type="text"
                           className="input-field"
                           value={partnerLat}
                           onChange={e => setPartnerLat(e.target.value)}
-                          placeholder="e.g. 19.0760"
+                          placeholder="e.g. 12.8941"
                           required
-                          style={{ padding: '0.55rem', fontSize: '0.85rem' }}
+                          style={{ padding: '0.6rem 0.75rem', fontSize: '0.85rem' }}
                         />
                       </div>
                       <div>
-                        <label style={{ display: 'block', fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: '3px' }}>Longitude (°E):</label>
+                        <label style={{ display: 'block', fontSize: '0.72rem', color: '#94a3b8', marginBottom: '3px' }}>Longitude (°E):</label>
                         <input
                           type="text"
                           className="input-field"
                           value={partnerLng}
                           onChange={e => setPartnerLng(e.target.value)}
-                          placeholder="e.g. 72.8777"
+                          placeholder="e.g. 74.8431"
                           required
-                          style={{ padding: '0.55rem', fontSize: '0.85rem' }}
+                          style={{ padding: '0.6rem 0.75rem', fontSize: '0.85rem' }}
                         />
                       </div>
                     </div>
                   </div>
 
-                  {/* ⚡ Mandatory Shop UPI ID & Official Shop QR Code Upload */}
+                  {/* UPI VPA & QR Upload */}
                   <div style={{
-                    background: 'rgba(56, 189, 248, 0.05)',
+                    background: 'rgba(56, 189, 248, 0.06)',
                     border: '1px solid rgba(56, 189, 248, 0.3)',
-                    borderRadius: '12px',
+                    borderRadius: '14px',
                     padding: '0.9rem',
                     display: 'flex',
                     flexDirection: 'column',
-                    gap: '0.65rem'
+                    gap: '0.7rem'
                   }}>
-                    <span style={{ fontSize: '0.8rem', color: '#38bdf8', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <span>⚡</span> Store UPI ID & Official Shop QR Code <span style={{ color: 'var(--red)' }}>*</span>
+                    <span style={{ fontSize: '0.82rem', color: '#38bdf8', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span>⚡</span> Store UPI ID & Official Shop QR Code <span style={{ color: '#ef4444' }}>*</span>
                     </span>
-
-                    <p style={{ margin: 0, fontSize: '0.72rem', color: 'var(--text-muted)', lineHeight: '1.3' }}>
-                      Required for customer scan-and-pay at checkout. If customer encounters live machine difficulty, this official QR is shown.
+                    <p style={{ margin: 0, fontSize: '0.72rem', color: '#94a3b8', lineHeight: '1.4' }}>
+                      Used for instant direct settlement to your bank account when customers pay at delivery or store checkout.
                     </p>
 
                     <div>
-                      <label style={{ display: 'block', fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: '3px', fontWeight: 'bold' }}>
-                        Shop UPI VPA / ID: <span style={{ color: 'var(--red)' }}>*</span>
+                      <label style={{ display: 'block', fontSize: '0.72rem', color: '#94a3b8', marginBottom: '4px', fontWeight: '600' }}>
+                        Shop UPI VPA / Handle: <span style={{ color: '#ef4444' }}>*</span>
                       </label>
                       <input
                         type="text"
                         className="input-field"
                         value={partnerShopUpiId}
                         onChange={e => setPartnerShopUpiId(e.target.value)}
-                        placeholder="e.g. yourstore@okhdfcbank or 9820011223@upi"
+                        placeholder="e.g. storename@okhdfcbank or 9820011223@upi"
                         required
-                        style={{ padding: '0.55rem', fontSize: '0.85rem' }}
+                        style={{ padding: '0.65rem 0.8rem', fontSize: '0.85rem' }}
                       />
                     </div>
 
                     <div>
-                      <label style={{ display: 'block', fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: '4px', fontWeight: 'bold' }}>
-                        Upload Store UPI QR Code (GPay / PhonePe / Paytm / Soundbox): <span style={{ color: 'var(--red)' }}>*</span>
+                      <label style={{ display: 'block', fontSize: '0.72rem', color: '#94a3b8', marginBottom: '4px', fontWeight: '600' }}>
+                        Store UPI QR Code (GPay / PhonePe / Paytm / Soundbox): <span style={{ color: '#ef4444' }}>*</span>
                       </label>
-                      
-                      <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+                      <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
                         <label style={{
                           flex: 1,
+                          minWidth: '200px',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
                           gap: '8px',
-                          background: '#16181d',
+                          background: 'rgba(56, 189, 248, 0.08)',
                           border: '1px dashed #38bdf8',
-                          borderRadius: '8px',
-                          padding: '0.7rem',
+                          borderRadius: '10px',
+                          padding: '0.75rem',
                           cursor: 'pointer',
-                          fontSize: '0.8rem',
-                          color: '#38bdf8'
+                          fontSize: '0.82rem',
+                          color: '#38bdf8',
+                          fontWeight: '600',
+                          minHeight: '44px'
                         }}>
                           <span>📷</span>
-                          <span>{partnerShopUpiQrPreview ? 'Change Shop QR Photo ✓' : 'Select or Capture Shop UPI QR'}</span>
+                          <span>{partnerShopUpiQrPreview ? 'Change QR Photo ✓' : 'Select or Capture Shop UPI QR'}</span>
                           <input
                             type="file"
                             accept="image/*"
+                            capture="environment"
                             onChange={handleShopUpiQrUpload}
                             style={{ display: 'none' }}
                           />
                         </label>
-
                         {partnerShopUpiQrPreview && (
-                          <div style={{ position: 'relative', width: '48px', height: '48px', borderRadius: '6px', overflow: 'hidden', border: '2px solid #38bdf8' }}>
-                            <img src={partnerShopUpiQrPreview} alt="Shop QR" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <div style={{ position: 'relative', width: '50px', height: '50px', borderRadius: '8px', overflow: 'hidden', border: '2px solid #38bdf8' }}>
+                              <img src={partnerShopUpiQrPreview} alt="Shop QR" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => { setPartnerShopUpiQr(''); setPartnerShopUpiQrPreview(''); }}
+                              style={{ background: 'none', border: 'none', color: '#f87171', fontSize: '0.75rem', cursor: 'pointer', textDecoration: 'underline' }}
+                            >
+                              Remove
+                            </button>
                           </div>
                         )}
                       </div>
                     </div>
                   </div>
                 </>
-              ) : (
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '4px', fontWeight: '600' }}>Vehicle Type:</label>
-                    <select className="input-field" value={partnerVehicleType} onChange={e => setPartnerVehicleType(e.target.value)} style={{ padding: '0.7rem', background: '#16171a' }}>
-                      <option value="Electric Scooter">Electric Scooter 🛵</option>
-                      <option value="Motorcycle">Motorcycle 🏍️</option>
-                      <option value="Bicycle">Bicycle 🚲</option>
-                    </select>
+              )}
+
+              {/* RIDER SPECIFIC FIELDS */}
+              {partnerType === 'delivery' && (
+                <>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '0.75rem' }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.78rem', color: '#94a3b8', marginBottom: '4px', fontWeight: '600' }}>
+                        Vehicle Type: <span style={{ color: '#ef4444' }}>*</span>
+                      </label>
+                      <select
+                        className="input-field"
+                        value={partnerVehicleType}
+                        onChange={e => setPartnerVehicleType(e.target.value)}
+                        style={{ padding: '0.75rem', background: '#111827', color: '#ffffff', fontSize: '0.9rem' }}
+                      >
+                        <option value="Electric Scooter">Electric Scooter 🛵 (Preferred)</option>
+                        <option value="Motorcycle">Motorcycle 🏍️</option>
+                        <option value="Bicycle">Bicycle 🚲 (Hyperlocal &lt; 2km)</option>
+                        <option value="EV Cargo Van">EV Cargo Van 🚐 (Bulk)</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.78rem', color: '#94a3b8', marginBottom: '4px', fontWeight: '600' }}>
+                        Driving License No. (DL): <span style={{ color: '#ef4444' }}>*</span>
+                      </label>
+                      <input
+                        type="text"
+                        className="input-field"
+                        value={partnerDrivingLicense}
+                        onChange={e => setPartnerDrivingLicense(e.target.value)}
+                        placeholder="e.g. DL-1420110012345"
+                        required
+                        style={{ padding: '0.75rem 0.85rem', fontSize: '0.9rem' }}
+                      />
+                    </div>
                   </div>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '4px', fontWeight: '600' }}>Driving License No.:</label>
-                    <input type="text" className="input-field" value={partnerDrivingLicense} onChange={e => setPartnerDrivingLicense(e.target.value)} placeholder="" style={{ padding: '0.7rem' }} />
+
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '0.75rem' }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.78rem', color: '#94a3b8', marginBottom: '4px', fontWeight: '600' }}>
+                        Vehicle Number / Plate: <span style={{ color: '#ef4444' }}>*</span>
+                      </label>
+                      <input
+                        type="text"
+                        className="input-field"
+                        value={partnerVehicleNumber}
+                        onChange={e => setPartnerVehicleNumber(e.target.value)}
+                        placeholder="e.g. KA-19-MB-4021"
+                        required
+                        style={{ padding: '0.75rem 0.85rem', fontSize: '0.9rem' }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.78rem', color: '#94a3b8', marginBottom: '4px', fontWeight: '600' }}>
+                        Operational City & Delivery Zone: <span style={{ color: '#ef4444' }}>*</span>
+                      </label>
+                      <input
+                        type="text"
+                        className="input-field"
+                        value={partnerDeliveryZone}
+                        onChange={e => setPartnerDeliveryZone(e.target.value)}
+                        placeholder="e.g. Mangalore Central / Indiranagar"
+                        required
+                        style={{ padding: '0.75rem 0.85rem', fontSize: '0.9rem' }}
+                      />
+                    </div>
                   </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '0.75rem' }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.78rem', color: '#94a3b8', marginBottom: '4px', fontWeight: '600' }}>
+                        Preferred Working Shift:
+                      </label>
+                      <select
+                        className="input-field"
+                        value={partnerShiftPreference}
+                        onChange={e => setPartnerShiftPreference(e.target.value)}
+                        style={{ padding: '0.75rem', background: '#111827', color: '#ffffff', fontSize: '0.9rem' }}
+                      >
+                        <option value="Full Time (Express 10-Min)">Full Time (Express 10-Min Fleet)</option>
+                        <option value="Evening Peak (5 PM - 11 PM)">Evening Peak (5 PM - 11 PM)</option>
+                        <option value="Flexible / Part Time">Flexible / On-Demand</option>
+                        <option value="Weekend Express">Weekend Express</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.78rem', color: '#94a3b8', marginBottom: '4px', fontWeight: '600' }}>
+                        Rider UPI ID (For Daily Payouts):
+                      </label>
+                      <input
+                        type="text"
+                        className="input-field"
+                        value={partnerRiderUpi}
+                        onChange={e => setPartnerRiderUpi(e.target.value)}
+                        placeholder="e.g. yourname@okaxis"
+                        style={{ padding: '0.75rem 0.85rem', fontSize: '0.9rem' }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Rider Readiness Checklist */}
+                  <label style={{
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: '10px',
+                    background: 'rgba(56, 189, 248, 0.06)',
+                    border: '1px solid rgba(56, 189, 248, 0.25)',
+                    borderRadius: '12px',
+                    padding: '0.85rem',
+                    cursor: 'pointer'
+                  }}>
+                    <input
+                      type="checkbox"
+                      checked={partnerBagConfirmed}
+                      onChange={e => setPartnerBagConfirmed(e.target.checked)}
+                      style={{ accentColor: '#38bdf8', width: '18px', height: '18px', marginTop: '2px', cursor: 'pointer' }}
+                    />
+                    <div style={{ fontSize: '0.78rem', color: '#e2e8f0', lineHeight: '1.4' }}>
+                      <strong>Rider Readiness Confirmation:</strong> I confirm I possess an active Android/iOS smartphone with GPS, valid driving credentials, and readiness to carry an insulated medicine delivery kit.
+                    </div>
+                  </label>
+                </>
+              )}
+
+              {errorMsg && (
+                <div style={{
+                  background: 'rgba(239, 68, 68, 0.12)',
+                  border: '1px solid rgba(239, 68, 68, 0.3)',
+                  borderRadius: '10px',
+                  padding: '0.75rem',
+                  color: '#f87171',
+                  fontSize: '0.85rem',
+                  textAlign: 'center',
+                  fontWeight: '600'
+                }}>
+                  ⚠️ {errorMsg}
                 </div>
               )}
 
-              {errorMsg && <div style={{ color: 'var(--red)', fontSize: '0.85rem', textAlign: 'center' }}>⚠️ {errorMsg}</div>}
-              {successMsg && <div style={{ color: 'var(--green)', fontSize: '0.85rem', textAlign: 'center' }}>✓ {successMsg}</div>}
+              {successMsg && (
+                <div style={{
+                  background: 'rgba(16, 185, 129, 0.15)',
+                  border: '1px solid rgba(16, 185, 129, 0.35)',
+                  borderRadius: '10px',
+                  padding: '0.75rem',
+                  color: '#34d399',
+                  fontSize: '0.85rem',
+                  textAlign: 'center',
+                  fontWeight: '600'
+                }}>
+                  ✓ {successMsg}
+                </div>
+              )}
 
-              <button type="submit" disabled={isLoading} className="btn-primary" style={{ width: '100%', justifyContent: 'center', padding: '0.9rem', fontSize: '0.95rem', fontWeight: 'bold' }}>
+              <button
+                type="submit"
+                disabled={isLoading}
+                className="btn-primary"
+                style={{
+                  width: '100%',
+                  justifyContent: 'center',
+                  padding: '1rem',
+                  fontSize: '1rem',
+                  fontWeight: '700',
+                  borderRadius: '12px',
+                  background: partnerType === 'pharmacy' ? 'linear-gradient(135deg, #10b981 0%, #0d9488 100%)' : 'linear-gradient(135deg, #38bdf8 0%, #0284c7 100%)',
+                  boxShadow: partnerType === 'pharmacy' ? '0 4px 15px rgba(16, 185, 129, 0.35)' : '0 4px 15px rgba(56, 189, 248, 0.35)',
+                  minHeight: '48px',
+                  cursor: isLoading ? 'wait' : 'pointer'
+                }}
+              >
                 {isLoading ? 'Submitting Application...' : `Submit Application to medora2k26@gmail.com 📩`}
               </button>
             </form>
@@ -1395,24 +1672,63 @@ export default function LoginGateway({ onLoginSuccess }) {
       {showPartnerLoginModal && (
         <div style={{
           position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: 'rgba(0,0,0,0.85)',
-          backdropFilter: 'blur(8px)',
+          inset: 0,
+          background: 'rgba(3, 7, 18, 0.88)',
+          backdropFilter: 'blur(10px)',
+          WebkitBackdropFilter: 'blur(10px)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          zIndex: 999,
-          padding: '1rem'
+          zIndex: 9999,
+          padding: '0.75rem',
+          overflowY: 'auto',
+          WebkitOverflowScrolling: 'touch'
         }}>
-          <div className="glass-panel" style={{ width: '100%', maxWidth: '480px', padding: '2rem', borderRadius: '20px', border: '1px solid rgba(184, 247, 228, 0.2)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
-              <h2 style={{ fontSize: '1.25rem', color: 'var(--primary)', margin: 0 }}>
-                Partner Sign In Portal
-              </h2>
-              <button onClick={() => setShowPartnerLoginModal(false)} style={{ background: 'none', border: 'none', color: '#fff', fontSize: '1.4rem', cursor: 'pointer' }}>✕</button>
+          <div className="glass-panel" style={{
+            width: '100%',
+            maxWidth: '480px',
+            maxHeight: '92vh',
+            display: 'flex',
+            flexDirection: 'column',
+            overflowY: 'auto',
+            WebkitOverflowScrolling: 'touch',
+            padding: '1.5rem 1.25rem',
+            borderRadius: '22px',
+            border: '1px solid rgba(16, 185, 129, 0.35)',
+            background: 'linear-gradient(180deg, #0e1726 0%, #070e18 100%)',
+            boxShadow: '0 25px 60px rgba(0,0,0,0.85), 0 0 35px rgba(16, 185, 129, 0.12)',
+            margin: 'auto'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '0.75rem' }}>
+              <div>
+                <h2 style={{ fontSize: '1.25rem', color: '#f8fafc', margin: 0, fontWeight: '800' }}>
+                  Partner Sign In Portal
+                </h2>
+                <p style={{ fontSize: '0.78rem', color: '#94a3b8', margin: '2px 0 0 0' }}>
+                  Access Pharmacy Store or Rider Fleet Console
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => { setShowPartnerLoginModal(false); clearMessages(); }}
+                style={{
+                  background: 'rgba(255,255,255,0.08)',
+                  border: '1px solid rgba(255,255,255,0.12)',
+                  color: '#e2e8f0',
+                  width: '36px',
+                  height: '36px',
+                  borderRadius: '50%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '1.1rem',
+                  cursor: 'pointer',
+                  flexShrink: 0
+                }}
+                aria-label="Close dialog"
+              >
+                ✕
+              </button>
             </div>
 
             {partnerForgotMode ? (
