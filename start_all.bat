@@ -1,26 +1,35 @@
 @echo off
 TITLE MEDORA Ecosystem Startup
 
-echo ==========================================
-echo Starting MEDORA Ecosystem Microservices
-echo ==========================================
+echo ===================================================
+echo   Starting MEDORA Ecosystem Microservices
+echo ===================================================
 
-echo [1/5] Starting FastAPI Core Backend (Port 8000, all interfaces)...
-start "MEDORA Service - Backend API" cmd /k "cd backend && call venv\Scripts\activate && uvicorn main:app --host 0.0.0.0 --port 8000"
+echo [1/5] Starting FastAPI Core Backend (Port 8000)...
+start "MEDORA Service - Backend API" cmd /k "cd /d "%~dp0backend" && call venv\Scripts\activate.bat && python -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload"
 
 echo [2/5] Starting FastAPI AI Services (Port 8001)...
-start "MEDORA Service - AI Services" cmd /k "cd ai-services && call venv\Scripts\activate && uvicorn symptom.main:app --port 8001"
+start "MEDORA Service - AI Services" cmd /k "cd /d "%~dp0ai-services" && call venv\Scripts\activate.bat && python -m uvicorn symptom.main:app --port 8001 --reload"
 
-echo [3/5] Starting Next.js User Frontend (Port 3000)...
-start "MEDORA Service - User App" cmd /k "cd frontend-user && npm run dev"
+echo [3/5] Starting Patient Web Portal (Port 3000)...
+start "MEDORA Service - User Web App" cmd /k "cd /d "%~dp0frontend-user" && npm run dev"
 
-echo [4/5] Starting Next.js Pharmacy Admin (Port 3001)...
-start "MEDORA Service - Pharmacy App" cmd /k "cd frontend-pharmacy && npm run dev"
+echo [4/5] Starting Pharmacy Dashboard (Port 3001)...
+start "MEDORA Service - Pharmacy Web App" cmd /k "cd /d "%~dp0frontend-pharmacy" && npm run dev"
 
-echo [5/5] Starting Next.js Delivery Rider (Port 3002)...
-start "MEDORA Service - Rider App" cmd /k "cd frontend-delivery && npm run dev"
+echo [5/5] Starting Delivery Rider App (Port 3002)...
+start "MEDORA Service - Delivery Web App" cmd /k "cd /d "%~dp0frontend-delivery" && npm run dev"
 
 echo.
-echo All services have been launched in separate secure windows.
-echo Close the individual windows or run kill_all.bat to stop them.
+echo ===================================================
+echo   All MEDORA microservices launched successfully!
+echo   -------------------------------------------------
+echo   - Core Backend API:   http://localhost:8000
+echo   - AI Services:        http://localhost:8001
+echo   - Patient Portal:     http://localhost:3000
+echo   - Pharmacy Dashboard: http://localhost:3001
+echo   - Delivery Rider App: http://localhost:3002
+echo ===================================================
+echo Run kill_all.bat to stop all services.
+echo.
 pause

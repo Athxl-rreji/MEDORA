@@ -1,8 +1,15 @@
+import os
+import dotenv
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.exceptions import RequestValidationError
-from app.api.routes import auth, medicines, orders, prescriptions
+
+# Load .env file at startup
+dotenv_path = os.path.join(os.path.dirname(__file__), '.env')
+dotenv.load_dotenv(dotenv_path)
+
+from app.api.routes import auth, medicines, orders, prescriptions, payments, admin
 from app.core.logger import logger
 
 app = FastAPI(
@@ -11,20 +18,34 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# CORS config to allow our frontend clients
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"], # In production, restrict this
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# CORS config — supports all Vercel and localhost origins with credentials
+_raw_origins = os.environ.get("ALLOWED_ORIGINS", "").strip()
+if _raw_origins and _raw_origins != "*":
+    _allowed_origins = [o.strip() for o in _raw_origins.split(",") if o.strip()]
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=_allowed_origins,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+else:
+    # When in production with dynamic Vercel preview/production URLs, regex matches any http/https origin safely with credentials
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origin_regex=r"^https?://.*",
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
 # Include routers
 app.include_router(auth.router, prefix="/api/v1/auth", tags=["Auth"])
+app.include_router(admin.router, prefix="/api/v1/admin", tags=["Admin"])
 app.include_router(medicines.router, prefix="/api/v1/medicines", tags=["Medicines"])
 app.include_router(orders.router, prefix="/api/v1/orders", tags=["Orders"])
 app.include_router(prescriptions.router, prefix="/api/v1/prescriptions", tags=["Prescriptions"])
+app.include_router(payments.router, prefix="/api/v1/payments", tags=["Payments"])
 
 @app.get("/health")
 def health_check():

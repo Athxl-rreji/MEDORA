@@ -163,115 +163,175 @@ async def chat_diagnose(request: ChatRequest):
         "5. Keep responses relatively concise (1-3 sentences) suitable for a chat bubble, until the final diagnosis."
     )
     
-    if openrouter_key or gemini_key or openai_key:
-        try:
-            if openrouter_key:
-                import openai
-                openai_messages = [{"role": "system", "content": system_prompt}]
-                for m in messages:
-                    openai_messages.append({"role": m["role"], "content": m["content"]})
-                
-                model_name = os.environ.get("OPENROUTER_MODEL", "meta-llama/llama-3-8b-instruct:free")
-                
-                if hasattr(openai, "ChatCompletion") and not hasattr(openai, "OpenAI"):
-                    openai.api_base = "https://openrouter.ai/api/v1"
-                    openai.api_key = openrouter_key
-                    response = openai.ChatCompletion.create(
-                        model=model_name,
-                        messages=openai_messages,
-                        headers={
-                            "HTTP-Referer": "https://github.com/Athxl-rreji/MEDORA",
-                            "X-Title": "MEDORA AI Pharmacy"
-                        }
-                    )
-                    reply = response.choices[0].message.content
-                else:
-                    from openai import OpenAI
-                    client = OpenAI(
-                        base_url="https://openrouter.ai/api/v1",
-                        api_key=openrouter_key,
-                        default_headers={
-                            "HTTP-Referer": "https://github.com/Athxl-rreji/MEDORA",
-                            "X-Title": "MEDORA AI Pharmacy"
-                        }
-                    )
-                    response = client.chat.completions.create(
-                        model=model_name,
-                        messages=openai_messages
-                    )
-                    reply = response.choices[0].message.content
-            elif gemini_key:
-                import urllib.request
-                import json
-                
-                url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={gemini_key}"
-                
-                contents = []
-                for m in messages:
-                    role = "user" if m["role"] == "user" else "model"
-                    contents.append({"role": role, "parts": [{"text": m["content"]}]})
-                    
-                payload = {
-                    "contents": contents,
-                    "systemInstruction": {
-                        "parts": [{"text": system_prompt}]
-                    }
-                }
-                
+    user_allergies = get_user_allergies(request.user_id)
+    allergy_clause = f" PATIENT WARNING: Patient has confirmed allergies to: {', '.join(user_allergies)}. NEVER recommend these or cross-reactive drugs." if user_allergies else ""
+
+    system_prompt = (
+        "You are MEDORA's AI Clinical Pharmacist, an empathetic and certified healthcare consultation AI. "
+        "Strictly adhere to clinical pharmacology and evidence-based medicine:\n\n"
+        "PHARMACOLOGICAL FORMULARY RULES (MANDATORY):\n"
+        "1. ACIDITY / HEARTBURN / GERD / ACID REFLUX / CHEST BURNING:\n"
+        "   - Recommend ONLY: Pantocid 40 (Pantoprazole 40mg - take 1 tablet 30 minutes before meal) and/or Gelusil (Antacid syrup/chewable tablet for rapid neutralization of stomach acid).\n"
+        "   - CRITICAL CONTRAINDICATION: NEVER recommend Paracetamol, Dolo 650, Crocin, Combiflam, or NSAIDs for acidity or gastric burning. Clearly state that NSAIDs irritate the gastric mucosa and worsen burning!\n"
+        "2. FEVER / HEADACHE / BODY PAIN:\n"
+        "   - Recommend: Dolo 650 (Paracetamol 650mg) or Calpol 500 for fever and headache.\n"
+        "   - Recommend: Combiflam (Ibuprofen + Paracetamol) for acute muscle or joint pain.\n"
+        "3. ALLERGIES / COLD / SNEEZING / RUNNY NOSE:\n"
+        "   - Recommend: Allegra 120 (Fexofenadine 120mg non-drowsy) or Cetirizine 10mg.\n"
+        "4. DRY COUGH / THROAT IRRITATION:\n"
+        "   - Recommend: Ascoril-D syrup.\n"
+        "5. DEHYDRATION / DIARRHEA:\n"
+        "   - Recommend: ORS Electrolyte sachet dissolved in 1L water.\n"
+        f"{allergy_clause}\n\n"
+        "OUTPUT FORMAT (STRICT):\n"
+        "Write in clean, easy-to-read clinical markdown. Never truncate sentences. Never invent fictional drug components like crocetin. Do not include random button texts.\n\n"
+        "**Probable Condition:**\n"
+        "[1 concise sentence describing the most likely clinical condition]\n\n"
+        "**Recommended OTC Relief:**\n"
+        "- **[Exact Medicine Name]**: [Precise dosage, administration timing, and therapeutic action]\n\n"
+        "**Clinical Guidance:**\n"
+        "- [Lifestyle, dietary, and hydration recommendations]\n"
+        "- [Contraindications or warning on what NOT to take]\n\n"
+        "Disclaimer: I am an AI clinical assistant, not a doctor. Consult a healthcare professional before taking medications."
+    )
+    
+    reply = None
+    if gemini_key:
+        import urllib.request
+        import json
+        
+        # Cascade list of available Gemini flash models for optimal speed & reliability
+        gemini_models = ["gemini-3.1-flash-lite", "gemini-3.8-flash", "gemini-flash-latest"]
+        
+        contents = []
+        for m in messages:
+            role = "user" if m["role"] == "user" else "model"
+            contents.append({"role": role, "parts": [{"text": m["content"]}]})
+            
+        payload = {
+            "contents": contents,
+            "systemInstruction": {
+                "parts": [{"text": system_prompt}]
+            },
+            "generationConfig": {
+                "temperature": 0.2,
+                "maxOutputTokens": 900
+            }
+        }
+
+        for model_name in gemini_models:
+            try:
+                url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={gemini_key}"
                 req = urllib.request.Request(
                     url,
                     data=json.dumps(payload).encode("utf-8"),
                     headers={"Content-Type": "application/json"},
                     method="POST"
                 )
-                
-                with urllib.request.urlopen(req) as res:
+                with urllib.request.urlopen(req, timeout=6) as res:
                     response_data = json.loads(res.read().decode("utf-8"))
-                    reply = response_data["candidates"][0]["content"]["parts"][0]["text"]
-            else:
-                import openai
-                openai_messages = [{"role": "system", "content": system_prompt}]
-                for m in messages:
-                    openai_messages.append({"role": m["role"], "content": m["content"]})
-                
-                if hasattr(openai, "ChatCompletion") and not hasattr(openai, "OpenAI"):
-                    openai.api_key = openai_key
-                    response = openai.ChatCompletion.create(
-                        model="gpt-3.5-turbo",
-                        messages=openai_messages
-                    )
-                    reply = response.choices[0].message.content
-                else:
-                    from openai import OpenAI
-                    client = OpenAI(api_key=openai_key)
-                    response = client.chat.completions.create(
-                        model="gpt-3.5-turbo",
-                        messages=openai_messages
-                    )
-                    reply = response.choices[0].message.content
-                
-            session_finished = "disclaimer" in reply.lower() or "i am an ai" in reply.lower()
-            suggested_medicines = []
-            
-            if session_finished:
-                for record in symptom_db:
-                    for med in record.get("suggested_otc_medicines", []):
-                        if med.lower() in reply.lower() and med not in suggested_medicines:
-                            suggested_medicines.append(med)
-                if not suggested_medicines:
-                    for mname in ["dolo", "crocin", "calpol", "allegra", "ascoril", "avil", "augmentin"]:
-                        if mname in reply.lower():
-                            suggested_medicines.append(mname.capitalize())
-                            
-            return ChatResponse(
-                content=reply,
-                session_finished=session_finished,
-                diagnosis="Diagnostic Assessment" if session_finished else None,
-                suggested_medicines=suggested_medicines
+                    cand = response_data.get("candidates", [])
+                    if cand and "content" in cand[0] and "parts" in cand[0]["content"]:
+                        reply = cand[0]["content"]["parts"][0]["text"]
+                        break
+            except Exception as e:
+                print(f"Gemini model {model_name} attempt failed: {e}")
+                continue
+
+    if not reply and openrouter_key:
+        try:
+            from openai import OpenAI
+            client = OpenAI(
+                base_url="https://openrouter.ai/api/v1",
+                api_key=openrouter_key,
+                default_headers={
+                    "HTTP-Referer": "https://github.com/Athxl-rreji/MEDORA",
+                    "X-Title": "MEDORA AI Pharmacy"
+                }
             )
+            openai_messages = [{"role": "system", "content": system_prompt}]
+            for m in messages:
+                openai_messages.append({"role": m["role"], "content": m["content"]})
+            response = client.chat.completions.create(
+                model=os.environ.get("OPENROUTER_MODEL", "meta-llama/llama-3-8b-instruct:free"),
+                messages=openai_messages,
+                timeout=8
+            )
+            reply = response.choices[0].message.content
         except Exception as e:
-            print(f"LLM API failure: {e}")
-            pass
+            print(f"OpenRouter LLM failure: {e}")
+
+    if not reply and openai_key:
+        try:
+            from openai import OpenAI
+            client = OpenAI(api_key=openai_key)
+            openai_messages = [{"role": "system", "content": system_prompt}]
+            for m in messages:
+                openai_messages.append({"role": m["role"], "content": m["content"]})
+            response = client.chat.completions.create(
+                model="gpt-3.5-turbo",
+                messages=openai_messages,
+                timeout=8
+            )
+            reply = response.choices[0].message.content
+        except Exception as e:
+            print(f"OpenAI failure: {e}")
+
+    if reply:
+        suggested_medicines = []
+        
+        # Scope extraction strictly to the **Recommended OTC Relief:** section
+        # This prevents warning text (e.g., "Do not take Dolo 650 or Crocin") from ever polluting suggestions!
+        otc_match = re.search(r'\*\*Recommended OTC Relief:\*\*(.*?)(?:\*\*Clinical Guidance:\*\*|Disclaimer:|⚠️|$)', reply, re.DOTALL | re.IGNORECASE)
+        search_scope = otc_match.group(1).lower() if otc_match else reply.lower()
+        
+        # Check overall context for gastric burning/acidity
+        full_conversation = " ".join([m.get("content", "") for m in messages]).lower()
+        is_acidity_context = any(term in full_conversation for term in ["acid", "reflux", "gerd", "heartburn", "chest burn", "burning chest", "stomach burn", "gastric"])
+        
+        catalog_mappings = [
+            ("pantocid 40", "Pantocid 40"),
+            ("pantoprazole", "Pantocid 40"),
+            ("pantocid", "Pantocid 40"),
+            ("gelusil", "Gelusil"),
+            ("dolo 650", "Dolo 650"),
+            ("dolo", "Dolo 650"),
+            ("calpol 500", "Calpol 500"),
+            ("calpol", "Calpol 500"),
+            ("crocin advance", "Crocin Advance"),
+            ("crocin", "Crocin Advance"),
+            ("combiflam", "Combiflam"),
+            ("allegra 120", "Allegra 120"),
+            ("allegra", "Allegra 120"),
+            ("cetirizine 10mg", "Cetirizine 10mg"),
+            ("cetirizine", "Cetirizine 10mg"),
+            ("ascoril-d", "Ascoril-D"),
+            ("ascoril", "Ascoril-D"),
+            ("ors electrolyte", "ORS Electrolyte"),
+            ("ors", "ORS Electrolyte"),
+            ("augmentin 625", "Augmentin 625"),
+            ("augmentin", "Augmentin 625"),
+            ("azithromycin 500", "Azithromycin 500"),
+            ("azithromycin", "Azithromycin 500")
+        ]
+        
+        for kw, official_name in catalog_mappings:
+            if re.search(r'\b' + re.escape(kw) + r'\b', search_scope):
+                # Hard contraindication check
+                if is_acidity_context and official_name in ["Dolo 650", "Calpol 500", "Crocin Advance", "Combiflam"]:
+                    continue
+                if official_name not in suggested_medicines:
+                    suggested_medicines.append(official_name)
+                    
+        session_finished = "disclaimer" in reply.lower() or "i am an ai" in reply.lower() or len(suggested_medicines) > 0
+                    
+        return ChatResponse(
+            content=reply,
+            session_finished=session_finished,
+            diagnosis="Clinical Assessment" if session_finished else None,
+            suggested_medicines=suggested_medicines
+        )
+
 
     user_msgs = [m for m in messages if m["role"] == "user"]
     num_user_turns = len(user_msgs)

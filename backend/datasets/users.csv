@@ -1,0 +1,6 @@
+user_id,full_name,age,gender,medical_conditions,allergies,location_lat,location_long,prescription_history
+USR001,John Doe,45,Male,"Type 2 Diabetes, Hypertension",Penicillin,19.0760,72.8777,"RX001, RX002"
+USR002,Jane Smith,28,Female,None,None,19.1000,72.9000,"RX004"
+USR003,Rajesh Kumar,60,Male,Asthma,"Aspirin, Ibuprofen",19.0500,72.8500,"RX005, RX007"
+USR004,Priya Patel,34,Female,Hypothyroidism,Sulfa Drugs,19.0800,72.8900,"RX008"
+USR005,Amit Sharma,50,Male,None,"Dust, Pollen",19.0600,72.8600,None

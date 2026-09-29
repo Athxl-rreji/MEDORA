@@ -29,3 +29,8 @@ Thumbs.db
 
 # Google Cloud Credentials
 medora-ocr-service-2c5ef3591c5d.json
+
+# 1.6GB Animation frames (served via CDN in production to comply with Vercel 100MB limit)
+Animation/
+frontend-user/public/Animation/
+**/public/Animation/

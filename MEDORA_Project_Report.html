@@ -1,0 +1,669 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MEDORA – Project Report</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+        :root {
+            --primary: #1a56db;
+            --primary-light: #e8effd;
+            --accent: #0d9488;
+            --accent-light: #e0f7f5;
+            --dark: #111827;
+            --gray: #4b5563;
+            --light-gray: #9ca3af;
+            --border: #e5e7eb;
+            --bg: #ffffff;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        @page {
+            size: A4;
+            margin: 14mm 16mm;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, sans-serif;
+            color: var(--dark);
+            background: var(--bg);
+            font-size: 9pt;
+            line-height: 1.45;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
+
+        .page {
+            width: 210mm;
+            min-height: 297mm;
+            margin: 0 auto;
+            padding: 14mm 16mm;
+            page-break-after: always;
+            position: relative;
+        }
+
+        .page:last-child { page-break-after: auto; }
+
+        @media print {
+            .page { width: auto; min-height: auto; padding: 0; margin: 0; }
+        }
+
+        /* ── HEADER ── */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-bottom: 10px;
+            border-bottom: 2.5px solid var(--primary);
+            margin-bottom: 14px;
+        }
+
+        .header-left h1 {
+            font-size: 22pt;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+            background: linear-gradient(135deg, var(--primary), var(--accent));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .header-left .tagline {
+            font-size: 9pt;
+            color: var(--gray);
+            font-weight: 400;
+            margin-top: 2px;
+        }
+
+        .header-right {
+            text-align: right;
+            font-size: 7.5pt;
+            color: var(--light-gray);
+            line-height: 1.5;
+        }
+
+        /* ── SECTIONS ── */
+        .section-title {
+            font-size: 10.5pt;
+            font-weight: 700;
+            color: var(--primary);
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            border-bottom: 1.5px solid var(--primary-light);
+            padding-bottom: 3px;
+            margin-bottom: 7px;
+            margin-top: 12px;
+        }
+
+        .section-title:first-of-type { margin-top: 0; }
+
+        p, li { color: var(--gray); font-size: 8.5pt; }
+
+        .intro-text {
+            font-size: 9pt;
+            line-height: 1.55;
+            color: var(--dark);
+            margin-bottom: 4px;
+        }
+
+        /* ── TWO-COLUMN LAYOUT ── */
+        .two-col {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 14px;
+        }
+
+        .three-col {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 10px;
+        }
+
+        /* ── CARDS ── */
+        .card {
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 8px 10px;
+            background: #fafbfc;
+        }
+
+        .card h4 {
+            font-size: 8.5pt;
+            font-weight: 700;
+            color: var(--dark);
+            margin-bottom: 3px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .card h4 .icon {
+            font-size: 12pt;
+        }
+
+        .card p, .card li {
+            font-size: 7.8pt;
+            line-height: 1.4;
+        }
+
+        .card ul {
+            padding-left: 14px;
+            margin: 0;
+        }
+
+        .card ul li { margin-bottom: 1px; }
+
+        /* ── FEATURE PILLS ── */
+        .pill-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+            margin-top: 4px;
+        }
+
+        .pill {
+            background: var(--primary-light);
+            color: var(--primary);
+            font-size: 7pt;
+            font-weight: 600;
+            padding: 3px 8px;
+            border-radius: 10px;
+            white-space: nowrap;
+        }
+
+        .pill.accent {
+            background: var(--accent-light);
+            color: var(--accent);
+        }
+
+        /* ── TECH STACK TABLE ── */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 8pt;
+            margin-top: 4px;
+        }
+
+        table th {
+            background: var(--primary);
+            color: white;
+            font-weight: 600;
+            text-align: left;
+            padding: 4px 8px;
+            font-size: 7.5pt;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+
+        table td {
+            padding: 4px 8px;
+            border-bottom: 1px solid var(--border);
+            color: var(--gray);
+        }
+
+        table tr:nth-child(even) td {
+            background: #f9fafb;
+        }
+
+        /* ── API TABLE ── */
+        .api-table td:first-child {
+            font-family: 'Courier New', monospace;
+            font-size: 7pt;
+            font-weight: 600;
+            color: var(--primary);
+            white-space: nowrap;
+        }
+
+        .method {
+            display: inline-block;
+            font-size: 6.5pt;
+            font-weight: 700;
+            padding: 1px 4px;
+            border-radius: 3px;
+            margin-right: 3px;
+            color: white;
+            min-width: 30px;
+            text-align: center;
+        }
+        .method.get { background: #059669; }
+        .method.post { background: #d97706; }
+
+        /* ── DATABASE SCHEMA ── */
+        .schema-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 5px;
+            margin-top: 4px;
+        }
+
+        .schema-item {
+            background: #f3f4f6;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 5px 7px;
+            text-align: center;
+        }
+
+        .schema-item .name {
+            font-size: 7.5pt;
+            font-weight: 700;
+            color: var(--dark);
+        }
+
+        .schema-item .desc {
+            font-size: 6.5pt;
+            color: var(--light-gray);
+            margin-top: 1px;
+        }
+
+        /* ── ARCHITECTURE FLOW ── */
+        .arch-flow {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            margin: 8px 0;
+            flex-wrap: wrap;
+        }
+
+        .arch-box {
+            background: var(--primary-light);
+            border: 1.5px solid var(--primary);
+            border-radius: 6px;
+            padding: 6px 10px;
+            text-align: center;
+            min-width: 80px;
+        }
+
+        .arch-box.accent-box {
+            background: var(--accent-light);
+            border-color: var(--accent);
+        }
+
+        .arch-box .label {
+            font-size: 7.5pt;
+            font-weight: 700;
+            color: var(--dark);
+        }
+
+        .arch-box .sub {
+            font-size: 6.5pt;
+            color: var(--light-gray);
+        }
+
+        .arch-arrow {
+            font-size: 14pt;
+            color: var(--light-gray);
+            font-weight: 300;
+        }
+
+        /* ── FOOTER ── */
+        .footer {
+            position: absolute;
+            bottom: 14mm;
+            left: 16mm;
+            right: 16mm;
+            display: flex;
+            justify-content: space-between;
+            font-size: 7pt;
+            color: var(--light-gray);
+            border-top: 1px solid var(--border);
+            padding-top: 6px;
+        }
+
+        @media print {
+            .footer {
+                position: fixed;
+                bottom: 0;
+                left: 0;
+                right: 0;
+            }
+        }
+
+        .highlight-box {
+            background: linear-gradient(135deg, var(--primary-light), var(--accent-light));
+            border-radius: 6px;
+            padding: 8px 12px;
+            margin-top: 6px;
+        }
+
+        .highlight-box p {
+            font-size: 8pt;
+            color: var(--dark);
+        }
+
+        .stat-row {
+            display: flex;
+            gap: 10px;
+            margin-top: 6px;
+        }
+
+        .stat {
+            flex: 1;
+            text-align: center;
+            padding: 6px;
+            background: var(--primary-light);
+            border-radius: 6px;
+        }
+
+        .stat .num {
+            font-size: 14pt;
+            font-weight: 800;
+            color: var(--primary);
+        }
+
+        .stat .label {
+            font-size: 6.5pt;
+            color: var(--gray);
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+    </style>
+</head>
+<body>
+
+<!-- ═══════════════════════ PAGE 1 ═══════════════════════ -->
+<div class="page">
+
+    <!-- HEADER -->
+    <div class="header">
+        <div class="header-left">
+            <h1>MEDORA</h1>
+            <div class="tagline">AI-Powered Pharmacy Ecosystem — Scalable Hybrid Monorepo</div>
+        </div>
+        <div class="header-right">
+            GitHub: Athxl-rreji/MEDORA<br>
+            Version 1.0.0 &nbsp;|&nbsp; July 2026
+        </div>
+    </div>
+
+    <!-- OVERVIEW -->
+    <div class="section-title">1. Project Overview</div>
+    <p class="intro-text">
+        <strong>MEDORA</strong> is a next-generation, AI-integrated pharmacy ecosystem designed for quick-commerce compatibility.
+        It connects <strong>customers</strong>, <strong>pharmacies</strong>, and <strong>delivery agents</strong> through a unified platform
+        featuring AI-driven symptom analysis, prescription OCR verification, intelligent medicine recommendations, and real-time order tracking.
+        The system follows a <strong>microservices-oriented hybrid monorepo</strong> architecture with dedicated frontends for each user role.
+    </p>
+
+    <!-- KEY STATS -->
+    <div class="stat-row">
+        <div class="stat"><div class="num">6</div><div class="label">Modules</div></div>
+        <div class="stat"><div class="num">3</div><div class="label">AI Services</div></div>
+        <div class="stat"><div class="num">8</div><div class="label">DB Tables</div></div>
+        <div class="stat"><div class="num">12+</div><div class="label">API Endpoints</div></div>
+        <div class="stat"><div class="num">4</div><div class="label">User Roles</div></div>
+    </div>
+
+    <!-- ARCHITECTURE -->
+    <div class="section-title">2. System Architecture</div>
+    <div class="arch-flow">
+        <div class="arch-box">
+            <div class="label">User Web App</div>
+            <div class="sub">Next.js · :3000</div>
+        </div>
+        <div class="arch-box">
+            <div class="label">Pharmacy Dashboard</div>
+            <div class="sub">Next.js · :3001</div>
+        </div>
+        <div class="arch-box">
+            <div class="label">Delivery Panel</div>
+            <div class="sub">Next.js · :3002</div>
+        </div>
+        <div class="arch-box">
+            <div class="label">Mobile Apps</div>
+            <div class="sub">React Native / Expo</div>
+        </div>
+        <div class="arch-arrow">⟶</div>
+        <div class="arch-box accent-box">
+            <div class="label">FastAPI Backend</div>
+            <div class="sub">Core API · :8000</div>
+        </div>
+        <div class="arch-arrow">⟶</div>
+        <div class="arch-box accent-box">
+            <div class="label">AI Microservices</div>
+            <div class="sub">FastAPI · :8001+</div>
+        </div>
+        <div class="arch-arrow">⟶</div>
+        <div class="arch-box">
+            <div class="label">Supabase</div>
+            <div class="sub">PostgreSQL + Auth + Storage</div>
+        </div>
+    </div>
+
+    <!-- TECH STACK -->
+    <div class="section-title">3. Technology Stack</div>
+    <table>
+        <thead>
+            <tr><th>Layer</th><th>Technology</th><th>Purpose</th></tr>
+        </thead>
+        <tbody>
+            <tr><td><strong>Frontend (Web)</strong></td><td>Next.js 14, React 18</td><td>User, Pharmacy & Delivery dashboards (SSR)</td></tr>
+            <tr><td><strong>Frontend (Mobile)</strong></td><td>React Native, Expo</td><td>User & Delivery mobile apps (iOS/Android)</td></tr>
+            <tr><td><strong>Backend API</strong></td><td>Python, FastAPI, Uvicorn</td><td>RESTful core API with CORS & validation</td></tr>
+            <tr><td><strong>AI Services</strong></td><td>FastAPI, OpenAI/Gemini, Tesseract OCR, LangChain</td><td>Symptom analysis, prescription OCR, recommendations</td></tr>
+            <tr><td><strong>Database</strong></td><td>Supabase (PostgreSQL + PostGIS)</td><td>Data persistence, auth, RLS, geospatial queries</td></tr>
+            <tr><td><strong>Auth & Storage</strong></td><td>Supabase Auth, Supabase Storage</td><td>JWT-based auth, prescription image storage</td></tr>
+            <tr><td><strong>Shared</strong></td><td>TypeScript types, shared utilities</td><td>Cross-module type safety & reusable logic</td></tr>
+        </tbody>
+    </table>
+
+    <!-- MODULES -->
+    <div class="section-title">4. Module Breakdown</div>
+    <div class="three-col">
+        <div class="card">
+            <h4><span class="icon">🛒</span> frontend-user</h4>
+            <p>Customer-facing web app — medicine search, cart, prescription upload with client-side OCR (Tesseract.js), AI symptom chat, order placement & tracking.</p>
+        </div>
+        <div class="card">
+            <h4><span class="icon">🏥</span> frontend-pharmacy</h4>
+            <p>Pharmacy dashboard — incoming order management, prescription verification with OCR, inventory management, order accept/reject workflows.</p>
+        </div>
+        <div class="card">
+            <h4><span class="icon">🚚</span> frontend-delivery</h4>
+            <p>Delivery agent panel — view assigned deliveries, update status (picked up → delivered), real-time location tracking.</p>
+        </div>
+        <div class="card">
+            <h4><span class="icon">📱</span> mobile-user</h4>
+            <p>React Native / Expo mobile app for customers — medicine browsing, prescription upload, order tracking with native UX.</p>
+        </div>
+        <div class="card">
+            <h4><span class="icon">📱</span> mobile-delivery</h4>
+            <p>React Native / Expo delivery app — delivery assignment queue, GPS-based navigation, delivery status updates.</p>
+        </div>
+        <div class="card">
+            <h4><span class="icon">⚙️</span> backend</h4>
+            <p>FastAPI core — auth, medicines CRUD/search, orders lifecycle, prescriptions upload/verify, Supabase integration with prototype fallback.</p>
+        </div>
+    </div>
+
+    <div class="footer">
+        <span>MEDORA — AI-Powered Pharmacy Ecosystem</span>
+        <span>Page 1 of 2</span>
+    </div>
+</div>
+
+<!-- ═══════════════════════ PAGE 2 ═══════════════════════ -->
+<div class="page">
+
+    <div class="header" style="padding-bottom: 8px; margin-bottom: 10px;">
+        <div class="header-left">
+            <h1 style="font-size: 16pt;">MEDORA</h1>
+            <div class="tagline">Technical Details & AI Services</div>
+        </div>
+        <div class="header-right">Page 2 of 2</div>
+    </div>
+
+    <!-- AI SERVICES -->
+    <div class="section-title">5. AI Services (Microservices)</div>
+    <div class="three-col">
+        <div class="card">
+            <h4><span class="icon">🩺</span> Symptom Analyzer</h4>
+            <ul>
+                <li>Multi-turn AI doctor chat (LLM-powered via OpenRouter / Gemini / OpenAI)</li>
+                <li>Structured medical interview — 5-step diagnostic flow</li>
+                <li>Red-flag detection with critical warnings</li>
+                <li>User allergy cross-referencing from profile</li>
+                <li>Fallback rule-based engine when LLM is unavailable</li>
+                <li>OTC medicine suggestion with disclaimers</li>
+            </ul>
+        </div>
+        <div class="card">
+            <h4><span class="icon">📋</span> Prescription OCR</h4>
+            <ul>
+                <li>Tesseract-based OCR extraction from prescription images</li>
+                <li>Extracts medicine names, dosages & salt compositions</li>
+                <li>AI validation status: pending → verified → flagged</li>
+                <li>Dual pipeline: server-side (Python) + client-side (Tesseract.js)</li>
+                <li>Pharmacist manual verification layer</li>
+            </ul>
+        </div>
+        <div class="card">
+            <h4><span class="icon">💊</span> Recommendation Engine</h4>
+            <ul>
+                <li>Generic alternative medicine matching</li>
+                <li>Price-savings calculations (up to 40%+)</li>
+                <li>Confidence scoring for alternatives</li>
+                <li>Salt-composition based matching</li>
+                <li>Integrated via <code>/medicines/{id}/alternatives</code></li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- DATABASE -->
+    <div class="section-title">6. Database Schema (Supabase / PostgreSQL)</div>
+    <div class="schema-grid">
+        <div class="schema-item"><div class="name">users</div><div class="desc">UUID · role · phone · RLS</div></div>
+        <div class="schema-item"><div class="name">pharmacies</div><div class="desc">PostGIS location · license</div></div>
+        <div class="schema-item"><div class="name">medicines</div><div class="desc">brand · generic · category</div></div>
+        <div class="schema-item"><div class="name">inventory</div><div class="desc">stock · price · expiry</div></div>
+        <div class="schema-item"><div class="name">prescriptions</div><div class="desc">image URL · AI status · JSONB</div></div>
+        <div class="schema-item"><div class="name">orders</div><div class="desc">status lifecycle · delivery type</div></div>
+        <div class="schema-item"><div class="name">order_items</div><div class="desc">medicine · qty · unit price</div></div>
+        <div class="schema-item"><div class="name">deliveries</div><div class="desc">agent · GPS · status tracking</div></div>
+    </div>
+    <p style="margin-top: 4px; font-size: 7.5pt;"><strong>Key Features:</strong> PostGIS extension for nearest-pharmacy geospatial queries, Row-Level Security (RLS) for multi-tenant data isolation, UUID primary keys, JSONB for flexible prescription data.</p>
+
+    <!-- API ENDPOINTS -->
+    <div class="section-title">7. API Endpoints</div>
+    <table class="api-table">
+        <thead>
+            <tr><th>Endpoint</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+            <tr><td><span class="method post">POST</span>/api/v1/auth/login</td><td>Supabase token exchange & session creation</td></tr>
+            <tr><td><span class="method post">POST</span>/api/v1/auth/register</td><td>Register user, pharmacist, or delivery agent</td></tr>
+            <tr><td><span class="method get">GET</span>/api/v1/medicines/search?q={query}</td><td>Full-text medicine search & ranking</td></tr>
+            <tr><td><span class="method get">GET</span>/api/v1/medicines/{id}/alternatives</td><td>AI-powered generic alternative recommendations</td></tr>
+            <tr><td><span class="method post">POST</span>/api/v1/prescriptions/upload</td><td>Upload prescription image → triggers OCR AI pipeline</td></tr>
+            <tr><td><span class="method get">GET</span>/api/v1/prescriptions/{id}</td><td>Get prescription status & extracted data</td></tr>
+            <tr><td><span class="method post">POST</span>/api/v1/orders/create</td><td>Create order (pickup or delivery mode)</td></tr>
+            <tr><td><span class="method get">GET</span>/api/v1/orders/{id}</td><td>Real-time order status tracking</td></tr>
+            <tr><td><span class="method post">POST</span>/api/v1/orders/{id}/accept</td><td>Pharmacy accepts/rejects incoming order</td></tr>
+            <tr><td><span class="method post">POST</span>/api/v1/orders/{id}/assign-delivery</td><td>Dispatch delivery agent to order</td></tr>
+            <tr><td><span class="method post">POST</span>/ai/symptom-check</td><td>AI symptom analysis & multi-turn chat diagnosis</td></tr>
+            <tr><td><span class="method post">POST</span>/ai/verify-prescription</td><td>Server-side prescription OCR extraction</td></tr>
+        </tbody>
+    </table>
+
+    <!-- KEY FEATURES -->
+    <div class="section-title">8. Key Features & Highlights</div>
+    <div class="two-col">
+        <div>
+            <div class="pill-grid">
+                <span class="pill">AI Doctor Chat</span>
+                <span class="pill">Prescription OCR</span>
+                <span class="pill accent">Generic Alternatives</span>
+                <span class="pill">Multi-Role Auth</span>
+                <span class="pill accent">Real-Time Tracking</span>
+                <span class="pill">Quick-Commerce Ready</span>
+                <span class="pill accent">PostGIS Geospatial</span>
+                <span class="pill">Row-Level Security</span>
+            </div>
+        </div>
+        <div>
+            <div class="pill-grid">
+                <span class="pill accent">Prototype DB Fallback</span>
+                <span class="pill">Multi-LLM Support</span>
+                <span class="pill accent">Red-Flag Detection</span>
+                <span class="pill">Allergy Cross-Check</span>
+                <span class="pill accent">Client + Server OCR</span>
+                <span class="pill">Structured Logging</span>
+                <span class="pill accent">Expo Mobile Apps</span>
+                <span class="pill">Deployable on Vercel</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- ORDER LIFECYCLE -->
+    <div class="section-title">9. Order Lifecycle</div>
+    <div class="arch-flow" style="margin: 6px 0;">
+        <div class="arch-box" style="min-width: 65px; padding: 4px 8px;"><div class="label" style="font-size: 7pt;">Pending</div></div>
+        <div class="arch-arrow" style="font-size: 11pt;">→</div>
+        <div class="arch-box" style="min-width: 65px; padding: 4px 8px;"><div class="label" style="font-size: 7pt;">Accepted</div></div>
+        <div class="arch-arrow" style="font-size: 11pt;">→</div>
+        <div class="arch-box" style="min-width: 65px; padding: 4px 8px;"><div class="label" style="font-size: 7pt;">Preparing</div></div>
+        <div class="arch-arrow" style="font-size: 11pt;">→</div>
+        <div class="arch-box" style="min-width: 65px; padding: 4px 8px;"><div class="label" style="font-size: 7pt;">Ready</div></div>
+        <div class="arch-arrow" style="font-size: 11pt;">→</div>
+        <div class="arch-box accent-box" style="min-width: 70px; padding: 4px 8px;"><div class="label" style="font-size: 7pt;">Out for Delivery</div></div>
+        <div class="arch-arrow" style="font-size: 11pt;">→</div>
+        <div class="arch-box accent-box" style="min-width: 65px; padding: 4px 8px;"><div class="label" style="font-size: 7pt;">Delivered ✓</div></div>
+    </div>
+
+    <!-- USER ROLES -->
+    <div class="section-title">10. User Roles & Data Flow</div>
+    <div class="two-col">
+        <div class="card" style="padding: 6px 10px;">
+            <h4>👤 Customer</h4>
+            <p>Search medicines → Upload prescription → AI symptom chat → Place order (pickup/delivery) → Real-time tracking.</p>
+        </div>
+        <div class="card" style="padding: 6px 10px;">
+            <h4>🏪 Pharmacist</h4>
+            <p>Receive orders → Verify prescriptions (OCR + manual) → Manage inventory → Accept/reject orders → Dispatch delivery.</p>
+        </div>
+        <div class="card" style="padding: 6px 10px;">
+            <h4>🛵 Delivery Agent</h4>
+            <p>View assigned deliveries → Accept assignments → Update status (picked up → in transit → delivered) → GPS tracking.</p>
+        </div>
+        <div class="card" style="padding: 6px 10px;">
+            <h4>🔧 Admin</h4>
+            <p>Full system oversight — manage users, pharmacies, medicines reference data, and monitor platform analytics.</p>
+        </div>
+    </div>
+
+    <!-- DATASETS -->
+    <div class="section-title">11. Datasets & Deployment</div>
+    <div class="two-col">
+        <div class="card">
+            <h4>📊 Bundled Datasets</h4>
+            <ul>
+                <li><strong>core_medicines.csv</strong> — 2 MB+ medicine reference database (brand, generic, category, pricing)</li>
+                <li><strong>pharmacy_inventory.csv</strong> — 1.5 MB sample inventory data</li>
+                <li><strong>users.csv</strong> — Sample users with allergy profiles</li>
+                <li><strong>ai_symptom_training.json</strong> — Symptom→condition→medicine mapping for AI fallback</li>
+            </ul>
+        </div>
+        <div class="card">
+            <h4>🚀 Deployment</h4>
+            <ul>
+                <li><strong>Web Frontends:</strong> Vercel (vercel.json configured)</li>
+                <li><strong>Backend:</strong> Any Python host (Railway, Render, EC2)</li>
+                <li><strong>Database:</strong> Supabase Cloud (managed PostgreSQL)</li>
+                <li><strong>Mobile:</strong> Expo EAS Build (iOS + Android)</li>
+                <li><strong>Local Dev:</strong> <code>start_all.bat</code> launches entire stack</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="footer">
+        <span>MEDORA — AI-Powered Pharmacy Ecosystem &nbsp;|&nbsp; github.com/Athxl-rreji/MEDORA</span>
+        <span>Page 2 of 2</span>
+    </div>
+</div>
+
+</body>
+</html>

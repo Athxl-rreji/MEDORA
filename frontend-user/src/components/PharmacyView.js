@@ -14,7 +14,7 @@ const STATUS_CONFIG = {
   delivered:        { label: "Delivered ✓",      color: "#10b981", bg: "rgba(16,185,129,0.08)",   next: null,               nextLabel: null,                      nextColor: null },
 };
 
-export default function PharmacyDashboard() {
+export default function PharmacyView() {
   // Navigation State
   const [activeTab, setActiveTab] = useState('orders'); // 'orders' | 'inventory' | 'quiz' | 'scanner' | 'inquiries' | 'terminal'
 

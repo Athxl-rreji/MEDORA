@@ -1,0 +1,45 @@
+[
+  {
+    "id": "req_pharm_ffb70d",
+    "partner_type": "pharmacy",
+    "full_name": "Dr. Sharma",
+    "email": "sharma.medplus@gmail.com",
+    "phone": "9820011223",
+    "status": "approved",
+    "submitted_at": "2026-09-29T06:59:24.117117",
+    "store_name": "Sharma MedPlus Bandra",
+    "license_no": "MH-MZ4-2024-88",
+    "store_address": "Hill Road, Bandra West, Mumbai",
+    "latitude": 19.055,
+    "longitude": 72.83,
+    "vehicle_type": null,
+    "driving_license": null,
+    "approved_at": "2026-09-29T06:59:32.512521",
+    "temp_password": "Pharmacy123"
+  },
+  {
+    "id": "req_pharm_demo1",
+    "partner_type": "pharmacy",
+    "full_name": "Dr. Rajesh Pai",
+    "email": "rajesh.pai@medoralabs.in",
+    "phone": "+91 98450 12345",
+    "status": "pending",
+    "submitted_at": "2026-09-29T06:00:00Z",
+    "store_name": "Pai Apex Chemist & Care",
+    "license_no": "KA-MAN-2024-99881",
+    "store_address": "City Light Circle, Kadri, Mangalore",
+    "latitude": 19.082,
+    "longitude": 72.885
+  },
+  {
+    "id": "req_deliv_demo2",
+    "partner_type": "delivery",
+    "full_name": "Suresh Gowda",
+    "email": "suresh.gowda@gmail.com",
+    "phone": "+91 97412 88877",
+    "status": "pending",
+    "submitted_at": "2026-09-29T06:15:00Z",
+    "vehicle_type": "Electric Scooter",
+    "driving_license": "DL-KA19-2022-77665"
+  }
+]

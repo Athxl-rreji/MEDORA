@@ -1,0 +1,30 @@
+[
+  {
+    "id": "SYM001",
+    "symptoms": ["mild fever", "headache", "body ache"],
+    "possible_conditions": ["Viral Fever", "Common Cold"],
+    "suggested_otc_medicines": ["MED001", "MED002", "MED006"],
+    "red_flags": []
+  },
+  {
+    "id": "SYM002",
+    "symptoms": ["severe chest pain", "shortness of breath", "sweating"],
+    "possible_conditions": ["Myocardial Infarction", "Angina"],
+    "suggested_otc_medicines": [],
+    "red_flags": ["chest pain", "shortness of breath"]
+  },
+  {
+    "id": "SYM003",
+    "symptoms": ["sneezing", "runny nose", "watery eyes"],
+    "possible_conditions": ["Allergic Rhinitis", "Seasonal Allergies"],
+    "suggested_otc_medicines": ["MED005"],
+    "red_flags": []
+  },
+  {
+    "id": "SYM004",
+    "symptoms": ["dry cough", "scratchy throat"],
+    "possible_conditions": ["Upper Respiratory Tract Infection"],
+    "suggested_otc_medicines": ["MED008"],
+    "red_flags": []
+  }
+]

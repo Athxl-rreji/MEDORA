@@ -91,11 +91,40 @@ export default function DeliveryDashboard() {
           <p className="sub">{AGENT_ID} • En Route</p>
         </div>
 
-        <div className="map-mock">
+        <div className="map-mock" style={{ padding: '1.5rem 1rem', textAlign: 'center' }}>
           <div className="emoji">🗺️</div>
-          <div className="route-text">Live Routing Active</div>
-          <div className="route-sub">Delivering to Customer {activeJob.user}</div>
-          <div className="eta-badge">ETA: ~8 mins</div>
+          <div className="route-text" style={{ fontSize: '1.15rem', fontWeight: 'bold', color: '#fff' }}>GPS Routing & Google Maps Sync</div>
+          <div className="route-sub" style={{ fontSize: '0.82rem', color: '#94a3b8', margin: '4px 0 10px 0' }}>
+            🏪 {activeJob.pharmacy_id || 'Vamanjoor Pharmacy, Mangalore'} ➔ 🏠 Customer {activeJob.user}
+          </div>
+          <div className="eta-badge" style={{ marginBottom: '12px' }}>ETA: ~8 mins</div>
+
+          <a
+            href={`https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(activeJob.pharmacy_id || 'Vamanjoor Express Pharmacy, Mangalore')}&destination=${encodeURIComponent(
+              activeJob.delivery_address 
+                ? [activeJob.delivery_address.houseNo, activeJob.delivery_address.area, activeJob.delivery_address.city].filter(Boolean).join(', ')
+                : 'Airport Road, Vamanjoor, Mangalore'
+            )}&travelmode=driving`}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '6px',
+              background: '#2563eb',
+              color: '#fff',
+              padding: '10px 20px',
+              borderRadius: '10px',
+              fontWeight: 'bold',
+              fontSize: '0.88rem',
+              textDecoration: 'none',
+              boxShadow: '0 4px 12px rgba(37, 99, 235, 0.4)'
+            }}
+          >
+            <span>🧭</span>
+            <span>Launch Google Maps GPS App ↗</span>
+          </a>
         </div>
 
         <div className="job-details">

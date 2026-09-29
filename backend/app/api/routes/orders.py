@@ -32,6 +32,11 @@ class OrderCreateRequest(BaseModel):
     items: List[OrderItem]
     delivery_type: str = "15-Min Quick Commerce"
     distance: str = "1.2 km away"
+    prescription_id: Optional[str] = None
+    payment_method: str = "cod"
+    payment_status: str = "unpaid"
+    payment_id: Optional[str] = None
+    delivery_address: Optional[dict] = None
 
 class OrderStatusUpdate(BaseModel):
     status: str
@@ -49,8 +54,12 @@ def create_order(
         order_insert = db.table("orders").insert({
             "user_id": payload.user_id,
             "pharmacy_id": payload.pharmacy_id,
+            "prescription_id": payload.prescription_id,
             "delivery_type": "delivery",
             "total_amount": total_amt,
+            "payment_method": payload.payment_method,
+            "payment_status": payload.payment_status,
+            "payment_id": payload.payment_id,
             "status": "pending"
         }).execute()
         created_order_uuid = order_insert.data[0]["id"]
@@ -72,7 +81,12 @@ def create_order(
             items=[item.dict() for item in payload.items],
             type_d=payload.delivery_type,
             distance=payload.distance,
-            pharmacy_id=payload.pharmacy_id
+            pharmacy_id=payload.pharmacy_id,
+            prescription_id=payload.prescription_id,
+            payment_method=payload.payment_method,
+            payment_status=payload.payment_status,
+            payment_id=payload.payment_id,
+            delivery_address=payload.delivery_address
         )
         return {"status": "success", "order": new_order}
 
