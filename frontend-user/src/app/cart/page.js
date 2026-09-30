@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 
-const API = process.env.NEXT_PUBLIC_API_URL || 'https://backend-three-kappa-38.vercel.app';
+const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 const USER_ID = "1";
 
 export default function FullPageCart() {

@@ -15,7 +15,8 @@ class OrderService:
             "status": "pending"
         }
         
-        # Note: In real app, we handle error and check responses
+        if not supabase:
+            return None
         response = supabase.table('orders').insert(order_data).execute()
         order = response.data[0] if response.data else None
         

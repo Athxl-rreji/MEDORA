@@ -9,7 +9,7 @@ import SwiggyAddressDrawer from '../components/SwiggyAddressDrawer';
 import LivePerimeterRadar from '../components/LivePerimeterRadar';
 import CartoonBootup from '../components/CartoonBootup';
 
-const API = process.env.NEXT_PUBLIC_API_URL || 'https://backend-three-kappa-38.vercel.app';
+const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 const USER_ID = "1";
 
 // Order lifecycle stages

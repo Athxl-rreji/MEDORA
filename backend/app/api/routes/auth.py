@@ -1,6 +1,6 @@
 import re
 from typing import Optional
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Query
 from pydantic import BaseModel
 from app.core.prototype_db import PrototypeDataStore, get_datastore
 from app.core.email_service import send_email_otp, send_partner_request_email
@@ -442,11 +442,18 @@ def register(
         raise HTTPException(status_code=500, detail=f"Registration failed: {str(e)}")
 
 @router.get("/user-status")
-def check_user_status(identifier: str, mock_db: PrototypeDataStore = Depends(get_datastore)):
-    clean_id = identifier.strip().lower()
+def check_user_status(
+    identifier: Optional[str] = Query(None),
+    email: Optional[str] = Query(None),
+    mock_db: PrototypeDataStore = Depends(get_datastore)
+):
+    target = identifier or email
+    if not target:
+        raise HTTPException(status_code=400, detail="Missing identifier or email parameter")
+    clean_id = target.strip().lower()
     if clean_id in mock_db.deleted_users:
         return {"exists": False, "status": "deleted"}
-    user = mock_db.find_user(identifier)
+    user = mock_db.find_user(target)
     if not user:
         return {"exists": False, "status": "deleted"}
     return {
