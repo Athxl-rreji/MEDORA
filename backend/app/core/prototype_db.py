@@ -8,6 +8,7 @@ import random
 import time
 import math
 import tempfile
+import sqlite3
 from datetime import datetime
 from typing import List, Dict, Optional, Tuple
 from app.core.logger import logger
@@ -20,6 +21,7 @@ _candidate_dirs = [
     os.path.join(os.getcwd(), 'backend', 'datasets'),
 ]
 DATASETS_DIR = next((d for d in _candidate_dirs if os.path.exists(d) and os.path.exists(os.path.join(d, 'core_medicines.csv'))), _candidate_dirs[0])
+SQLITE_DB_PATH = os.path.join(DATASETS_DIR, 'medora.db')
 REGISTERED_USERS_CSV = os.path.join(DATASETS_DIR, 'registered_users.csv')
 PARTNER_REQUESTS_JSON = os.path.join(DATASETS_DIR, 'partner_requests.json')
 DELETED_USERS_JSON = os.path.join(DATASETS_DIR, 'deleted_users.json')
@@ -92,11 +94,346 @@ class PrototypeDataStore:
             "Vicks", "Montair"
         ]
 
+        # Initialize SQLite database engine & seed from existing records if needed
+        self.init_sqlite_db()
         self.load_deleted_users()
         self.load_users()
         self.load_data()
         self.load_deleted_partner_requests()
         self.load_partner_requests()
+
+    def get_db(self) -> sqlite3.Connection:
+        """Returns a thread-safe connection to the SQLite database with WAL mode."""
+        os.makedirs(os.path.dirname(SQLITE_DB_PATH), exist_ok=True)
+        conn = sqlite3.connect(SQLITE_DB_PATH, timeout=30.0)
+        conn.row_factory = sqlite3.Row
+        conn.execute("PRAGMA journal_mode = WAL;")
+        conn.execute("PRAGMA synchronous = NORMAL;")
+        return conn
+
+    def init_sqlite_db(self):
+        """Initializes SQLite schema and migrates existing CSV/JSON records to SQL."""
+        with self.get_db() as conn:
+            cur = conn.cursor()
+            cur.executescript("""
+                CREATE TABLE IF NOT EXISTS users (
+                    id TEXT PRIMARY KEY,
+                    full_name TEXT NOT NULL,
+                    role TEXT NOT NULL,
+                    email TEXT NOT NULL UNIQUE,
+                    phone TEXT DEFAULT '',
+                    username TEXT NOT NULL UNIQUE,
+                    password TEXT NOT NULL,
+                    status TEXT DEFAULT 'active',
+                    must_change_password INTEGER DEFAULT 0,
+                    address TEXT DEFAULT '',
+                    pharmacy_license TEXT DEFAULT '',
+                    vehicle_type TEXT DEFAULT '',
+                    driving_license TEXT DEFAULT '',
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT
+                );
+                CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+                CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
+                CREATE INDEX IF NOT EXISTS idx_users_phone ON users(phone);
+                CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
+                CREATE INDEX IF NOT EXISTS idx_users_status ON users(status);
+
+                CREATE TABLE IF NOT EXISTS partner_requests (
+                    id TEXT PRIMARY KEY,
+                    partner_type TEXT NOT NULL,
+                    full_name TEXT NOT NULL,
+                    email TEXT NOT NULL,
+                    phone TEXT DEFAULT '',
+                    status TEXT DEFAULT 'pending',
+                    submitted_at TEXT NOT NULL,
+                    store_name TEXT DEFAULT '',
+                    license_no TEXT DEFAULT '',
+                    store_address TEXT DEFAULT '',
+                    latitude REAL DEFAULT 19.0760,
+                    longitude REAL DEFAULT 72.8777,
+                    vehicle_type TEXT DEFAULT '',
+                    driving_license TEXT DEFAULT '',
+                    vehicle_number TEXT DEFAULT '',
+                    delivery_zone TEXT DEFAULT '',
+                    shift_preference TEXT DEFAULT '',
+                    rider_upi_id TEXT DEFAULT '',
+                    shop_upi_id TEXT DEFAULT '',
+                    shop_upi_qr TEXT DEFAULT '',
+                    approved_at TEXT,
+                    rejected_at TEXT,
+                    rejection_reason TEXT,
+                    temp_password TEXT
+                );
+                CREATE INDEX IF NOT EXISTS idx_partner_requests_status ON partner_requests(status);
+                CREATE INDEX IF NOT EXISTS idx_partner_requests_email ON partner_requests(email);
+
+                CREATE TABLE IF NOT EXISTS deleted_users (
+                    identifier TEXT PRIMARY KEY,
+                    id TEXT,
+                    email TEXT,
+                    username TEXT,
+                    role TEXT,
+                    deleted_at TEXT NOT NULL
+                );
+
+                CREATE TABLE IF NOT EXISTS deleted_partner_requests (
+                    id TEXT PRIMARY KEY,
+                    action TEXT NOT NULL,
+                    reason TEXT,
+                    email TEXT,
+                    timestamp TEXT NOT NULL
+                );
+            """)
+            conn.commit()
+
+            # 1. Seed deleted_users from JSON if table is empty
+            cur.execute("SELECT COUNT(*) FROM deleted_users")
+            if cur.fetchone()[0] == 0:
+                for d in self.get_all_dataset_dirs():
+                    path = os.path.join(d, 'deleted_users.json')
+                    if os.path.exists(path):
+                        try:
+                            with open(path, 'r', encoding='utf-8') as f:
+                                data = json.load(f)
+                                if isinstance(data, dict):
+                                    for k, v in data.items():
+                                        del_at = v.get("deleted_at", datetime.now().isoformat()) if isinstance(v, dict) else datetime.now().isoformat()
+                                        cur.execute("INSERT OR IGNORE INTO deleted_users (identifier, deleted_at) VALUES (?, ?)", (k.lower(), del_at))
+                        except Exception as e:
+                            logger.error(f"Error seeding deleted_users from {path}: {e}")
+                conn.commit()
+
+            # 2. Seed deleted_partner_requests from JSON if table is empty
+            cur.execute("SELECT COUNT(*) FROM deleted_partner_requests")
+            if cur.fetchone()[0] == 0:
+                for d in self.get_all_dataset_dirs():
+                    path = os.path.join(d, 'deleted_partner_requests.json')
+                    if os.path.exists(path):
+                        try:
+                            with open(path, 'r', encoding='utf-8') as f:
+                                data = json.load(f)
+                                if isinstance(data, dict):
+                                    for k, v in data.items():
+                                        action = v.get("action", "deleted") if isinstance(v, dict) else "deleted"
+                                        ts = v.get("timestamp", datetime.now().isoformat()) if isinstance(v, dict) else datetime.now().isoformat()
+                                        em = v.get("email") if isinstance(v, dict) else None
+                                        re = v.get("reason") if isinstance(v, dict) else None
+                                        cur.execute("INSERT OR IGNORE INTO deleted_partner_requests (id, action, reason, email, timestamp) VALUES (?, ?, ?, ?, ?)",
+                                                    (k, action, re, em, ts))
+                        except Exception as e:
+                            logger.error(f"Error seeding deleted_partner_requests from {path}: {e}")
+                conn.commit()
+
+            # 3. Migrate users from registered_users.csv if table is empty
+            cur.execute("SELECT COUNT(*) FROM users")
+            if cur.fetchone()[0] == 0:
+                logger.info(f"Users SQL table empty. Migrating accounts to SQLite at {SQLITE_DB_PATH}...")
+                default_users = [
+                    {
+                        "id": "usr_admin_1",
+                        "full_name": "MEDORA System Administrator",
+                        "role": "admin",
+                        "email": "admin@medora.com",
+                        "phone": "+919000000000",
+                        "username": "admin",
+                        "password": "admin",
+                        "status": "active",
+                        "must_change_password": 0,
+                        "address": "",
+                        "pharmacy_license": "",
+                        "vehicle_type": "",
+                        "driving_license": "",
+                        "created_at": "2026-01-01T00:00:00Z"
+                    },
+                    {
+                        "id": "usr_patient_1",
+                        "full_name": "Adhwaith (Patient)",
+                        "role": "patient",
+                        "email": "patient@medora.com",
+                        "phone": "+919999999999",
+                        "username": "patient",
+                        "password": "patient123",
+                        "status": "active",
+                        "must_change_password": 0,
+                        "address": "",
+                        "pharmacy_license": "",
+                        "vehicle_type": "",
+                        "driving_license": "",
+                        "created_at": "2026-01-01T00:00:00Z"
+                    },
+                    {
+                        "id": "usr_pharmacy_1",
+                        "full_name": "Vamanjoor Pharmacy Admin",
+                        "role": "pharmacy",
+                        "email": "pharmacy@medora.com",
+                        "phone": "+918888888888",
+                        "username": "pharmacy",
+                        "password": "pharmacy123",
+                        "status": "active",
+                        "must_change_password": 0,
+                        "address": "Airport Road, Vamanjoor",
+                        "pharmacy_license": "KA-MN-2024-PH998",
+                        "vehicle_type": "",
+                        "driving_license": "",
+                        "created_at": "2026-01-01T00:00:00Z"
+                    },
+                    {
+                        "id": "usr_rider_1",
+                        "full_name": "Rider AGT-591",
+                        "role": "delivery",
+                        "email": "rider@medora.com",
+                        "phone": "+917777777777",
+                        "username": "rider",
+                        "password": "rider123",
+                        "status": "active",
+                        "must_change_password": 0,
+                        "address": "Kodialbail, Mangalore",
+                        "pharmacy_license": "",
+                        "vehicle_type": "Electric Scooter",
+                        "driving_license": "DL-KA19-202300091",
+                        "created_at": "2026-01-01T00:00:00Z"
+                    }
+                ]
+
+                csv_source = REGISTERED_USERS_CSV
+                if os.path.exists('/tmp/medora_registered_users.csv'):
+                    csv_source = '/tmp/medora_registered_users.csv'
+
+                ingested_emails = set()
+                if os.path.exists(csv_source):
+                    try:
+                        with open(csv_source, mode='r', encoding='utf-8') as f:
+                            reader = csv.DictReader(f)
+                            for row in reader:
+                                em = str(row.get("email", "")).strip().lower()
+                                uid = str(row.get("id", "")).strip().lower()
+                                un = str(row.get("username", "")).strip().lower()
+                                if not em: continue
+
+                                cur.execute("SELECT identifier FROM deleted_users WHERE LOWER(identifier) IN (?, ?, ?)", (em, uid, un))
+                                if cur.fetchone():
+                                    continue
+
+                                passw = row.get("password", "")
+                                if un == "admin" or em == "admin@medora.com":
+                                    passw = "admin"
+                                # Flag temp passwords for pharmacies and riders
+                                must_change = 1 if passw in ["Pharmacy123", "Delivery123"] else int(row.get("must_change_password", 0) or 0)
+
+                                cur.execute("""
+                                    INSERT OR IGNORE INTO users (
+                                        id, full_name, role, email, phone, username, password, status,
+                                        must_change_password, address, pharmacy_license, vehicle_type,
+                                        driving_license, created_at
+                                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                """, (
+                                    row.get("id") or f"usr_{uuid.uuid4().hex[:8]}",
+                                    row.get("full_name") or "User",
+                                    row.get("role", "patient"),
+                                    row.get("email").strip(),
+                                    row.get("phone", ""),
+                                    row.get("username", em.split("@")[0]),
+                                    passw,
+                                    row.get("status", "active"),
+                                    must_change,
+                                    row.get("address", ""),
+                                    row.get("pharmacy_license", ""),
+                                    row.get("vehicle_type", ""),
+                                    row.get("driving_license", ""),
+                                    row.get("created_at", datetime.now().isoformat() + "Z")
+                                ))
+                                ingested_emails.add(em)
+                    except Exception as e:
+                        logger.error(f"Error reading CSV during SQLite migration: {e}")
+
+                for du in default_users:
+                    em = du["email"].lower()
+                    if em not in ingested_emails:
+                        cur.execute("SELECT identifier FROM deleted_users WHERE LOWER(identifier) = ?", (em,))
+                        if not cur.fetchone():
+                            cur.execute("""
+                                INSERT OR IGNORE INTO users (
+                                    id, full_name, role, email, phone, username, password, status,
+                                    must_change_password, address, pharmacy_license, vehicle_type,
+                                    driving_license, created_at
+                                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                            """, (
+                                du["id"], du["full_name"], du["role"], du["email"], du["phone"],
+                                du["username"], du["password"], du["status"], du["must_change_password"],
+                                du["address"], du["pharmacy_license"], du["vehicle_type"],
+                                du["driving_license"], du["created_at"]
+                            ))
+                conn.commit()
+
+            # 4. Migrate partner requests from JSON if table is empty
+            cur.execute("SELECT COUNT(*) FROM partner_requests")
+            if cur.fetchone()[0] == 0:
+                logger.info(f"Partner requests SQL table empty. Migrating applications to SQLite...")
+                candidate_paths = [PARTNER_REQUESTS_JSON]
+                for d in self.get_all_dataset_dirs():
+                    p = os.path.join(d, 'partner_requests.json')
+                    if p not in candidate_paths:
+                        candidate_paths.append(p)
+
+                for path in candidate_paths:
+                    if os.path.exists(path):
+                        try:
+                            with open(path, 'r', encoding='utf-8') as f:
+                                data = json.load(f)
+                                if isinstance(data, list):
+                                    for item in data:
+                                        req_id = item.get("id")
+                                        if not req_id: continue
+                                        cur.execute("SELECT id FROM deleted_partner_requests WHERE id = ?", (req_id,))
+                                        if cur.fetchone():
+                                            continue
+                                        cur.execute("""
+                                            INSERT OR IGNORE INTO partner_requests (
+                                                id, partner_type, full_name, email, phone, status, submitted_at,
+                                                store_name, license_no, store_address, latitude, longitude,
+                                                vehicle_type, driving_license, vehicle_number, delivery_zone,
+                                                shift_preference, rider_upi_id, shop_upi_id, shop_upi_qr
+                                            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                        """, (
+                                            req_id, item.get("partner_type", "pharmacy"), item.get("full_name", ""),
+                                            item.get("email", ""), item.get("phone", ""), item.get("status", "pending"),
+                                            item.get("submitted_at", datetime.now().isoformat()),
+                                            item.get("store_name", ""), item.get("license_no", ""),
+                                            item.get("store_address", ""), float(item.get("latitude") or 19.0760),
+                                            float(item.get("longitude") or 72.8777), item.get("vehicle_type", ""),
+                                            item.get("driving_license", ""), item.get("vehicle_number", ""),
+                                            item.get("delivery_zone", ""), item.get("shift_preference", ""),
+                                            item.get("rider_upi_id", ""), item.get("shop_upi_id", ""),
+                                            item.get("shop_upi_qr", "")
+                                        ))
+                        except Exception as e:
+                            logger.error(f"Error migrating partner requests from {path}: {e}")
+                conn.commit()
+
+                cur.execute("SELECT COUNT(*) FROM partner_requests")
+                if cur.fetchone()[0] == 0:
+                    demo_requests = [
+                        ("req_pharm_demo1", "pharmacy", "Dr. Rajesh Pai", "rajesh.pai@medoralabs.in", "+91 98450 12345",
+                         "pending", "2026-09-29T06:00:00Z", "Pai Apex Chemist & Care", "KA-MAN-2024-99881",
+                         "City Light Circle, Kadri, Mangalore", 19.0820, 72.8850, "", "", "", "", "", "", "", ""),
+                        ("req_deliv_demo2", "delivery", "Suresh Gowda", "suresh.gowda@gmail.com", "+91 97412 88877",
+                         "pending", "2026-09-29T06:15:00Z", "", "", "", 19.0760, 72.8777, "Electric Scooter",
+                         "DL-KA19-2022-77665", "", "", "", "", "", "")
+                    ]
+                    for dr in demo_requests:
+                        cur.execute("SELECT id FROM deleted_partner_requests WHERE id = ?", (dr[0],))
+                        if not cur.fetchone():
+                            cur.execute("""
+                                INSERT OR IGNORE INTO partner_requests (
+                                    id, partner_type, full_name, email, phone, status, submitted_at,
+                                    store_name, license_no, store_address, latitude, longitude,
+                                    vehicle_type, driving_license, vehicle_number, delivery_zone,
+                                    shift_preference, rider_upi_id, shop_upi_id, shop_upi_qr
+                                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                            """, dr)
+                    conn.commit()
+        logger.info(f"SQLite SQL database ready and indexed at {SQLITE_DB_PATH}")
 
     def calculate_distance(self, lat1: float, lon1: float, lat2: float, lon2: float) -> float:
         """Haversine formula to compute geodesic distance in kilometers between two coordinates."""
@@ -135,177 +472,64 @@ class PrototypeDataStore:
         return dirs
 
     def load_deleted_users(self):
-        """Loads tombstone records of permanently deleted user accounts."""
+        """Loads tombstone records from SQLite into memory dictionary."""
         self.deleted_users = {}
-        candidate_paths = [
-            os.path.join(d, 'deleted_users.json') for d in self.get_all_dataset_dirs()
-        ]
-        candidate_paths.append('/tmp/medora_deleted_users.json')
-
-        for path in candidate_paths:
-            if os.path.exists(path):
-                try:
-                    with open(path, 'r', encoding='utf-8') as f:
-                        data = json.load(f)
-                        if isinstance(data, dict):
-                            self.deleted_users.update(data)
-                        elif isinstance(data, list):
-                            for item in data:
-                                if isinstance(item, str):
-                                    self.deleted_users[item.strip().lower()] = {"deleted_at": datetime.now().isoformat()}
-                                elif isinstance(item, dict) and "identifier" in item:
-                                    self.deleted_users[item["identifier"].strip().lower()] = item
-                except Exception as e:
-                    logger.error(f"Error loading deleted users from {path}: {e}")
+        try:
+            with self.get_db() as conn:
+                cur = conn.cursor()
+                cur.execute("SELECT * FROM deleted_users")
+                for r in cur.fetchall():
+                    self.deleted_users[r["identifier"].strip().lower()] = dict(r)
+        except Exception as e:
+            logger.error(f"Error loading deleted users from SQLite: {e}")
 
     def save_deleted_users(self):
-        """Persists deleted user tombstones across all dataset locations."""
+        """Mirrors deleted user tombstones across JSON files for backup/visibility."""
         for d in self.get_all_dataset_dirs():
             path = os.path.join(d, 'deleted_users.json')
             try:
                 with open(path, 'w', encoding='utf-8') as f:
                     json.dump(self.deleted_users, f, indent=2)
             except Exception as e:
-                logger.error(f"Failed to save deleted users to {path}: {e}")
-        
-        # Also persist to /tmp for serverless environments
-        try:
-            with open('/tmp/medora_deleted_users.json', 'w', encoding='utf-8') as f:
-                json.dump(self.deleted_users, f, indent=2)
-        except Exception:
-            pass
+                logger.error(f"Failed to mirror deleted users to {path}: {e}")
 
     def load_users(self):
-        """Loads registered users from CSV to remember credentials even across server termination."""
-        default_users = [
-            {
-                "id": "usr_admin_1",
-                "full_name": "MEDORA System Administrator",
-                "role": "admin",
-                "email": "admin@medora.com",
-                "phone": "+919000000000",
-                "username": "admin",
-                "password": "admin",
-                "status": "active",
-                "address": "",
-                "pharmacy_license": "",
-                "vehicle_type": "",
-                "driving_license": "",
-                "created_at": "2026-01-01T00:00:00Z"
-            },
-            {
-                "id": "usr_patient_1",
-                "full_name": "Adhwaith (Patient)",
-                "role": "patient",
-                "email": "patient@medora.com",
-                "phone": "+919999999999",
-                "username": "patient",
-                "password": "patient123",
-                "status": "active",
-                "address": "",
-                "pharmacy_license": "",
-                "vehicle_type": "",
-                "driving_license": "",
-                "created_at": "2026-01-01T00:00:00Z"
-            },
-            {
-                "id": "usr_pharmacy_1",
-                "full_name": "Vamanjoor Pharmacy Admin",
-                "role": "pharmacy",
-                "email": "pharmacy@medora.com",
-                "phone": "+918888888888",
-                "username": "pharmacy",
-                "password": "pharmacy123",
-                "status": "active",
-                "address": "Airport Road, Vamanjoor",
-                "pharmacy_license": "KA-MN-2024-PH998",
-                "vehicle_type": "",
-                "driving_license": "",
-                "created_at": "2026-01-01T00:00:00Z"
-            },
-            {
-                "id": "usr_rider_1",
-                "full_name": "Rider AGT-591",
-                "role": "delivery",
-                "email": "rider@medora.com",
-                "phone": "+917777777777",
-                "username": "rider",
-                "password": "rider123",
-                "status": "active",
-                "address": "Kodialbail, Mangalore",
-                "pharmacy_license": "",
-                "vehicle_type": "Electric Scooter",
-                "driving_license": "DL-KA19-202300091",
-                "created_at": "2026-01-01T00:00:00Z"
-            }
-        ]
-
-        # Always ensure tombstones are loaded first
+        """Loads registered users from SQLite database into memory cache and updates CSV mirror."""
         self.load_deleted_users()
-
-        # Check if /tmp has newer credentials (serverless) or load from registered_users.csv
-        csv_source = REGISTERED_USERS_CSV
-        if os.path.exists('/tmp/medora_registered_users.csv'):
-            csv_source = '/tmp/medora_registered_users.csv'
-
-        if not os.path.exists(csv_source):
-            self.users = [
-                d for d in default_users 
-                if d["email"].lower() not in self.deleted_users 
-                and d["id"].lower() not in self.deleted_users
-                and d["username"].lower() not in self.deleted_users
-            ]
-            self.save_users_to_csv()
-            logger.info(f"Initialized registered_users.csv with {len(self.users)} non-deleted default credentials at {REGISTERED_USERS_CSV}")
-            return
-
-        loaded_users = []
+        loaded = []
         try:
-            with open(csv_source, mode='r', encoding='utf-8') as f:
-                reader = csv.DictReader(f)
-                for row in reader:
-                    uid = str(row.get("id", "")).strip().lower()
-                    uemail = str(row.get("email", "")).strip().lower()
-                    uname = str(row.get("username", "")).strip().lower()
+            with self.get_db() as conn:
+                cur = conn.cursor()
+                cur.execute("""
+                    SELECT id, full_name, role, email, phone, username, password, status,
+                           must_change_password, address, pharmacy_license, vehicle_type,
+                           driving_license, created_at, updated_at
+                    FROM users
+                    ORDER BY created_at ASC
+                """)
+                for r in cur.fetchall():
+                    uid = str(r["id"]).strip().lower()
+                    uemail = str(r["email"]).strip().lower()
+                    uname = str(r["username"]).strip().lower()
 
-                    # PERMANENT PURGE: If user is marked as deleted in tombstones, skip completely
                     if uid in self.deleted_users or uemail in self.deleted_users or uname in self.deleted_users:
-                        logger.info(f"Skipping permanently deleted user account: {uemail} ({uid})")
                         continue
 
-                    if not row.get("status"):
-                        row["status"] = "active"
-                    # Ensure admin password can always be 'admin'
-                    if row.get("username") == "admin" or row.get("email") == "admin@medora.com":
-                        row["password"] = "admin"
-                    loaded_users.append(row)
+                    d = dict(r)
+                    d["must_change_password"] = bool(d.get("must_change_password", 0))
+                    loaded.append(d)
+            self.users = loaded
+            self.save_users_to_csv()
+            logger.info(f"Loaded {len(self.users)} active accounts from SQLite database.")
         except Exception as e:
-            logger.error(f"Error reading registered_users.csv: {e}")
-
-        # Ensure default accounts are present ONLY IF NOT DELETED
-        existing_emails = {u.get("email", "").lower() for u in loaded_users}
-        for d in default_users:
-            d_email = d["email"].lower()
-            d_id = d.get("id", "").lower()
-            d_uname = d.get("username", "").lower()
-
-            # NEVER RESTORE A DELETED USER ACCOUNT
-            if d_email in self.deleted_users or d_id in self.deleted_users or d_uname in self.deleted_users:
-                continue
-
-            if d_email not in existing_emails:
-                loaded_users.append(d)
-
-        self.users = loaded_users
-        self.save_users_to_csv()
-        logger.info(f"Loaded {len(self.users)} registered user accounts from {REGISTERED_USERS_CSV}")
+            logger.error(f"Error querying users from SQLite: {e}")
 
     def save_users_to_csv(self):
-        """Flushes user credentials to registered_users.csv across all dataset directories for durable persistence."""
+        """Saves a mirror of user credentials to registered_users.csv across all dataset directories."""
         fieldnames = [
             "id", "full_name", "role", "email", "phone", 
-            "username", "password", "status", "address", "pharmacy_license", 
-            "vehicle_type", "driving_license", "created_at"
+            "username", "password", "status", "must_change_password", "address",
+            "pharmacy_license", "vehicle_type", "driving_license", "created_at"
         ]
         clean_users = [
             u for u in self.users
@@ -321,24 +545,11 @@ class PrototypeDataStore:
                     writer = csv.DictWriter(f, fieldnames=fieldnames, extrasaction='ignore')
                     writer.writeheader()
                     for u in clean_users:
-                        if not u.get("status"):
-                            u["status"] = "active"
-                        writer.writerow(u)
-                logger.info(f"Durable credentials persisted: {len(clean_users)} accounts saved to {path}")
+                        row = dict(u)
+                        row["must_change_password"] = 1 if row.get("must_change_password") else 0
+                        writer.writerow(row)
             except Exception as e:
-                logger.error(f"Failed to persist users to CSV at {path}: {e}")
-
-        # Also persist to /tmp for serverless environments
-        try:
-            with open('/tmp/medora_registered_users.csv', mode='w', newline='', encoding='utf-8') as f:
-                writer = csv.DictWriter(f, fieldnames=fieldnames, extrasaction='ignore')
-                writer.writeheader()
-                for u in clean_users:
-                    if not u.get("status"):
-                        u["status"] = "active"
-                    writer.writerow(u)
-        except Exception:
-            pass
+                logger.error(f"Failed to mirror users to CSV at {path}: {e}")
 
     def load_data(self):
         med_path = os.path.join(DATASETS_DIR, 'core_medicines.csv')
@@ -703,6 +914,36 @@ class PrototypeDataStore:
     def find_user(self, identifier: str) -> Optional[dict]:
         if not identifier: return None
         identifier_clean = identifier.strip().lower()
+        clean_phone = identifier_clean.replace(" ", "").replace("-", "")
+
+        try:
+            with self.get_db() as conn:
+                cur = conn.cursor()
+                cur.execute("SELECT identifier FROM deleted_users WHERE LOWER(identifier) = ? OR LOWER(email) = ? OR LOWER(username) = ?",
+                            (identifier_clean, identifier_clean, identifier_clean))
+                if cur.fetchone():
+                    return None
+
+                cur.execute("""
+                    SELECT id, full_name, role, email, phone, username, password, status,
+                           must_change_password, address, pharmacy_license, vehicle_type,
+                           driving_license, created_at, updated_at
+                    FROM users
+                    WHERE LOWER(email) = ? 
+                       OR LOWER(username) = ? 
+                       OR LOWER(id) = ? 
+                       OR (phone != '' AND REPLACE(REPLACE(phone, ' ', ''), '-', '') = ?)
+                    LIMIT 1
+                """, (identifier_clean, identifier_clean, identifier_clean, clean_phone))
+                row = cur.fetchone()
+                if row:
+                    user_dict = dict(row)
+                    user_dict["must_change_password"] = bool(user_dict.get("must_change_password", 0))
+                    return user_dict
+        except Exception as e:
+            logger.error(f"Error querying user {identifier} from SQLite: {e}")
+
+        # Fallback to in-memory cache
         if identifier_clean in self.deleted_users:
             return None
         for u in self.users:
@@ -710,46 +951,48 @@ class PrototypeDataStore:
             uemail = str(u.get("email", "")).strip().lower()
             uname = str(u.get("username", "")).strip().lower()
             uphone = str(u.get("phone", "")).replace(" ", "").replace("-", "")
-            clean_phone = identifier_clean.replace(" ", "").replace("-", "")
-
-            if uid in self.deleted_users or uemail in self.deleted_users or uname in self.deleted_users:
-                continue
-
-            if (uemail == identifier_clean or uname == identifier_clean or (clean_phone and uphone == clean_phone)):
+            if (uemail == identifier_clean or uname == identifier_clean or uid == identifier_clean or (clean_phone and uphone == clean_phone)):
                 return u
         return None
 
     def register_user(self, full_name: str, role: str, email: str, phone: str, username: str, password: str,
-                      address: str = None, pharmacy_license: str = None, vehicle_type: str = None, driving_license: str = None) -> dict:
-        """Registers a user and immediately flushes credentials to registered_users.csv."""
-        existing = self.find_user(email) or self.find_user(username) or self.find_user(phone)
+                      address: str = None, pharmacy_license: str = None, vehicle_type: str = None, 
+                      driving_license: str = None, must_change_password: bool = False) -> dict:
+        """Registers a user directly into SQLite database and syncs to memory & CSV mirror."""
+        existing = self.find_user(email) or self.find_user(username) or (phone and self.find_user(phone))
         if existing:
             raise ValueError("An account with this email, username, or phone number already exists.")
-        
-        # If this email or username was previously in deleted_users, clear it now for fresh registration
+
         clean_email = email.strip().lower()
         clean_uname = (username or email.split("@")[0]).strip().lower()
-        if clean_email in self.deleted_users or clean_uname in self.deleted_users:
-            self.deleted_users.pop(clean_email, None)
-            self.deleted_users.pop(clean_uname, None)
-            self.save_deleted_users()
+        user_id = f"usr_{uuid.uuid4().hex[:8]}"
+        created_at = datetime.now().isoformat() + "Z"
+        must_change_val = 1 if must_change_password else 0
 
-        new_user = {
-            "id": f"usr_{uuid.uuid4().hex[:8]}",
-            "full_name": full_name,
-            "role": role,
-            "email": email,
-            "phone": phone,
-            "username": username or email.split("@")[0],
-            "password": password,
-            "address": address or "",
-            "pharmacy_license": pharmacy_license or "",
-            "vehicle_type": vehicle_type or "",
-            "driving_license": driving_license or "",
-            "created_at": datetime.now().isoformat() + "Z"
-        }
-        self.users.append(new_user)
-        self.save_users_to_csv()
+        with self.get_db() as conn:
+            cur = conn.cursor()
+            # Clear from tombstones if previously deleted
+            cur.execute("DELETE FROM deleted_users WHERE LOWER(identifier) IN (?, ?) OR LOWER(email) = ? OR LOWER(username) = ?",
+                        (clean_email, clean_uname, clean_email, clean_uname))
+            
+            cur.execute("""
+                INSERT INTO users (
+                    id, full_name, role, email, phone, username, password, status,
+                    must_change_password, address, pharmacy_license, vehicle_type,
+                    driving_license, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, ?)
+            """, (
+                user_id, full_name.strip(), role.strip(), email.strip(),
+                phone.strip() if phone else "", clean_uname, password,
+                must_change_val, address or "", pharmacy_license or "",
+                vehicle_type or "", driving_license or "", created_at
+            ))
+            conn.commit()
+
+        # Update in-memory state and CSV mirror
+        self.load_users()
+        new_user = self.find_user(user_id)
+        logger.info(f"Registered user in SQLite: {clean_email} (Role: {role}, must_change_password: {must_change_password})")
         return new_user
 
     def validate_password_strength(self, password: str):
@@ -789,7 +1032,7 @@ class PrototypeDataStore:
         return otp_code
 
     def confirm_pending_registration(self, email: str, otp_code: str) -> dict:
-        """Verifies OTP and writes the verified user credentials to registered_users.csv."""
+        """Verifies OTP and writes the verified user credentials into SQLite database."""
         key = email.strip().lower()
         pending = self.pending_registrations.get(key)
         if not pending:
@@ -808,32 +1051,18 @@ class PrototypeDataStore:
             remaining = 5 - pending["attempts"]
             raise ValueError(f"Invalid 6-digit OTP code. {remaining} attempt(s) remaining.")
 
-        # Clear from deleted_users if previously deleted
-        clean_email = pending["email"].strip().lower()
-        clean_uname = pending["username"].strip().lower()
-        if clean_email in self.deleted_users or clean_uname in self.deleted_users:
-            self.deleted_users.pop(clean_email, None)
-            self.deleted_users.pop(clean_uname, None)
-            self.save_deleted_users()
-
-        new_user = {
-            "id": f"usr_{uuid.uuid4().hex[:8]}",
-            "full_name": pending["full_name"],
-            "role": pending["role"],
-            "email": pending["email"],
-            "phone": pending["phone"],
-            "username": pending["username"],
-            "password": pending["password"],
-            "address": pending.get("address", ""),
-            "pharmacy_license": "",
-            "vehicle_type": "",
-            "driving_license": "",
-            "created_at": datetime.now().isoformat() + "Z"
-        }
-        self.users.append(new_user)
-        self.save_users_to_csv()
+        new_user = self.register_user(
+            full_name=pending["full_name"],
+            role=pending["role"],
+            email=pending["email"],
+            phone=pending["phone"],
+            username=pending["username"],
+            password=pending["password"],
+            address=pending.get("address", ""),
+            must_change_password=False
+        )
         del self.pending_registrations[key]
-        logger.info(f"Confirmed registration & saved user to CSV: {new_user['full_name']} ({new_user['email']})")
+        logger.info(f"Confirmed registration & saved user to SQLite: {new_user['full_name']} ({new_user['email']})")
         return new_user
 
     def update_password(self, identifier: str, new_password: str) -> bool:
@@ -841,175 +1070,106 @@ class PrototypeDataStore:
         if not user:
             return False
         self.validate_password_strength(new_password)
-        user["password"] = new_password
-        self.save_users_to_csv()
-        logger.info(f"Updated password and saved to CSV for user {user['email']}")
+        now_iso = datetime.now().isoformat() + "Z"
+        with self.get_db() as conn:
+            cur = conn.cursor()
+            cur.execute("""
+                UPDATE users 
+                SET password = ?, updated_at = ?
+                WHERE id = ?
+            """, (new_password, now_iso, user["id"]))
+            conn.commit()
+        self.load_users()
+        logger.info(f"Updated password in SQLite for user {user['email']}")
         return True
 
-    def load_deleted_partner_requests(self):
-        """Loads tombstone records of removed, rejected, or approved partner applications."""
-        self.deleted_partner_requests = {}
-        candidate_paths = [
-            os.path.join(d, 'deleted_partner_requests.json') for d in self.get_all_dataset_dirs()
-        ]
-        candidate_paths.append(os.path.join(tempfile.gettempdir(), 'medora_deleted_partner_requests.json'))
-        candidate_paths.append('/tmp/medora_deleted_partner_requests.json')
+    def set_first_time_password(self, identifier: str, temp_password: str, new_password: str) -> dict:
+        """Sets a permanent password for accounts initialized with a temporary password and clears must_change_password."""
+        user = self.find_user(identifier)
+        if not user:
+            raise ValueError("User account not found.")
 
-        for path in candidate_paths:
-            if os.path.exists(path):
-                try:
-                    with open(path, 'r', encoding='utf-8') as f:
-                        data = json.load(f)
-                        if isinstance(data, dict):
-                            self.deleted_partner_requests.update(data)
-                        elif isinstance(data, list):
-                            for item in data:
-                                if isinstance(item, str):
-                                    self.deleted_partner_requests[item.strip()] = {"deleted_at": datetime.now().isoformat()}
-                                elif isinstance(item, dict) and "id" in item:
-                                    self.deleted_partner_requests[item["id"].strip()] = item
-                except Exception as e:
-                    logger.error(f"Error loading deleted partner requests from {path}: {e}")
+        if user.get("password") != temp_password.strip():
+            raise ValueError("The temporary password entered is incorrect. Please verify your initial login credentials.")
+
+        if new_password.strip() == temp_password.strip():
+            raise ValueError("Your new password cannot be identical to the temporary password. Please choose a new, private password.")
+
+        self.validate_password_strength(new_password)
+        now_iso = datetime.now().isoformat() + "Z"
+        with self.get_db() as conn:
+            cur = conn.cursor()
+            cur.execute("""
+                UPDATE users 
+                SET password = ?, must_change_password = 0, updated_at = ?
+                WHERE id = ?
+            """, (new_password.strip(), now_iso, user["id"]))
+            conn.commit()
+
+        self.load_users()
+        updated_user = self.find_user(user["id"])
+        logger.info(f"First-time password set for {updated_user['email']}! Temporary flag cleared.")
+        return updated_user
+
+    def load_deleted_partner_requests(self):
+        """Loads tombstone records from SQLite into memory dictionary."""
+        self.deleted_partner_requests = {}
+        try:
+            with self.get_db() as conn:
+                cur = conn.cursor()
+                cur.execute("SELECT * FROM deleted_partner_requests")
+                for r in cur.fetchall():
+                    self.deleted_partner_requests[r["id"].strip()] = dict(r)
+        except Exception as e:
+            logger.error(f"Error loading deleted partner requests from SQLite: {e}")
 
     def save_deleted_partner_requests(self):
-        """Persists deleted partner request tombstones across all dataset locations."""
+        """Mirrors deleted partner request tombstones across JSON files for backup/visibility."""
         for d in self.get_all_dataset_dirs():
             path = os.path.join(d, 'deleted_partner_requests.json')
             try:
                 with open(path, 'w', encoding='utf-8') as f:
                     json.dump(self.deleted_partner_requests, f, indent=2)
             except Exception as e:
-                logger.error(f"Failed to save deleted partner requests to {path}: {e}")
-        
-        temp_paths = [
-            os.path.join(tempfile.gettempdir(), 'medora_deleted_partner_requests.json'),
-            '/tmp/medora_deleted_partner_requests.json'
-        ]
-        for tpath in temp_paths:
-            try:
-                os.makedirs(os.path.dirname(tpath), exist_ok=True)
-                with open(tpath, 'w', encoding='utf-8') as f:
-                    json.dump(self.deleted_partner_requests, f, indent=2)
-            except Exception:
-                pass
+                logger.error(f"Failed to mirror deleted partner requests to {path}: {e}")
 
     def load_partner_requests(self):
-        # Always ensure tombstones are loaded first
+        """Loads partner requests from SQLite into memory and updates JSON mirror."""
         self.load_deleted_partner_requests()
-
-        candidate_paths = [
-            os.path.join(tempfile.gettempdir(), 'medora_partner_requests.json'),
-            '/tmp/medora_partner_requests.json',
-            PARTNER_REQUESTS_JSON
-        ]
-        for d in self.get_all_dataset_dirs():
-            p = os.path.join(d, 'partner_requests.json')
-            if p not in candidate_paths:
-                candidate_paths.append(p)
-
-        loaded_requests = []
-        seen_ids = set()
-        for path in candidate_paths:
-            if os.path.exists(path):
-                try:
-                    with open(path, 'r', encoding='utf-8') as f:
-                        data = json.load(f)
-                        if isinstance(data, list) and len(data) > 0:
-                            for item in data:
-                                if isinstance(item, dict) and "id" in item:
-                                    req_id = item["id"]
-                                    # Never resurrect requests that have been deleted, rejected, or approved
-                                    if req_id in self.deleted_partner_requests:
-                                        continue
-                                    if req_id not in seen_ids:
-                                        seen_ids.add(req_id)
-                                        loaded_requests.append(item)
-                except Exception as e:
-                    logger.error(f"Error loading partner requests from {path}: {e}")
-
-        # Filter in-memory partner requests to purge any deleted IDs
-        self.partner_requests = [
-            r for r in self.partner_requests
-            if r.get("id") and r.get("id") not in self.deleted_partner_requests
-        ]
-
-        # Merge with in-memory requests so newly created requests are never dropped
-        if not self.partner_requests and not loaded_requests:
-            # Default starter partner requests if none exist anywhere
-            demo_requests = [
-                {
-                    "id": "req_pharm_demo1",
-                    "partner_type": "pharmacy",
-                    "full_name": "Dr. Rajesh Pai",
-                    "email": "rajesh.pai@medoralabs.in",
-                    "phone": "+91 98450 12345",
-                    "status": "pending",
-                    "submitted_at": "2026-09-29T06:00:00Z",
-                    "store_name": "Pai Apex Chemist & Care",
-                    "license_no": "KA-MAN-2024-99881",
-                    "store_address": "City Light Circle, Kadri, Mangalore",
-                    "latitude": 19.0820,
-                    "longitude": 72.8850
-                },
-                {
-                    "id": "req_deliv_demo2",
-                    "partner_type": "delivery",
-                    "full_name": "Suresh Gowda",
-                    "email": "suresh.gowda@gmail.com",
-                    "phone": "+91 97412 88877",
-                    "status": "pending",
-                    "submitted_at": "2026-09-29T06:15:00Z",
-                    "vehicle_type": "Electric Scooter",
-                    "driving_license": "DL-KA19-2022-77665"
-                }
-            ]
-            self.partner_requests = [
-                dr for dr in demo_requests if dr["id"] not in self.deleted_partner_requests
-            ]
+        loaded = []
+        try:
+            with self.get_db() as conn:
+                cur = conn.cursor()
+                cur.execute("""
+                    SELECT * FROM partner_requests
+                    WHERE id NOT IN (SELECT id FROM deleted_partner_requests)
+                    ORDER BY submitted_at DESC
+                """)
+                for r in cur.fetchall():
+                    loaded.append(dict(r))
+            self.partner_requests = loaded
             self.save_partner_requests()
-        elif not self.partner_requests and loaded_requests:
-            self.partner_requests = [
-                lr for lr in loaded_requests if lr.get("id") not in self.deleted_partner_requests
-            ]
-        elif self.partner_requests and loaded_requests:
-            existing_ids = {r.get("id") for r in self.partner_requests}
-            for lr in loaded_requests:
-                req_id = lr.get("id")
-                if req_id and req_id not in existing_ids and req_id not in self.deleted_partner_requests:
-                    self.partner_requests.append(lr)
-                    existing_ids.add(req_id)
+            logger.info(f"Loaded {len(self.partner_requests)} active partner requests from SQLite.")
+        except Exception as e:
+            logger.error(f"Error querying partner requests from SQLite: {e}")
 
     def save_partner_requests(self):
-        # Filter before saving
+        """Mirrors active partner requests to partner_requests.json for backup/visibility."""
         clean_requests = [
             r for r in self.partner_requests
             if r.get("id") and r.get("id") not in self.deleted_partner_requests
         ]
-        self.partner_requests = clean_requests
-
         for d in self.get_all_dataset_dirs():
             path = os.path.join(d, 'partner_requests.json')
             try:
                 with open(path, 'w', encoding='utf-8') as f:
                     json.dump(clean_requests, f, indent=2)
             except Exception as e:
-                logger.error(f"Error saving partner requests to {path}: {e}")
-        
-        # Save cross-platform temp copies
-        temp_paths = [
-            os.path.join(tempfile.gettempdir(), 'medora_partner_requests.json'),
-            '/tmp/medora_partner_requests.json'
-        ]
-        for tpath in temp_paths:
-            try:
-                os.makedirs(os.path.dirname(tpath), exist_ok=True)
-                with open(tpath, 'w', encoding='utf-8') as f:
-                    json.dump(clean_requests, f, indent=2)
-            except Exception:
-                pass
+                logger.error(f"Error mirroring partner requests to {path}: {e}")
 
     def create_partner_request(self, partner_type: str, full_name: str, email: str, phone: str, details: dict) -> dict:
         req_id = f"req_{partner_type[:5]}_{uuid.uuid4().hex[:6]}"
+        submitted_at = datetime.now().isoformat()
         new_req = {
             "id": req_id,
             "partner_type": partner_type,
@@ -1017,47 +1177,90 @@ class PrototypeDataStore:
             "email": email,
             "phone": phone,
             "status": "pending",
-            "submitted_at": datetime.now().isoformat(),
-            **details
+            "submitted_at": submitted_at,
+            "store_name": details.get("store_name", ""),
+            "license_no": details.get("license_no", ""),
+            "store_address": details.get("store_address", ""),
+            "latitude": float(details.get("latitude") or 19.0760),
+            "longitude": float(details.get("longitude") or 72.8777),
+            "vehicle_type": details.get("vehicle_type", ""),
+            "driving_license": details.get("driving_license", ""),
+            "vehicle_number": details.get("vehicle_number", ""),
+            "delivery_zone": details.get("delivery_zone", ""),
+            "shift_preference": details.get("shift_preference", ""),
+            "rider_upi_id": details.get("rider_upi_id", ""),
+            "shop_upi_id": details.get("shop_upi_id", ""),
+            "shop_upi_qr": details.get("shop_upi_qr", "")
         }
-        self.partner_requests.insert(0, new_req)
-        self.save_partner_requests()
-        logger.info(f"Created new partner request {req_id} for {full_name} ({partner_type})")
+
+        with self.get_db() as conn:
+            cur = conn.cursor()
+            cur.execute("""
+                INSERT INTO partner_requests (
+                    id, partner_type, full_name, email, phone, status, submitted_at,
+                    store_name, license_no, store_address, latitude, longitude,
+                    vehicle_type, driving_license, vehicle_number, delivery_zone,
+                    shift_preference, rider_upi_id, shop_upi_id, shop_upi_qr
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                new_req["id"], new_req["partner_type"], new_req["full_name"], new_req["email"],
+                new_req["phone"], new_req["status"], new_req["submitted_at"], new_req["store_name"],
+                new_req["license_no"], new_req["store_address"], new_req["latitude"], new_req["longitude"],
+                new_req["vehicle_type"], new_req["driving_license"], new_req["vehicle_number"],
+                new_req["delivery_zone"], new_req["shift_preference"], new_req["rider_upi_id"],
+                new_req["shop_upi_id"], new_req["shop_upi_qr"]
+            ))
+            conn.commit()
+
+        self.load_partner_requests()
+        logger.info(f"Created partner request in SQLite: {req_id} for {full_name} ({partner_type})")
         return new_req
 
     def get_partner_requests(self, status: str = None, partner_type: str = None) -> List[dict]:
-        self.load_partner_requests()
-        results = [
-            r for r in self.partner_requests
-            if r.get("id") and r.get("id") not in self.deleted_partner_requests
-        ]
-        if status and status != 'all':
-            results = [r for r in results if r.get('status') == status]
-        if partner_type and partner_type != 'all':
-            results = [r for r in results if r.get('partner_type') == partner_type]
-        return results
+        with self.get_db() as conn:
+            cur = conn.cursor()
+            query = """
+                SELECT * FROM partner_requests
+                WHERE id NOT IN (SELECT id FROM deleted_partner_requests)
+            """
+            params = []
+            if status and status != 'all':
+                query += " AND status = ?"
+                params.append(status)
+            if partner_type and partner_type != 'all':
+                query += " AND partner_type = ?"
+                params.append(partner_type)
+            query += " ORDER BY submitted_at DESC"
+            cur.execute(query, params)
+            rows = cur.fetchall()
+            return [dict(r) for r in rows]
 
     def delete_partner_request(self, req_id: str) -> bool:
         """Permanently removes a partner application from the onboarding KYC list."""
-        self.deleted_partner_requests[req_id] = {
-            "id": req_id,
-            "action": "removed",
-            "timestamp": datetime.now().isoformat()
-        }
-        initial_len = len(self.partner_requests)
-        self.partner_requests = [
-            r for r in self.partner_requests
-            if r.get("id") != req_id and r.get("id") not in self.deleted_partner_requests
-        ]
-        self.save_partner_requests()
-        self.save_deleted_partner_requests()
-        logger.info(f"Deleted partner request {req_id} from onboarding list and recorded tombstone.")
+        now_iso = datetime.now().isoformat()
+        with self.get_db() as conn:
+            cur = conn.cursor()
+            cur.execute("""
+                INSERT OR REPLACE INTO deleted_partner_requests (id, action, timestamp)
+                VALUES (?, 'removed', ?)
+            """, (req_id, now_iso))
+            conn.commit()
+
+        self.load_deleted_partner_requests()
+        self.load_partner_requests()
+        logger.info(f"Recorded tombstone in SQLite for partner request {req_id} and removed from onboarding.")
         return True
 
     def approve_partner_request(self, req_id: str) -> dict:
-        req = next((r for r in self.partner_requests if r["id"] == req_id), None)
-        if not req:
-            raise ValueError("Partner request not found.")
+        req = None
+        with self.get_db() as conn:
+            cur = conn.cursor()
+            cur.execute("SELECT * FROM partner_requests WHERE id = ?", (req_id,))
+            row = cur.fetchone()
+            if not row:
+                raise ValueError("Partner request not found.")
+            req = dict(row)
+
         if req.get("status") == "approved":
             raise ValueError("This application has already been approved.")
 
@@ -1071,26 +1274,33 @@ class PrototypeDataStore:
                 full_name=req["full_name"],
                 role=role,
                 email=req["email"],
-                phone=req["phone"],
+                phone=req.get("phone", ""),
                 username=username,
                 password=temp_pass,
                 address=req.get("store_address", ""),
                 pharmacy_license=req.get("license_no"),
                 vehicle_type=req.get("vehicle_type"),
-                driving_license=req.get("driving_license")
+                driving_license=req.get("driving_license"),
+                must_change_password=True  # MANDATORY FIRST TIME RESET
             )
         else:
-            user["status"] = "active"
-            self.save_users_to_csv()
+            with self.get_db() as conn:
+                cur = conn.cursor()
+                cur.execute("""
+                    UPDATE users 
+                    SET status = 'active', password = ?, must_change_password = 1, updated_at = ?
+                    WHERE id = ?
+                """, (temp_pass, datetime.now().isoformat() + "Z", user["id"]))
+                conn.commit()
+            self.load_users()
+            user = self.find_user(user["id"])
 
-        # If it is a pharmacy store, register this pharmacy node in the network with its GPS coordinates!
         if req["partner_type"] == "pharmacy":
             pharm_id = f"PHARM_{req_id[-4:].upper()}"
             store_name = req.get("store_name") or req.get("full_name") or "Express Pharmacy"
             lat = float(req.get("latitude") or 19.0760)
             lng = float(req.get("longitude") or 72.8777)
             
-            # Add to pharmacy metadata dark-store network
             self.pharmacy_metadata[pharm_id] = {
                 "id": pharm_id,
                 "name": store_name,
@@ -1109,50 +1319,58 @@ class PrototypeDataStore:
             }
             logger.info(f"Registered new GPS dark-store pharmacy node: {store_name} ({pharm_id}) at [{lat}, {lng}]")
 
-        req["status"] = "approved"
-        req["approved_at"] = datetime.now().isoformat()
-        req["temp_password"] = temp_pass
+        now_iso = datetime.now().isoformat()
+        with self.get_db() as conn:
+            cur = conn.cursor()
+            cur.execute("""
+                UPDATE partner_requests 
+                SET status = 'approved', approved_at = ?, temp_password = ?
+                WHERE id = ?
+            """, (now_iso, temp_pass, req_id))
+            cur.execute("""
+                INSERT OR REPLACE INTO deleted_partner_requests (id, action, timestamp, email)
+                VALUES (?, 'approved', ?, ?)
+            """, (req_id, now_iso, req["email"]))
+            conn.commit()
 
-        # Permanently record tombstone so approved partner request is immediately removed from list
-        self.deleted_partner_requests[req_id] = {
-            "id": req_id,
-            "action": "approved",
-            "timestamp": datetime.now().isoformat(),
-            "email": req["email"]
-        }
-        self.partner_requests = [
-            r for r in self.partner_requests
-            if r.get("id") != req_id and r.get("id") not in self.deleted_partner_requests
-        ]
-        self.save_partner_requests()
-        self.save_deleted_partner_requests()
-        logger.info(f"Approved partner request {req_id} for {req['full_name']} and removed from onboarding list. Created user: {user['email']}")
+        self.load_deleted_partner_requests()
+        self.load_partner_requests()
+        req["status"] = "approved"
+        req["approved_at"] = now_iso
+        req["temp_password"] = temp_pass
+        logger.info(f"Approved partner request {req_id} in SQLite. User: {user['email']}, must_change_password=True")
         return {"request": req, "user": user, "temp_password": temp_pass}
 
     def reject_partner_request(self, req_id: str, reason: str = "Application credentials could not be verified.") -> dict:
-        req = next((r for r in self.partner_requests if r["id"] == req_id), None)
-        if not req:
-            raise ValueError("Partner request not found.")
+        req = None
+        with self.get_db() as conn:
+            cur = conn.cursor()
+            cur.execute("SELECT * FROM partner_requests WHERE id = ?", (req_id,))
+            row = cur.fetchone()
+            if not row:
+                raise ValueError("Partner request not found.")
+            req = dict(row)
 
+        now_iso = datetime.now().isoformat()
+        with self.get_db() as conn:
+            cur = conn.cursor()
+            cur.execute("""
+                UPDATE partner_requests 
+                SET status = 'rejected', rejected_at = ?, rejection_reason = ?
+                WHERE id = ?
+            """, (now_iso, reason, req_id))
+            cur.execute("""
+                INSERT OR REPLACE INTO deleted_partner_requests (id, action, reason, timestamp, email)
+                VALUES (?, 'rejected', ?, ?, ?)
+            """, (req_id, reason, now_iso, req["email"]))
+            conn.commit()
+
+        self.load_deleted_partner_requests()
+        self.load_partner_requests()
         req["status"] = "rejected"
-        req["rejected_at"] = datetime.now().isoformat()
+        req["rejected_at"] = now_iso
         req["rejection_reason"] = reason
-
-        # Permanently record tombstone so rejected partner request is immediately removed from list
-        self.deleted_partner_requests[req_id] = {
-            "id": req_id,
-            "action": "rejected",
-            "reason": reason,
-            "timestamp": datetime.now().isoformat(),
-            "email": req["email"]
-        }
-        self.partner_requests = [
-            r for r in self.partner_requests
-            if r.get("id") != req_id and r.get("id") not in self.deleted_partner_requests
-        ]
-        self.save_partner_requests()
-        self.save_deleted_partner_requests()
-        logger.info(f"Rejected partner request {req_id} for {req['full_name']} and removed from onboarding list. Reason: {reason}")
+        logger.info(f"Rejected partner request {req_id} in SQLite. Reason: {reason}")
         return req
 
     def get_pharmacy_full_catalog(self, pharmacy_id: str = "PHARM_001") -> List[dict]:
@@ -1258,16 +1476,38 @@ class PrototypeDataStore:
 
     # ─── ADMIN USER ACCOUNT MANAGEMENT ───
     def get_all_users(self) -> List[dict]:
-        """Returns all registered users with sanitized password fields, excluding permanently deleted accounts."""
+        """Returns all registered users from SQLite with sanitized fields, excluding permanently deleted accounts."""
+        try:
+            with self.get_db() as conn:
+                cur = conn.cursor()
+                cur.execute("""
+                    SELECT id, full_name, role, email, phone, username, status,
+                           must_change_password, address, pharmacy_license, vehicle_type,
+                           driving_license, created_at, updated_at
+                    FROM users
+                    WHERE LOWER(id) NOT IN (SELECT LOWER(identifier) FROM deleted_users)
+                      AND LOWER(email) NOT IN (SELECT LOWER(identifier) FROM deleted_users)
+                      AND LOWER(username) NOT IN (SELECT LOWER(identifier) FROM deleted_users)
+                    ORDER BY created_at DESC
+                """)
+                rows = cur.fetchall()
+                sanitized = []
+                for r in rows:
+                    u = dict(r)
+                    u["must_change_password"] = bool(u.get("must_change_password", 0))
+                    sanitized.append(u)
+                return sanitized
+        except Exception as e:
+            logger.error(f"Error querying all users from SQLite: {e}")
+
+        # Fallback to in-memory list
         sanitized = []
         for u in self.users:
             uid = str(u.get("id", "")).strip().lower()
             uemail = str(u.get("email", "")).strip().lower()
             uname = str(u.get("username", "")).strip().lower()
-
             if uid in self.deleted_users or uemail in self.deleted_users or uname in self.deleted_users:
                 continue
-
             sanitized.append({
                 "id": u.get("id"),
                 "full_name": u.get("full_name"),
@@ -1276,6 +1516,7 @@ class PrototypeDataStore:
                 "phone": u.get("phone"),
                 "username": u.get("username"),
                 "status": u.get("status", "active"),
+                "must_change_password": bool(u.get("must_change_password", False)),
                 "address": u.get("address", ""),
                 "pharmacy_license": u.get("pharmacy_license", ""),
                 "vehicle_type": u.get("vehicle_type", ""),
@@ -1285,89 +1526,69 @@ class PrototypeDataStore:
         return sanitized
 
     def set_user_status(self, user_id: str, status: str) -> dict:
-        """Toggles user account status between 'active' and 'deactivated'."""
+        """Toggles user account status between 'active' and 'deactivated' directly in SQLite."""
         clean_id = user_id.strip().lower()
         clean_status = status.strip().lower()
         if clean_status not in ["active", "deactivated"]:
             clean_status = "active"
 
-        for u in self.users:
-            uid = str(u.get("id", "")).strip().lower()
-            uemail = str(u.get("email", "")).strip().lower()
-            uname = str(u.get("username", "")).strip().lower()
+        user = self.find_user(clean_id)
+        if not user:
+            raise ValueError(f"User account '{user_id}' not found.")
 
-            if uid in self.deleted_users or uemail in self.deleted_users or uname in self.deleted_users:
-                continue
+        if user.get("role") == "admin":
+            raise ValueError("Cannot deactivate the master system administrator account.")
 
-            if uid == clean_id or uemail == clean_id or uname == clean_id:
-                if u.get("role") == "admin":
-                    raise ValueError("Cannot deactivate the master system administrator account.")
-                u["status"] = clean_status
-                self.save_users_to_csv()
-                logger.info(f"Updated status of user {u['email']} (ID: {u.get('id')}) to {clean_status}")
-                return u
-        raise ValueError(f"User account '{user_id}' not found.")
+        now_iso = datetime.now().isoformat() + "Z"
+        with self.get_db() as conn:
+            cur = conn.cursor()
+            cur.execute("""
+                UPDATE users
+                SET status = ?, updated_at = ?
+                WHERE id = ? OR LOWER(email) = ? OR LOWER(username) = ?
+            """, (clean_status, now_iso, clean_id, clean_id, clean_id))
+            conn.commit()
+
+        self.load_users()
+        updated = self.find_user(user["id"])
+        logger.info(f"Updated status of user {updated['email']} to {clean_status} in SQLite.")
+        return updated
 
     def delete_user_account(self, user_id: str) -> bool:
-        """Removes a user account permanently and records a persistent tombstone so it stays deleted across restarts."""
+        """Removes a user account permanently from SQLite and records a persistent tombstone."""
         clean_id = user_id.strip().lower()
-        target_user = None
-        for u in self.users:
-            uid = str(u.get("id", "")).strip().lower()
-            uemail = str(u.get("email", "")).strip().lower()
-            uname = str(u.get("username", "")).strip().lower()
-            if uid == clean_id or uemail == clean_id or uname == clean_id:
-                target_user = u
-                break
-
+        target_user = self.find_user(clean_id)
         if not target_user:
-            # If already marked as deleted in tombstones, treat as successfully deleted
-            if clean_id in self.deleted_users:
-                return True
+            with self.get_db() as conn:
+                cur = conn.cursor()
+                cur.execute("SELECT identifier FROM deleted_users WHERE LOWER(identifier) = ?", (clean_id,))
+                if cur.fetchone():
+                    return True
             raise ValueError(f"User account '{user_id}' not found.")
 
         if target_user.get("role") == "admin":
             raise ValueError("Cannot delete the master system administrator account.")
 
-        # Record persistent tombstone in deleted_users
-        del_metadata = {
-            "id": target_user.get("id"),
-            "email": str(target_user.get("email", "")).lower(),
-            "username": str(target_user.get("username", "")).lower(),
-            "role": target_user.get("role"),
-            "deleted_at": datetime.now().isoformat() + "Z"
-        }
-        if target_user.get("id"):
-            self.deleted_users[str(target_user.get("id")).strip().lower()] = del_metadata
-        if target_user.get("email"):
-            self.deleted_users[str(target_user.get("email")).strip().lower()] = del_metadata
-        if target_user.get("username"):
-            self.deleted_users[str(target_user.get("username")).strip().lower()] = del_metadata
+        del_at = datetime.now().isoformat() + "Z"
+        with self.get_db() as conn:
+            cur = conn.cursor()
+            for ident in [target_user.get("id"), target_user.get("email"), target_user.get("username")]:
+                if ident:
+                    cur.execute("""
+                        INSERT OR REPLACE INTO deleted_users (identifier, id, email, username, role, deleted_at)
+                        VALUES (?, ?, ?, ?, ?, ?)
+                    """, (str(ident).strip().lower(), target_user.get("id"), target_user.get("email"), target_user.get("username"), target_user.get("role"), del_at))
 
-        # Save tombstones permanently across all dataset locations
+            cur.execute("DELETE FROM users WHERE id = ? OR LOWER(email) = ? OR LOWER(username) = ?",
+                        (clean_id, clean_id, clean_id))
+            if target_user.get("email"):
+                cur.execute("DELETE FROM partner_requests WHERE LOWER(email) = ?", (target_user["email"].lower(),))
+            conn.commit()
+
+        self.load_deleted_users()
+        self.load_users()
         self.save_deleted_users()
-
-        # Remove from in-memory active users
-        self.users = [
-            u for u in self.users 
-            if str(u.get("id", "")).strip().lower() != str(target_user.get("id", "")).strip().lower()
-            and str(u.get("email", "")).strip().lower() != str(target_user.get("email", "")).strip().lower()
-            and str(u.get("username", "")).strip().lower() != str(target_user.get("username", "")).strip().lower()
-        ]
-        
-        # Flush to CSV across all dataset directories and /tmp
-        self.save_users_to_csv()
-
-        # Clean up any pending partner requests for this user as well
-        req_email = str(target_user.get("email", "")).strip().lower()
-        if req_email:
-            self.partner_requests = [
-                pr for pr in self.partner_requests 
-                if str(pr.get("email", "")).strip().lower() != req_email
-            ]
-            self.save_partner_requests()
-
-        logger.info(f"Permanently deleted user account {target_user['email']} (ID: {target_user.get('id')}) with tombstone recorded.")
+        logger.info(f"Permanently deleted user account {target_user['email']} from SQLite with tombstones recorded.")
         return True
 
     # ─── ESSENTIAL CHEMICAL COMPOUNDS INVENTORY SETUP (QUIZ) ───

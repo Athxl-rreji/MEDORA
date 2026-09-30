@@ -50,6 +50,12 @@ class ResetPasswordRequest(BaseModel):
     otp: str
     new_password: str
 
+class ChangeFirstPasswordRequest(BaseModel):
+    identifier: str
+    temp_password: str
+    new_password: str
+    confirm_password: Optional[str] = None
+
 class PartnerRequest(BaseModel):
     partner_type: str # "pharmacy" | "delivery"
     full_name: str
@@ -339,19 +345,68 @@ def login(
                 detail="Incorrect password. Please verify your credentials or click 'Forgot Password?' to reset."
             )
 
+    must_change = bool(user.get("must_change_password", False))
     return {
         "status": "success",
         "message": "Authentication successful",
+        "must_change_password": must_change,
         "user": {
             "id": user["id"],
             "full_name": user.get("full_name", "MEDORA User"),
             "role": user.get("role", "patient"),
             "email": user.get("email", ""),
             "phone": user.get("phone", ""),
-            "username": user.get("username", "")
+            "username": user.get("username", ""),
+            "must_change_password": must_change
         },
         "token": f"medora_token_{user['id']}"
     }
+
+@router.post("/change-first-password")
+@router.post("/setup-password")
+def change_first_password(
+    payload: ChangeFirstPasswordRequest,
+    mock_db: PrototypeDataStore = Depends(get_datastore)
+):
+    """
+    Mandatory first-time password setup for newly approved Partner accounts (pharmacies & delivery riders)
+    who were issued temporary passwords upon admin onboarding.
+    Validates temp password, enforces strong permanent password, updates SQLite, and clears the flag.
+    """
+    if not payload.identifier or not payload.identifier.strip():
+        raise HTTPException(status_code=400, detail="Identifier (email or username) is required.")
+    if not payload.temp_password or not payload.temp_password.strip():
+        raise HTTPException(status_code=400, detail="Please enter your temporary password.")
+    if not payload.new_password or not payload.new_password.strip():
+        raise HTTPException(status_code=400, detail="Please enter a new permanent password.")
+    if payload.confirm_password and payload.new_password != payload.confirm_password:
+        raise HTTPException(status_code=400, detail="The confirmed password does not match the new password.")
+
+    try:
+        updated_user = mock_db.set_first_time_password(
+            identifier=payload.identifier.strip(),
+            temp_password=payload.temp_password.strip(),
+            new_password=payload.new_password.strip()
+        )
+        return {
+            "status": "success",
+            "message": "Permanent password successfully configured! You can now access your dashboard.",
+            "user": {
+                "id": updated_user["id"],
+                "full_name": updated_user.get("full_name", "MEDORA Partner"),
+                "role": updated_user.get("role", "pharmacy"),
+                "email": updated_user.get("email", ""),
+                "phone": updated_user.get("phone", ""),
+                "username": updated_user.get("username", ""),
+                "must_change_password": False
+            },
+            "token": f"medora_token_{updated_user['id']}"
+        }
+    except ValueError as val_err:
+        raise HTTPException(status_code=400, detail=str(val_err))
+    except Exception as e:
+        logger.error(f"Error changing first-time password for {payload.identifier}: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to configure password: {str(e)}")
 
 @router.post("/register")
 def register(

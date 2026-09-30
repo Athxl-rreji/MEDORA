@@ -69,6 +69,17 @@ export default function LoginGateway({ onLoginSuccess }) {
   const [partnerForgotConfirmPassword, setPartnerForgotConfirmPassword] = useState('');
   const [partnerForgotTimer, setPartnerForgotTimer] = useState(0);
 
+  // First-Time Temporary Password Reset States (Pharmacies & Delivery Onboarding)
+  const [showFirstTimePasswordModal, setShowFirstTimePasswordModal] = useState(false);
+  const [firstTimeUser, setFirstTimeUser] = useState(null);
+  const [newFirstPassword, setNewFirstPassword] = useState('');
+  const [confirmFirstPassword, setConfirmFirstPassword] = useState('');
+  const [firstPassEye, setFirstPassEye] = useState(false);
+  const [firstConfirmEye, setFirstConfirmEye] = useState(false);
+  const [firstPassError, setFirstPassError] = useState('');
+  const [firstPassSuccess, setFirstPassSuccess] = useState('');
+  const [firstPassLoading, setFirstPassLoading] = useState(false);
+
   // OTP Timer State
   const [otpTimer, setOtpTimer] = useState(0);
 
@@ -148,6 +159,21 @@ export default function LoginGateway({ onLoginSuccess }) {
       const data = await res.json();
 
       if (res.ok && data.user) {
+        if (data.must_change_password || data.user.must_change_password) {
+          setFirstTimeUser({
+            ...data.user,
+            tempPassword: password,
+            identifier: email.trim(),
+            role: data.user.role || 'patient'
+          });
+          setNewFirstPassword('');
+          setConfirmFirstPassword('');
+          setFirstPassError('');
+          setFirstPassSuccess('');
+          setShowFirstTimePasswordModal(true);
+          return;
+        }
+
         try {
           const userCreds = {
             email: data.user.email || email.trim(),
@@ -631,6 +657,22 @@ export default function LoginGateway({ onLoginSuccess }) {
       const data = await res.json();
 
       if (res.ok && data.user) {
+        if (data.must_change_password || data.user.must_change_password) {
+          setFirstTimeUser({
+            ...data.user,
+            tempPassword: partnerLoginPassword,
+            identifier: partnerLoginEmail.trim(),
+            role: data.user.role || partnerLoginRole
+          });
+          setNewFirstPassword('');
+          setConfirmFirstPassword('');
+          setFirstPassError('');
+          setFirstPassSuccess('');
+          setShowPartnerLoginModal(false);
+          setShowFirstTimePasswordModal(true);
+          return;
+        }
+
         onLoginSuccess({
           role: data.user.role || partnerLoginRole,
           email: data.user.email || partnerLoginEmail,
@@ -648,6 +690,80 @@ export default function LoginGateway({ onLoginSuccess }) {
       });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  // 8. Mandatory First-Time Temporary Password Setup Handler
+  const handleFirstTimePasswordSubmit = async (e) => {
+    if (e) e.preventDefault();
+    if (!newFirstPassword || !confirmFirstPassword) {
+      setFirstPassError('Please enter and confirm your new permanent password.');
+      return;
+    }
+    const passErr = validatePassword(newFirstPassword);
+    if (passErr) {
+      setFirstPassError(passErr);
+      return;
+    }
+    if (newFirstPassword !== confirmFirstPassword) {
+      setFirstPassError('New passwords do not match. Please verify both fields.');
+      return;
+    }
+    if (newFirstPassword === firstTimeUser?.tempPassword) {
+      setFirstPassError('Your new password cannot be the same as your initial temporary password. Please choose a new, unique password.');
+      return;
+    }
+
+    setFirstPassError('');
+    setFirstPassSuccess('');
+    setFirstPassLoading(true);
+
+    try {
+      const res = await fetch(`${API}/api/v1/auth/change-first-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          identifier: firstTimeUser.identifier || firstTimeUser.email,
+          temp_password: firstTimeUser.tempPassword,
+          new_password: newFirstPassword,
+          confirm_password: confirmFirstPassword
+        })
+      });
+      const data = await res.json();
+
+      if (res.ok && data.user) {
+        setFirstPassSuccess('🎉 Password successfully configured! Launching your dashboard...');
+        
+        try {
+          const userCreds = {
+            email: data.user.email || firstTimeUser.email,
+            password: newFirstPassword,
+            name: data.user.full_name || firstTimeUser.full_name || firstTimeUser.name,
+            role: data.user.role || firstTimeUser.role
+          };
+          localStorage.setItem('medora_remembered_credentials', JSON.stringify(userCreds));
+          localStorage.setItem('medora_active_user', JSON.stringify({
+            role: data.user.role || firstTimeUser.role,
+            email: data.user.email || firstTimeUser.email,
+            name: data.user.full_name || firstTimeUser.full_name || firstTimeUser.name
+          }));
+        } catch (e) {}
+
+        setTimeout(() => {
+          setShowFirstTimePasswordModal(false);
+          onLoginSuccess({
+            role: data.user.role || firstTimeUser.role,
+            email: data.user.email || firstTimeUser.email,
+            name: data.user.full_name || firstTimeUser.full_name || firstTimeUser.name
+          });
+        }, 1200);
+      } else {
+        setFirstPassError(data.detail || 'Failed to update password.');
+      }
+    } catch (err) {
+      setFirstPassError(`Connection error to backend: ${err.message}`);
+    } finally {
+      setFirstPassLoading(false);
     }
   };
 
@@ -2087,6 +2203,265 @@ export default function LoginGateway({ onLoginSuccess }) {
                 </div>
               </form>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* MANDATORY FIRST-TIME TEMPORARY PASSWORD SETUP MODAL */}
+      {showFirstTimePasswordModal && firstTimeUser && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0,0,0,0.85)',
+          backdropFilter: 'blur(16px)',
+          WebkitBackdropFilter: 'blur(16px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 99999,
+          padding: '1.25rem'
+        }}>
+          <div style={{
+            background: '#121418',
+            borderRadius: '20px',
+            border: '1px solid rgba(184, 247, 228, 0.35)',
+            boxShadow: '0 25px 60px rgba(0,0,0,0.8), 0 0 40px rgba(184, 247, 228, 0.15)',
+            width: '100%',
+            maxWidth: '520px',
+            padding: '2rem 2.25rem',
+            animation: 'fadeInUp 0.3s ease-out'
+          }}>
+            {/* Modal Header */}
+            <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
+              <div style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                background: 'rgba(245, 158, 11, 0.15)',
+                color: '#f59e0b',
+                border: '1px solid rgba(245, 158, 11, 0.35)',
+                padding: '4px 12px',
+                borderRadius: '99px',
+                fontSize: '0.74rem',
+                fontWeight: '800',
+                letterSpacing: '0.05em',
+                marginBottom: '0.75rem',
+                textTransform: 'uppercase'
+              }}>
+                <span>🔐</span>
+                <span>Mandatory Security Step</span>
+              </div>
+              <h2 style={{ fontSize: '1.45rem', fontWeight: '800', color: '#fff', margin: '0 0 0.4rem 0' }}>
+                Create Your Permanent Password
+              </h2>
+              <p style={{ fontSize: '0.84rem', color: '#94a3b8', lineHeight: '1.45', margin: 0 }}>
+                Welcome to MEDORA! Because your account was initialized with a temporary password, you must create a new permanent password to activate full access.
+              </p>
+            </div>
+
+            {/* Account Info Pill */}
+            <div style={{
+              background: '#181b21',
+              border: '1px solid rgba(255,255,255,0.08)',
+              borderRadius: '12px',
+              padding: '0.85rem 1.1rem',
+              marginBottom: '1.25rem',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              flexWrap: 'wrap',
+              gap: '0.5rem'
+            }}>
+              <div>
+                <span style={{ fontSize: '0.72rem', color: '#64748b', display: 'block', fontWeight: 'bold' }}>ACCOUNT:</span>
+                <span style={{ fontSize: '0.88rem', color: '#fff', fontWeight: '600' }}>{firstTimeUser.email}</span>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <span style={{
+                  background: firstTimeUser.role === 'pharmacy' ? 'rgba(56, 189, 248, 0.15)' : 'rgba(245, 158, 11, 0.15)',
+                  color: firstTimeUser.role === 'pharmacy' ? '#38bdf8' : '#fbbf24',
+                  border: firstTimeUser.role === 'pharmacy' ? '1px solid rgba(56, 189, 248, 0.3)' : '1px solid rgba(245, 158, 11, 0.3)',
+                  padding: '3px 9px',
+                  borderRadius: '6px',
+                  fontSize: '0.72rem',
+                  fontWeight: 'bold',
+                  display: 'inline-block'
+                }}>
+                  {firstTimeUser.role === 'pharmacy' ? '🏥 Pharmacy Store' : firstTimeUser.role === 'delivery' ? '🛵 Delivery Rider' : '👤 Verified User'}
+                </span>
+              </div>
+            </div>
+
+            {/* Password Form */}
+            <form onSubmit={handleFirstTimePasswordSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '5px', fontWeight: '600' }}>
+                  New Permanent Password (8-14 chars):
+                </label>
+                <div style={{ position: 'relative' }}>
+                  <input
+                    type={firstPassEye ? 'text' : 'password'}
+                    className="input-field"
+                    value={newFirstPassword}
+                    onChange={e => setNewFirstPassword(e.target.value)}
+                    placeholder="Enter new private password"
+                    style={{ paddingRight: '45px' }}
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setFirstPassEye(p => !p)}
+                    style={{
+                      position: 'absolute',
+                      right: '12px',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      fontSize: '1rem',
+                      color: '#94a3b8'
+                    }}
+                  >
+                    {firstPassEye ? '👁️' : '🙈'}
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '5px', fontWeight: '600' }}>
+                  Confirm Permanent Password:
+                </label>
+                <div style={{ position: 'relative' }}>
+                  <input
+                    type={firstConfirmEye ? 'text' : 'password'}
+                    className="input-field"
+                    value={confirmFirstPassword}
+                    onChange={e => setConfirmFirstPassword(e.target.value)}
+                    placeholder="Re-enter new password"
+                    style={{ paddingRight: '45px' }}
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setFirstConfirmEye(p => !p)}
+                    style={{
+                      position: 'absolute',
+                      right: '12px',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      fontSize: '1rem',
+                      color: '#94a3b8'
+                    }}
+                  >
+                    {firstConfirmEye ? '👁️' : '🙈'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Real-time Password Rules Checklist */}
+              <div style={{
+                background: '#0e1013',
+                borderRadius: '10px',
+                padding: '0.75rem 1rem',
+                border: '1px solid rgba(255,255,255,0.06)',
+                fontSize: '0.74rem',
+                display: 'grid',
+                gridTemplateColumns: '1fr 1fr',
+                gap: '0.4rem'
+              }}>
+                <div style={{ color: (newFirstPassword.length >= 8 && newFirstPassword.length <= 14) ? '#34d399' : '#64748b', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                  <span>{(newFirstPassword.length >= 8 && newFirstPassword.length <= 14) ? '✓' : '○'}</span>
+                  <span>8 to 14 characters</span>
+                </div>
+                <div style={{ color: /[a-zA-Z]/.test(newFirstPassword) ? '#34d399' : '#64748b', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                  <span>{/[a-zA-Z]/.test(newFirstPassword) ? '✓' : '○'}</span>
+                  <span>At least 1 letter</span>
+                </div>
+                <div style={{ color: /\d/.test(newFirstPassword) ? '#34d399' : '#64748b', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                  <span>{/\d/.test(newFirstPassword) ? '✓' : '○'}</span>
+                  <span>At least 1 digit</span>
+                </div>
+                <div style={{ color: (newFirstPassword && newFirstPassword === confirmFirstPassword) ? '#34d399' : '#64748b', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                  <span>{(newFirstPassword && newFirstPassword === confirmFirstPassword) ? '✓' : '○'}</span>
+                  <span>Passwords match</span>
+                </div>
+              </div>
+
+              {firstPassError && (
+                <div style={{
+                  background: 'rgba(239, 68, 68, 0.15)',
+                  border: '1px solid rgba(239, 68, 68, 0.35)',
+                  color: '#f87171',
+                  padding: '8px 12px',
+                  borderRadius: '8px',
+                  fontSize: '0.8rem',
+                  textAlign: 'center'
+                }}>
+                  ⚠️ {firstPassError}
+                </div>
+              )}
+
+              {firstPassSuccess && (
+                <div style={{
+                  background: 'rgba(52, 211, 153, 0.15)',
+                  border: '1px solid rgba(52, 211, 153, 0.35)',
+                  color: '#34d399',
+                  padding: '8px 12px',
+                  borderRadius: '8px',
+                  fontSize: '0.8rem',
+                  textAlign: 'center'
+                }}>
+                  {firstPassSuccess}
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={firstPassLoading}
+                className="btn-primary"
+                style={{
+                  width: '100%',
+                  justifyContent: 'center',
+                  padding: '0.85rem',
+                  fontSize: '0.92rem',
+                  fontWeight: 'bold',
+                  marginTop: '0.25rem'
+                }}
+              >
+                {firstPassLoading ? 'Securing Password...' : 'Save Password & Enter Dashboard ➔'}
+              </button>
+
+              <div style={{ textAlign: 'center', marginTop: '0.25rem' }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowFirstTimePasswordModal(false);
+                    setFirstTimeUser(null);
+                    setNewFirstPassword('');
+                    setConfirmFirstPassword('');
+                    setFirstPassError('');
+                    setFirstPassSuccess('');
+                  }}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: '#64748b',
+                    fontSize: '0.78rem',
+                    cursor: 'pointer',
+                    textDecoration: 'underline'
+                  }}
+                >
+                  ← Cancel & Return to Sign In
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

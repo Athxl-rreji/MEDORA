@@ -926,6 +926,23 @@ export default function AdminView() {
                               }}>
                                 {isActive ? '● Active' : '○ Deactivated'}
                               </span>
+                              {user.must_change_password && (
+                                <span style={{
+                                  background: 'rgba(245, 158, 11, 0.15)',
+                                  color: '#fbbf24',
+                                  padding: '2px 8px',
+                                  borderRadius: '99px',
+                                  fontSize: '0.72rem',
+                                  fontWeight: 'bold',
+                                  border: '1px solid rgba(245, 158, 11, 0.35)',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '4px'
+                                }}>
+                                  <span>🔑</span>
+                                  <span>Temp Pass (Setup Pending)</span>
+                                </span>
+                              )}
                             </div>
 
                             <div style={{ fontSize: '0.82rem', color: '#94a3b8', marginTop: '4px', display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
