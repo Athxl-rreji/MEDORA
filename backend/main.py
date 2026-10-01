@@ -49,6 +49,15 @@ app.include_router(payments.router, prefix="/api/v1/payments", tags=["Payments"]
 app.include_router(ai.router, prefix="/api/v1/ai", tags=["AI"])
 app.include_router(ai.router, prefix="/api/v1", tags=["AI"]) # supports /api/v1/chat
 app.include_router(ai.router, prefix="", tags=["AI"])       # supports /chat
+@app.get("/")
+def root():
+    return {
+        "status": "online",
+        "service": "MEDORA Backend API",
+        "version": "1.0.0",
+        "docs": "/docs",
+        "health": "/health"
+    }
 
 @app.get("/health")
 def health_check():
