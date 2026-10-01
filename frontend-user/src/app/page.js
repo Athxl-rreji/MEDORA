@@ -93,24 +93,28 @@ export default function Home() {
       if (saved) {
         try {
           const parsed = JSON.parse(saved);
-          if (parsed && parsed.email) {
-            // Verify with backend that this user account is still active
-            fetch(`${API}/api/v1/auth/user-status?identifier=${encodeURIComponent(parsed.email)}`)
-              .then(res => res.json())
-              .then(data => {
-                if (data.exists === false) {
-                  showToast('This account has been deleted by the administrator.', '⚠️');
-                  handleLogout();
-                } else if (data.status === 'deactivated') {
-                  showToast('This account has been deactivated by the administrator.', '🚫');
-                  handleLogout();
-                } else {
-                  setActiveUser(parsed);
-                }
-              })
-              .catch(() => {
-                setActiveUser(parsed);
-              });
+          if (parsed && (parsed.email || parsed.role)) {
+            // Instantly activate user session so credentials and dashboard persist smoothly
+            setActiveUser(parsed);
+
+            // Asynchronously verify with backend without logging out on temporary network blips
+            if (parsed.email) {
+              fetch(`${API}/api/v1/auth/user-status?identifier=${encodeURIComponent(parsed.email)}`)
+                .then(res => res.ok ? res.json() : null)
+                .then(data => {
+                  if (!data) return; // Retain session if backend is temporarily starting up
+                  if (data.exists === false) {
+                    showToast('This account has been deleted by the administrator.', '⚠️');
+                    handleLogout();
+                  } else if (data.status === 'deactivated') {
+                    showToast('This account has been deactivated by the administrator.', '🚫');
+                    handleLogout();
+                  }
+                })
+                .catch(() => {
+                  // Retain active session on connection hiccups
+                });
+            }
           }
         } catch (e) {}
       }
@@ -1007,7 +1011,7 @@ export default function Home() {
   };
 
   const handleTriggerChatMessage = async (inputText) => {
-    if (!inputText || !inputText.trim() || isChatLoading || chatFinished) return;
+    if (!inputText || !inputText.trim() || isChatLoading) return;
 
     const userMessage = { role: 'user', content: inputText.trim() };
     const updatedMessages = [...chatMessages, userMessage];
@@ -1029,16 +1033,17 @@ export default function Home() {
       
       if (res.ok) {
         const data = await res.json();
+        const meds = data.suggested_medicines || [];
         setChatMessages(prev => [...prev, {
           role: 'assistant',
           content: data.content,
           confidence_score: data.confidence_score || 0.95,
           confidence_label: data.confidence_label || 'High Clinical Correlation (95%)',
-          engine: data.engine || 'MEDORA Clinical AI'
+          engine: data.engine || 'MEDORA Clinical AI',
+          suggested_medicines: meds
         }]);
-        if (data.session_finished || (data.suggested_medicines && data.suggested_medicines.length > 0)) {
-          setChatFinished(true);
-          setChatSuggestedMedicines(data.suggested_medicines || []);
+        if (meds.length > 0) {
+          setChatSuggestedMedicines(meds);
         }
         return;
       }
@@ -1058,16 +1063,17 @@ export default function Home() {
       });
       if (res2.ok) {
         const data2 = await res2.json();
+        const meds2 = data2.suggested_medicines || [];
         setChatMessages(prev => [...prev, {
           role: 'assistant',
           content: data2.content,
           confidence_score: data2.confidence_score || 0.95,
           confidence_label: data2.confidence_label || 'High Clinical Correlation (95%)',
-          engine: data2.engine || 'MEDORA Clinical AI'
+          engine: data2.engine || 'MEDORA Clinical AI',
+          suggested_medicines: meds2
         }]);
-        if (data2.session_finished || (data2.suggested_medicines && data2.suggested_medicines.length > 0)) {
-          setChatFinished(true);
-          setChatSuggestedMedicines(data2.suggested_medicines || []);
+        if (meds2.length > 0) {
+          setChatSuggestedMedicines(meds2);
         }
         return;
       }
@@ -1156,9 +1162,12 @@ export default function Home() {
           "3. Any known allergies or underlying medical conditions?";
       }
 
-      setChatMessages(prev => [...prev, { role: 'assistant', content: replyText }]);
+      setChatMessages(prev => [...prev, {
+        role: 'assistant',
+        content: replyText,
+        suggested_medicines: foundMeds
+      }]);
       if (foundMeds.length > 0) {
-        setChatFinished(true);
         setChatSuggestedMedicines(foundMeds);
       }
     } catch (fallbackErr) {
@@ -4155,26 +4164,39 @@ export default function Home() {
             </div>
           )}
 
-          {chatFinished && chatSuggestedMedicines.length > 0 && (
+          {chatSuggestedMedicines.length > 0 && (
             <div style={{
               background: '#f0fdf4',
               border: '1px solid #bbf7d0',
               borderRadius: '12px',
-              padding: '1rem',
+              padding: '0.85rem 1rem',
               marginTop: '0.5rem',
               display: 'flex',
               flexDirection: 'column',
-              gap: '0.65rem',
+              gap: '0.55rem',
               boxShadow: '0 4px 14px rgba(16, 185, 129, 0.08)'
             }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <span style={{ fontSize: '1.2rem' }}>💊</span>
-                  <strong style={{ color: '#15803d', fontSize: '0.92rem' }}>Recommended OTC Remedies:</strong>
+                  <span style={{ fontSize: '1.1rem' }}>💊</span>
+                  <strong style={{ color: '#15803d', fontSize: '0.88rem' }}>Recommended OTC Remedies:</strong>
                 </div>
-                <span style={{ background: '#dcfce7', color: '#166534', fontSize: '0.68rem', padding: '2px 8px', borderRadius: '99px', fontWeight: '800' }}>
-                  ⚡ 10m FAST DISPATCH
-                </span>
+                <button
+                  type="button"
+                  onClick={() => handleCheckoutFromChat(true)}
+                  style={{
+                    background: '#15803d',
+                    color: '#ffffff',
+                    border: 'none',
+                    fontSize: '0.72rem',
+                    padding: '3px 9px',
+                    borderRadius: '6px',
+                    fontWeight: '800',
+                    cursor: 'pointer'
+                  }}
+                >
+                  ⚡ Order All
+                </button>
               </div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.45rem' }}>
                 {chatSuggestedMedicines.map((med, idx) => (
@@ -4184,15 +4206,16 @@ export default function Home() {
                       background: '#ffffff',
                       color: '#15803d',
                       border: '1px solid #86efac',
-                      padding: '5px 12px',
-                      borderRadius: '12px',
-                      fontSize: '0.8rem',
+                      padding: '4px 10px',
+                      borderRadius: '10px',
+                      fontSize: '0.78rem',
                       fontWeight: '800',
                       cursor: 'pointer',
                       transition: 'all 0.2s ease',
-                      boxShadow: '0 2px 6px rgba(0, 0, 0, 0.04)'
+                      boxShadow: '0 2px 5px rgba(0, 0, 0, 0.04)'
                     }}
                     onClick={() => handleSuggestedMedicineClick(med)}
+                    title={`Click to add ${med} to cart`}
                   >
                     + {med}
                   </span>
@@ -4204,55 +4227,54 @@ export default function Home() {
         </div>
 
         {/* Quick Symptom Assessment Chips */}
-        {!chatFinished && (
-          <div style={{ padding: '8px 1rem', background: '#f8fafc', borderTop: '1px solid #e2e8f0', display: 'flex', gap: '6px', overflowX: 'auto', scrollbarWidth: 'none' }}>
-            {[
-              { label: "🤒 High Fever", query: "I have high fever and severe headache since yesterday. What medicines can I take for relief?" },
-              { label: "🤧 Cold & Allergy", query: "I am having persistent sneezing, runny nose, and itchy eyes. Recommend OTC allergy medicine." },
-              { label: "🤢 Acidity & Gas", query: "I am having burning sensation in chest and stomach acid reflux. What should I take?" },
-              { label: "🤕 Migraine", query: "Severe one-sided throbbing headache with light sensitivity. Please suggest safe OTC relief." },
-              { label: "😷 Dry Cough", query: "I have had a dry tickling throat cough for 2 days. What OTC syrup or tablet helps?" }
-            ].map((chip, idx) => (
-              <button
-                key={idx}
-                type="button"
-                onClick={() => handleTriggerChatMessage(chip.query)}
-                disabled={isChatLoading}
-                style={{
-                  background: '#ffffff',
-                  border: '1px solid #cbd5e1',
-                  borderRadius: '99px',
-                  padding: '4px 10px',
-                  fontSize: '0.72rem',
-                  fontWeight: '700',
-                  color: 'var(--text-main)',
-                  cursor: 'pointer',
-                  whiteSpace: 'nowrap',
-                  boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
-                  transition: 'all 0.15s ease'
-                }}
-              >
-                {chip.label}
-              </button>
-            ))}
-          </div>
-        )}
+        <div style={{ padding: '8px 1rem', background: '#f8fafc', borderTop: '1px solid #e2e8f0', display: 'flex', gap: '6px', overflowX: 'auto', scrollbarWidth: 'none' }}>
+          {[
+            { label: "🤒 High Fever", query: "I have high fever and severe headache since yesterday. What medicines can I take for relief?" },
+            { label: "🤧 Cold & Allergy", query: "I am having persistent sneezing, runny nose, and itchy eyes. Recommend OTC allergy medicine." },
+            { label: "🤢 Acidity & Gas", query: "I am having burning sensation in chest and stomach acid reflux. What should I take?" },
+            { label: "🤕 Migraine", query: "Severe one-sided throbbing headache with light sensitivity. Please suggest safe OTC relief." },
+            { label: "😷 Dry Cough", query: "I have had a dry tickling throat cough for 2 days. What OTC syrup or tablet helps?" },
+            { label: "⚡ Sore Throat", query: "Sharp pain while swallowing and irritated throat. What gargle or lozenge should I use?" }
+          ].map((chip, idx) => (
+            <button
+              key={idx}
+              type="button"
+              onClick={() => handleTriggerChatMessage(chip.query)}
+              disabled={isChatLoading}
+              style={{
+                background: '#ffffff',
+                border: '1px solid #cbd5e1',
+                borderRadius: '99px',
+                padding: '4px 10px',
+                fontSize: '0.72rem',
+                fontWeight: '700',
+                color: 'var(--text-main)',
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+                transition: 'all 0.15s ease'
+              }}
+            >
+              {chip.label}
+            </button>
+          ))}
+        </div>
 
         <div className="chatbot-footer" style={{ borderTop: '1px solid #e2e8f0', background: '#f8fafc' }}>
           <form onSubmit={sendChatMessage} style={{ display: 'flex', gap: '0.5rem' }}>
             <input
               type="text"
               className="input-field"
-              placeholder={chatFinished ? "Consultation completed." : "Type your message..."}
+              placeholder="Type your symptom, medicine query, or dosage..."
               value={chatInput}
               onChange={e => setChatInput(e.target.value)}
-              disabled={chatFinished || isChatLoading}
+              disabled={isChatLoading}
               style={{ flex: 1, padding: '0.65rem 0.9rem', borderRadius: '8px', fontSize: '0.88rem', background: '#ffffff', border: '1px solid #cbd5e1' }}
             />
             <button 
               type="submit" 
               className="btn-primary" 
-              disabled={chatFinished || isChatLoading || !chatInput.trim()}
+              disabled={isChatLoading || !chatInput.trim()}
               style={{ padding: '0.65rem 1.1rem', borderRadius: '8px', fontSize: '0.88rem' }}
             >
               Send

@@ -173,12 +173,19 @@ export default function LoginGateway({ onLoginSuccess }) {
           return;
         }
 
+        const activeUserData = {
+          role: data.user.role || 'patient',
+          email: data.user.email || email.trim(),
+          name: data.user.full_name || 'Patient / User'
+        };
+
         try {
+          localStorage.setItem('medora_active_user', JSON.stringify(activeUserData));
           const userCreds = {
-            email: data.user.email || email.trim(),
+            email: activeUserData.email,
             password: password,
-            name: data.user.full_name || 'Patient User',
-            role: data.user.role || 'patient'
+            name: activeUserData.name,
+            role: activeUserData.role
           };
           if (rememberMe) {
             localStorage.setItem('medora_remembered_credentials', JSON.stringify(userCreds));
@@ -188,19 +195,9 @@ export default function LoginGateway({ onLoginSuccess }) {
           const updated = accounts.filter(a => a.email.toLowerCase() !== userCreds.email.toLowerCase());
           updated.unshift(userCreds);
           localStorage.setItem('medora_registered_accounts', JSON.stringify(updated));
-
-          localStorage.setItem('medora_active_user', JSON.stringify({
-            role: data.user.role || 'patient',
-            email: data.user.email || email,
-            name: data.user.full_name || 'Patient / User'
-          }));
         } catch (e) {}
 
-        onLoginSuccess({
-          role: data.user.role || 'patient',
-          email: data.user.email || email,
-          name: data.user.full_name || 'Patient / User'
-        });
+        onLoginSuccess(activeUserData);
       } else {
         setErrorMsg(data.detail || 'Authentication failed. Please check your credentials.');
       }
@@ -672,21 +669,39 @@ export default function LoginGateway({ onLoginSuccess }) {
           return;
         }
 
-        onLoginSuccess({
+        const partnerUser = {
           role: data.user.role || partnerLoginRole,
-          email: data.user.email || partnerLoginEmail,
+          email: data.user.email || partnerLoginEmail.trim(),
           name: data.user.full_name || `${partnerLoginRole.toUpperCase()} Admin`
-        });
+        };
+
+        try {
+          localStorage.setItem('medora_active_user', JSON.stringify(partnerUser));
+          localStorage.setItem('medora_remembered_credentials', JSON.stringify({
+            email: partnerUser.email,
+            password: partnerLoginPassword,
+            name: partnerUser.name,
+            role: partnerUser.role
+          }));
+        } catch (e) {}
+
+        setShowPartnerLoginModal(false);
+        onLoginSuccess(partnerUser);
       } else {
         setErrorMsg(data.detail || 'Partner authentication failed.');
       }
     } catch (err) {
       // Demo partner fallback if backend offline
-      onLoginSuccess({
+      const fallbackUser = {
         role: partnerLoginRole,
-        email: partnerLoginEmail,
+        email: partnerLoginEmail.trim(),
         name: `${partnerLoginRole === 'pharmacy' ? 'Pharmacy Store' : 'Delivery Rider'} Admin`
-      });
+      };
+      try {
+        localStorage.setItem('medora_active_user', JSON.stringify(fallbackUser));
+      } catch (e) {}
+      setShowPartnerLoginModal(false);
+      onLoginSuccess(fallbackUser);
     } finally {
       setIsLoading(false);
     }
