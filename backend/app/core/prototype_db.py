@@ -13,14 +13,35 @@ from datetime import datetime
 from typing import List, Dict, Optional, Tuple
 from app.core.logger import logger
 
+import shutil
+
 # Try backend-local datasets first (for Railway Root Directory = /backend), then fallback to repo root
 _candidate_dirs = [
     os.path.join(os.path.dirname(__file__), '..', '..', 'datasets'),       # backend/datasets
     os.path.join(os.path.dirname(__file__), '..', '..', '..', 'datasets'), # repo root datasets
     os.path.join(os.getcwd(), 'datasets'),
     os.path.join(os.getcwd(), 'backend', 'datasets'),
+    "/var/task/datasets",
+    "/var/task/backend/datasets",
 ]
-DATASETS_DIR = next((d for d in _candidate_dirs if os.path.exists(d) and os.path.exists(os.path.join(d, 'core_medicines.csv'))), _candidate_dirs[0])
+_src_datasets_dir = next((d for d in _candidate_dirs if os.path.exists(d) and os.path.exists(os.path.join(d, 'core_medicines.csv'))), _candidate_dirs[0])
+
+is_serverless = bool(os.environ.get("VERCEL") or os.environ.get("AWS_LAMBDA_FUNCTION_NAME"))
+if is_serverless:
+    DATASETS_DIR = "/tmp/medora_data"
+    os.makedirs(DATASETS_DIR, exist_ok=True)
+    if os.path.exists(_src_datasets_dir):
+        for fname in os.listdir(_src_datasets_dir):
+            src_f = os.path.join(_src_datasets_dir, fname)
+            dst_f = os.path.join(DATASETS_DIR, fname)
+            if os.path.isfile(src_f) and not os.path.exists(dst_f):
+                try:
+                    shutil.copy2(src_f, dst_f)
+                except Exception:
+                    pass
+else:
+    DATASETS_DIR = _src_datasets_dir
+
 SQLITE_DB_PATH = os.path.join(DATASETS_DIR, 'medora.db')
 REGISTERED_USERS_CSV = os.path.join(DATASETS_DIR, 'registered_users.csv')
 PARTNER_REQUESTS_JSON = os.path.join(DATASETS_DIR, 'partner_requests.json')
@@ -107,8 +128,14 @@ class PrototypeDataStore:
         os.makedirs(os.path.dirname(SQLITE_DB_PATH), exist_ok=True)
         conn = sqlite3.connect(SQLITE_DB_PATH, timeout=30.0)
         conn.row_factory = sqlite3.Row
-        conn.execute("PRAGMA journal_mode = WAL;")
-        conn.execute("PRAGMA synchronous = NORMAL;")
+        try:
+            conn.execute("PRAGMA journal_mode = WAL;")
+            conn.execute("PRAGMA synchronous = NORMAL;")
+        except Exception:
+            try:
+                conn.execute("PRAGMA journal_mode = DELETE;")
+            except Exception:
+                pass
         return conn
 
     def init_sqlite_db(self):
