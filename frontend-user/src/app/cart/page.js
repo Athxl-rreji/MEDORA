@@ -1,10 +1,7 @@
 "use client";
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-
-const API = (typeof window !== 'undefined' && window.location && window.location.hostname && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1' && (!process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_API_URL.includes('localhost') || process.env.NEXT_PUBLIC_API_URL.includes('127.0.0.1')))
-  ? (window.location.protocol + '//' + window.location.hostname + ':8000')
-  : (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000');
+import { API } from '../../utils/apiConfig';
 const USER_ID = "1";
 
 export default function FullPageCart() {

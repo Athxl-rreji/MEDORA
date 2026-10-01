@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { StyleSheet, Text, View, ScrollView, TouchableOpacity, SafeAreaView, Alert, Platform } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 
-// Your machine's hotspot IP — phone connects to backend through this
-const API = 'http://172.20.10.5:8000';
+// Connect to live cloud backend (accessible from anywhere, anytime)
+const API = 'https://backend-three-kappa-38.vercel.app';
 const AGENT_ID = "AGT-591";
 
 export default function App() {
