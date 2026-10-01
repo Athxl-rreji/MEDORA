@@ -40,3 +40,7 @@ frontend-user/public/Animation/
 
 # Splash screen animation CSS (splash removed)
 frontend-user/src/app/splash/splash.module.css
+
+# SQLite temporary WAL files
+*.db-shm
+*.db-wal
