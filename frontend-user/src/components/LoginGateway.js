@@ -2,7 +2,9 @@
 import React, { useState, useEffect } from 'react';
 import CartoonBootup from './CartoonBootup';
 
-const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const API = (typeof window !== 'undefined' && window.location && window.location.hostname && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1' && (!process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_API_URL.includes('localhost') || process.env.NEXT_PUBLIC_API_URL.includes('127.0.0.1')))
+  ? (window.location.protocol + '//' + window.location.hostname + ':8000')
+  : (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000');
 
 export default function LoginGateway({ onLoginSuccess }) {
   const [showBootupToon, setShowBootupToon] = useState(false);
