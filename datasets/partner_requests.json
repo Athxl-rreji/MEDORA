@@ -24,31 +24,5 @@
     "rejected_at": null,
     "rejection_reason": null,
     "temp_password": null
-  },
-  {
-    "id": "req_pharm_demo1",
-    "partner_type": "pharmacy",
-    "full_name": "Dr. Rajesh Pai",
-    "email": "rajesh.pai@medoralabs.in",
-    "phone": "+91 98450 12345",
-    "status": "pending",
-    "submitted_at": "2026-09-29T06:00:00Z",
-    "store_name": "Pai Apex Chemist & Care",
-    "license_no": "KA-MAN-2024-99881",
-    "store_address": "City Light Circle, Kadri, Mangalore",
-    "latitude": 19.082,
-    "longitude": 72.885,
-    "vehicle_type": "",
-    "driving_license": "",
-    "vehicle_number": "",
-    "delivery_zone": "",
-    "shift_preference": "",
-    "rider_upi_id": "",
-    "shop_upi_id": "",
-    "shop_upi_qr": "",
-    "approved_at": null,
-    "rejected_at": null,
-    "rejection_reason": null,
-    "temp_password": null
   }
 ]

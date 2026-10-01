@@ -1325,51 +1325,104 @@ class PrototypeDataStore:
         logger.info(f"Recorded tombstone in SQLite for partner request {req_id} and removed from onboarding.")
         return True
 
-    def approve_partner_request(self, req_id: str) -> dict:
+    def approve_partner_request(self, req_id: str, fallback_data: Optional[dict] = None) -> dict:
         req = None
         with self.get_db() as conn:
             cur = conn.cursor()
             cur.execute("SELECT * FROM partner_requests WHERE id = ?", (req_id,))
             row = cur.fetchone()
-            if not row:
+            if row:
+                req = dict(row)
+            elif fallback_data:
+                req = dict(fallback_data)
+                req["id"] = req_id
+                # Insert into partner_requests table
+                cur.execute("""
+                    INSERT OR REPLACE INTO partner_requests (
+                        id, partner_type, full_name, email, phone, status, submitted_at,
+                        store_name, license_no, store_address, latitude, longitude,
+                        vehicle_type, driving_license, vehicle_number, delivery_zone,
+                        shift_preference, rider_upi_id, shop_upi_id, shop_upi_qr
+                    ) VALUES (?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    req_id, req.get("partner_type", "pharmacy"), req.get("full_name", ""),
+                    req.get("email", ""), req.get("phone", ""),
+                    req.get("submitted_at", datetime.now().isoformat()),
+                    req.get("store_name", ""), req.get("license_no", ""),
+                    req.get("store_address", ""), float(req.get("latitude") or 19.0760),
+                    float(req.get("longitude") or 72.8777), req.get("vehicle_type", ""),
+                    req.get("driving_license", ""), req.get("vehicle_number", ""),
+                    req.get("delivery_zone", ""), req.get("shift_preference", ""),
+                    req.get("rider_upi_id", ""), req.get("shop_upi_id", ""),
+                    req.get("shop_upi_qr", "")
+                ))
+                conn.commit()
+            else:
                 raise ValueError("Partner request not found.")
-            req = dict(row)
 
-        if req.get("status") == "approved":
-            raise ValueError("This application has already been approved.")
-
-        role = "pharmacy" if req["partner_type"] == "pharmacy" else "delivery"
+        role = "pharmacy" if req.get("partner_type") == "pharmacy" else "delivery"
         temp_pass = f"{role.capitalize()}123"
-        username = req["email"].split("@")[0]
+        raw_email = (req.get("email") or "").strip()
+        raw_phone = (req.get("phone") or "").strip()
+        base_username = raw_email.split("@")[0] if "@" in raw_email else (req.get("username") or f"user_{req_id[-4:]}")
 
-        user = self.find_user(req["email"])
+        user = self.find_user(raw_email) or (raw_phone and self.find_user(raw_phone)) or self.find_user(base_username)
         if not user:
-            user = self.register_user(
-                full_name=req["full_name"],
-                role=role,
-                email=req["email"],
-                phone=req.get("phone", ""),
-                username=username,
-                password=temp_pass,
-                address=req.get("store_address", ""),
-                pharmacy_license=req.get("license_no"),
-                vehicle_type=req.get("vehicle_type"),
-                driving_license=req.get("driving_license"),
-                must_change_password=True  # MANDATORY FIRST TIME RESET
-            )
+            clean_uname = base_username.strip().lower()
+            # Ensure unique username
+            with self.get_db() as conn:
+                cur = conn.cursor()
+                cur.execute("SELECT id FROM users WHERE LOWER(username) = ?", (clean_uname,))
+                if cur.fetchone():
+                    clean_uname = f"{clean_uname}_{uuid.uuid4().hex[:4]}"
+
+            user_id = f"usr_{uuid.uuid4().hex[:8]}"
+            created_at = datetime.now().isoformat() + "Z"
+            with self.get_db() as conn:
+                cur = conn.cursor()
+                cur.execute("DELETE FROM deleted_users WHERE LOWER(identifier) IN (?, ?) OR LOWER(email) = ?",
+                            (raw_email.lower(), clean_uname, raw_email.lower()))
+                cur.execute("""
+                    INSERT OR REPLACE INTO users (
+                        id, full_name, role, email, phone, username, password, status,
+                        must_change_password, address, pharmacy_license, vehicle_type,
+                        driving_license, created_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, 'active', 1, ?, ?, ?, ?, ?)
+                """, (
+                    user_id, req.get("full_name", "").strip() or "Partner", role, raw_email,
+                    raw_phone, clean_uname, temp_pass,
+                    req.get("store_address", ""), req.get("license_no", ""),
+                    req.get("vehicle_type", ""), req.get("driving_license", ""), created_at
+                ))
+                conn.commit()
+            self.load_users()
+            user = self.find_user(user_id) or self.find_user(raw_email) or {
+                "id": user_id, "full_name": req.get("full_name", "Partner"), "role": role,
+                "email": raw_email, "phone": raw_phone, "username": clean_uname, "status": "active"
+            }
         else:
             with self.get_db() as conn:
                 cur = conn.cursor()
                 cur.execute("""
                     UPDATE users 
-                    SET status = 'active', password = ?, must_change_password = 1, updated_at = ?
-                    WHERE id = ?
-                """, (temp_pass, datetime.now().isoformat() + "Z", user["id"]))
+                    SET role = ?, status = 'active', password = ?, must_change_password = 1,
+                        address = COALESCE(NULLIF(?, ''), address),
+                        pharmacy_license = COALESCE(NULLIF(?, ''), pharmacy_license),
+                        vehicle_type = COALESCE(NULLIF(?, ''), vehicle_type),
+                        driving_license = COALESCE(NULLIF(?, ''), driving_license),
+                        updated_at = ?
+                    WHERE id = ? OR LOWER(email) = ?
+                """, (
+                    role, temp_pass,
+                    req.get("store_address", ""), req.get("license_no", ""),
+                    req.get("vehicle_type", ""), req.get("driving_license", ""),
+                    datetime.now().isoformat() + "Z", user["id"], raw_email.lower()
+                ))
                 conn.commit()
             self.load_users()
-            user = self.find_user(user["id"])
+            user = self.find_user(user["id"]) or user
 
-        if req["partner_type"] == "pharmacy":
+        if req.get("partner_type") == "pharmacy":
             pharm_id = f"PHARM_{req_id[-4:].upper()}"
             store_name = req.get("store_name") or req.get("full_name") or "Express Pharmacy"
             lat = float(req.get("latitude") or 19.0760)
@@ -1404,7 +1457,7 @@ class PrototypeDataStore:
             cur.execute("""
                 INSERT OR REPLACE INTO deleted_partner_requests (id, action, timestamp, email)
                 VALUES (?, 'approved', ?, ?)
-            """, (req_id, now_iso, req["email"]))
+            """, (req_id, now_iso, raw_email))
             conn.commit()
 
         self.load_deleted_partner_requests()
@@ -1412,18 +1465,35 @@ class PrototypeDataStore:
         req["status"] = "approved"
         req["approved_at"] = now_iso
         req["temp_password"] = temp_pass
-        logger.info(f"Approved partner request {req_id} in SQLite. User: {user['email']}, must_change_password=True")
+        logger.info(f"Approved partner request {req_id}. User: {user['email']}, must_change_password=True")
         return {"request": req, "user": user, "temp_password": temp_pass}
 
-    def reject_partner_request(self, req_id: str, reason: str = "Application credentials could not be verified.") -> dict:
+    def reject_partner_request(self, req_id: str, reason: str = "Application credentials could not be verified.", fallback_data: Optional[dict] = None) -> dict:
         req = None
         with self.get_db() as conn:
             cur = conn.cursor()
             cur.execute("SELECT * FROM partner_requests WHERE id = ?", (req_id,))
             row = cur.fetchone()
-            if not row:
+            if row:
+                req = dict(row)
+            elif fallback_data:
+                req = dict(fallback_data)
+                req["id"] = req_id
+                cur.execute("""
+                    INSERT OR IGNORE INTO partner_requests (
+                        id, partner_type, full_name, email, phone, status, submitted_at,
+                        store_name, license_no, store_address, latitude, longitude
+                    ) VALUES (?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?)
+                """, (
+                    req_id, req.get("partner_type", "pharmacy"), req.get("full_name", ""),
+                    req.get("email", ""), req.get("phone", ""),
+                    req.get("submitted_at", datetime.now().isoformat()),
+                    req.get("store_name", ""), req.get("license_no", ""),
+                    req.get("store_address", ""), float(req.get("latitude") or 19.0760),
+                    float(req.get("longitude") or 72.8777)
+                ))
+            else:
                 raise ValueError("Partner request not found.")
-            req = dict(row)
 
         now_iso = datetime.now().isoformat()
         with self.get_db() as conn:
@@ -1436,7 +1506,7 @@ class PrototypeDataStore:
             cur.execute("""
                 INSERT OR REPLACE INTO deleted_partner_requests (id, action, reason, timestamp, email)
                 VALUES (?, 'rejected', ?, ?, ?)
-            """, (req_id, reason, now_iso, req["email"]))
+            """, (req_id, reason, now_iso, req.get("email", "")))
             conn.commit()
 
         self.load_deleted_partner_requests()

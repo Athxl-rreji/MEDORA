@@ -29,30 +29,36 @@ def list_partner_requests(
 @router.post("/partner-requests/{req_id}/approve")
 def approve_partner_request(
     req_id: str,
+    payload: Optional[dict] = None,
     mock_db: PrototypeDataStore = Depends(get_datastore)
 ):
     """
     Approves a partner application, registers their user account, and emails login credentials via Gmail SMTP.
     """
     try:
-        result = mock_db.approve_partner_request(req_id)
+        result = mock_db.approve_partner_request(req_id, fallback_data=payload)
         req = result["request"]
         user = result["user"]
         temp_password = result["temp_password"]
 
-        # Send approval notification email
-        email_sent = send_partner_approval_email(
-            recipient_email=req["email"],
-            full_name=req["full_name"],
-            partner_type=req["partner_type"],
-            temp_password=temp_password
-        )
+        # Send approval notification email safely
+        email_sent = False
+        try:
+            email_sent = send_partner_approval_email(
+                recipient_email=req.get("email", ""),
+                full_name=req.get("full_name", "Partner"),
+                partner_type=req.get("partner_type", "pharmacy"),
+                temp_password=temp_password
+            )
+        except Exception as mail_err:
+            logger.warning(f"SMTP notification failed for {req.get('email')}: {mail_err}")
 
         return {
             "status": "success",
-            "message": f"Partner request {req_id} approved successfully! Login credentials dispatched to {req['email']}.",
+            "message": f"Partner request {req_id} approved successfully! Login credentials ({temp_password}) dispatched to {req.get('email')}.",
             "request": req,
             "user": user,
+            "temp_password": temp_password,
             "email_sent": email_sent
         }
     except ValueError as val_err:
@@ -64,28 +70,33 @@ def approve_partner_request(
 @router.post("/partner-requests/{req_id}/reject")
 def reject_partner_request(
     req_id: str,
-    payload: RejectRequestPayload,
+    payload: Optional[dict] = None,
     mock_db: PrototypeDataStore = Depends(get_datastore)
 ):
     """
     Rejects a partner application with a reason and sends a rejection notification email.
     """
     try:
-        req = mock_db.reject_partner_request(req_id, reason=payload.reason)
+        reason = (payload.get("reason") if payload else None) or "Application credentials could not be verified."
+        req = mock_db.reject_partner_request(req_id, reason=reason, fallback_data=payload)
         
-        # Send rejection notification email with full details and stated reason
-        email_sent = send_partner_rejection_email(
-            recipient_email=req["email"],
-            full_name=req["full_name"],
-            partner_type=req["partner_type"],
-            reason=payload.reason,
-            details=req,
-            request_id=req_id
-        )
+        # Send rejection notification email with full details and stated reason safely
+        email_sent = False
+        try:
+            email_sent = send_partner_rejection_email(
+                recipient_email=req.get("email", ""),
+                full_name=req.get("full_name", "Applicant"),
+                partner_type=req.get("partner_type", "partner"),
+                reason=reason,
+                details=req,
+                request_id=req_id
+            )
+        except Exception as mail_err:
+            logger.warning(f"SMTP rejection notice failed for {req.get('email')}: {mail_err}")
 
         return {
             "status": "success",
-            "message": f"Partner request {req_id} rejected. Official rejection notice with reason dispatched to {req['email']}.",
+            "message": f"Partner request {req_id} rejected. Official rejection notice dispatched to {req.get('email')}.",
             "request": req,
             "email_sent": email_sent
         }

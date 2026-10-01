@@ -148,11 +148,12 @@ export default function AdminView() {
     try {
       const res = await fetch(`${API}/api/v1/admin/partner-requests/${req.id}/approve`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(req)
       });
       const data = await res.json();
       if (res.ok) {
-        showToast(`✅ Approved ${req.full_name}! Login credentials (${data.temp_password}) emailed to ${req.email}. Removed from onboarding.`);
+        showToast(`✅ Approved ${req.full_name}! Login credentials (${data.temp_password || 'dispatched'}) emailed to ${req.email}. Removed from onboarding.`);
         fetchRequests();
         fetchUsers();
       } else {
@@ -192,7 +193,7 @@ export default function AdminView() {
       const res = await fetch(`${API}/api/v1/admin/partner-requests/${rejectId}/reject`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ reason: trimmedReason })
+        body: JSON.stringify({ reason: trimmedReason, ...selectedReqForReject })
       });
       const data = await res.json();
       if (res.ok) {
