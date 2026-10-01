@@ -171,6 +171,8 @@ export default function Home() {
   const [activeCompositionTab, setActiveCompositionTab] = useState(0);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [focusedIndex, setFocusedIndex] = useState(-1);
+  const [searchCategoryFilter, setSearchCategoryFilter] = useState('All');
+  const searchContainerRef = useRef(null);
   const [cart, setCart] = useState([]);
   const [activeOrders, setActiveOrders] = useState([]);
 
@@ -486,7 +488,14 @@ export default function Home() {
 
   // Handle keyboard events in search bar
   const handleKeyDown = (e) => {
-    if (!showSuggestions || searchResults.length === 0) return;
+    if (!showSuggestions || searchResults.length === 0) {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        const resultsEl = document.getElementById('search-results-section');
+        if (resultsEl) resultsEl.scrollIntoView({ behavior: 'smooth' });
+      }
+      return;
+    }
 
     if (e.key === 'ArrowDown') {
       e.preventDefault();
@@ -498,11 +507,30 @@ export default function Home() {
       e.preventDefault();
       if (focusedIndex >= 0 && focusedIndex < searchResults.length) {
         addToCart(searchResults[focusedIndex]);
+      } else {
+        setShowSuggestions(false);
+        const resultsEl = document.getElementById('search-results-section');
+        if (resultsEl) resultsEl.scrollIntoView({ behavior: 'smooth' });
       }
     } else if (e.key === 'Escape') {
       setShowSuggestions(false);
     }
   };
+
+  // Close search suggestions on click outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (searchContainerRef.current && !searchContainerRef.current.contains(event.target)) {
+        setShowSuggestions(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('touchstart', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside);
+    };
+  }, []);
 
   // Poll user's orders for live tracking
   useEffect(() => {
@@ -1882,29 +1910,136 @@ export default function Home() {
             </div>
 
             {/* Search Bar Container */}
-            <div className="search-container glass-panel" style={{ padding: '0.4rem', borderRadius: '18px', flexDirection: 'column', position: 'relative' }}>
-              <form onSubmit={e => { e.preventDefault(); }} style={{ display: 'flex', width: '100%', gap: '0.75rem', alignItems: 'center' }}>
-                <span style={{ fontSize: '1.25rem', paddingLeft: '1rem', color: 'var(--primary)' }}>🔍</span>
+            <div 
+              ref={searchContainerRef}
+              className="search-container glass-panel" 
+              style={{ 
+                padding: '0.6rem 0.8rem', 
+                borderRadius: '22px', 
+                flexDirection: 'column', 
+                position: 'relative',
+                background: '#ffffff',
+                border: '1.5px solid rgba(13, 148, 136, 0.35)',
+                boxShadow: '0 12px 35px rgba(13, 148, 136, 0.12)',
+                transition: 'all 0.25s ease'
+              }}
+            >
+              <form 
+                onSubmit={e => { 
+                  e.preventDefault(); 
+                  setShowSuggestions(false);
+                  const el = document.getElementById('search-results-section');
+                  if (el) el.scrollIntoView({ behavior: 'smooth' });
+                }} 
+                style={{ display: 'flex', width: '100%', gap: '0.6rem', alignItems: 'center' }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', paddingLeft: '0.5rem', color: 'var(--primary)', fontSize: '1.3rem' }}>
+                  🔍
+                </div>
                 <input
                   type="text"
                   className="input-field"
-                  placeholder="Search medicines or brand names (e.g. Crocin, Augmentin, Dolo)..."
+                  placeholder="Search medicines or brand names (e.g. Crocin, Augmentin, Dolo, Pantocid)..."
                   value={searchQuery}
-                  onChange={e => setSearchQuery(e.target.value)}
-                  onFocus={() => { if (searchQuery.length > 1) setShowSuggestions(true); }}
+                  onChange={e => {
+                    setSearchQuery(e.target.value);
+                    if (e.target.value.length >= 2) setShowSuggestions(true);
+                  }}
+                  onFocus={() => { if (searchQuery.length >= 2) setShowSuggestions(true); }}
                   onKeyDown={handleKeyDown}
-                  style={{ background: 'transparent', border: 'none', boxShadow: 'none', padding: '0.8rem 0.5rem' }}
+                  style={{ 
+                    flex: 1,
+                    background: 'transparent', 
+                    border: 'none', 
+                    boxShadow: 'none', 
+                    padding: '0.75rem 0.5rem',
+                    fontSize: '1rem',
+                    color: 'var(--text-main)',
+                    fontWeight: '500',
+                    outline: 'none'
+                  }}
                 />
                 {searchQuery && (
                   <button 
                     type="button" 
                     onClick={() => { setSearchQuery(''); setShowSuggestions(false); }} 
-                    style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '0.5rem', fontSize: '1.1rem' }}
+                    style={{ 
+                      background: 'rgba(241, 245, 249, 0.9)', 
+                      border: 'none', 
+                      color: 'var(--text-muted)', 
+                      cursor: 'pointer', 
+                      width: '28px',
+                      height: '28px',
+                      borderRadius: '50%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '1rem',
+                      fontWeight: 'bold',
+                      transition: 'background 0.15s ease'
+                    }}
+                    title="Clear search"
                   >
                     &times;
                   </button>
                 )}
+                <button
+                  type="submit"
+                  className="btn-primary"
+                  style={{
+                    padding: '0.65rem 1.35rem',
+                    borderRadius: '14px',
+                    fontWeight: '700',
+                    fontSize: '0.88rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    whiteSpace: 'nowrap',
+                    boxShadow: '0 4px 14px rgba(13, 148, 136, 0.25)'
+                  }}
+                >
+                  <span>Search</span>
+                </button>
               </form>
+
+              {/* Popular Instant Search Chips */}
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                flexWrap: 'wrap',
+                marginTop: '0.55rem',
+                paddingTop: '0.45rem',
+                borderTop: '1px solid rgba(226, 232, 240, 0.7)'
+              }}>
+                <span style={{ fontSize: '0.72rem', fontWeight: '700', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                  🔥 Popular:
+                </span>
+                {['Dolo 650', 'Pantocid 40', 'Allegra 120', 'Ascoril-D', 'Combiflam', 'Gelusil', 'Cetirizine', 'Azithromycin'].map(term => (
+                  <button
+                    key={term}
+                    type="button"
+                    onClick={() => {
+                      setSearchQuery(term);
+                      setShowSuggestions(true);
+                    }}
+                    style={{
+                      background: searchQuery.toLowerCase() === term.toLowerCase() ? 'rgba(13, 148, 136, 0.15)' : 'rgba(241, 245, 249, 0.85)',
+                      border: searchQuery.toLowerCase() === term.toLowerCase() ? '1px solid var(--primary)' : '1px solid rgba(203, 213, 225, 0.6)',
+                      color: searchQuery.toLowerCase() === term.toLowerCase() ? 'var(--primary)' : '#475569',
+                      padding: '2px 8px',
+                      borderRadius: '99px',
+                      fontSize: '0.72rem',
+                      fontWeight: '600',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease',
+                      whiteSpace: 'nowrap'
+                    }}
+                  >
+                    {term}
+                  </button>
+                ))}
+              </div>
 
               {/* Live Suggestions Dropdown with AI Compound Matching Badges */}
               {showSuggestions && searchQuery.length >= 2 && (
@@ -1913,22 +2048,40 @@ export default function Home() {
                   top: '100%',
                   left: 0,
                   right: 0,
-                  marginTop: '8px',
+                  marginTop: '10px',
                   background: '#ffffff',
-                  border: '1px solid rgba(13, 148, 136, 0.25)',
-                  borderRadius: '16px',
-                  boxShadow: '0 16px 40px rgba(0,0,0,0.15)',
+                  border: '1.5px solid rgba(13, 148, 136, 0.3)',
+                  borderRadius: '20px',
+                  boxShadow: '0 20px 50px rgba(0, 0, 0, 0.16)',
                   zIndex: 9999,
-                  maxHeight: '440px',
+                  maxHeight: '480px',
                   overflowY: 'auto',
-                  padding: '0.5rem'
+                  padding: '0.75rem'
                 }}>
-                  {/* ─── MULTI-COMPOSITION 2-TAB SPLIT BANNER (When brand has multiple compositions or combo tablet not in stock) ─── */}
+                  {/* Dropdown Header */}
+                  <div style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    padding: '0.35rem 0.6rem 0.6rem 0.6rem',
+                    borderBottom: '1px solid #f1f5f9',
+                    marginBottom: '0.5rem'
+                  }}>
+                    <span style={{ fontSize: '0.78rem', fontWeight: '800', color: '#0f766e', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#10b981', display: 'inline-block' }}></span>
+                      Live Stock Matches ({searchResults.length})
+                    </span>
+                    <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: '600' }}>
+                      ⚡ 10-15 Min Instant Delivery Available
+                    </span>
+                  </div>
+
+                  {/* ─── MULTI-COMPOSITION 2-TAB SPLIT BANNER ─── */}
                   {multiCompositionSplit && multiCompositionSplit.tabs && multiCompositionSplit.tabs.length >= 2 && (
                     <div style={{
                       background: 'linear-gradient(135deg, #f0fdfa 0%, #e0f2fe 100%)',
                       border: '1px solid #99f6e4',
-                      borderRadius: '14px',
+                      borderRadius: '16px',
                       padding: '1rem',
                       marginBottom: '0.85rem'
                     }}>
@@ -1941,7 +2094,7 @@ export default function Home() {
                         </div>
                         <span style={{
                           fontSize: '0.7rem',
-                          padding: '2px 8px',
+                          padding: '3px 10px',
                           borderRadius: '99px',
                           background: multiCompositionSplit.is_combined_in_stock ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)',
                           color: multiCompositionSplit.is_combined_in_stock ? '#059669' : '#dc2626',
@@ -1959,7 +2112,7 @@ export default function Home() {
                       <div style={{
                         display: 'flex',
                         background: '#ffffff',
-                        borderRadius: '10px',
+                        borderRadius: '12px',
                         padding: '3px',
                         border: '1px solid #cbd5e1',
                         marginBottom: '10px',
@@ -1976,13 +2129,13 @@ export default function Home() {
                               alignItems: 'center',
                               justifyContent: 'center',
                               gap: '6px',
-                              padding: '7px 10px',
-                              borderRadius: '8px',
+                              padding: '8px 12px',
+                              borderRadius: '9px',
                               border: 'none',
                               background: activeCompositionTab === tIdx ? 'linear-gradient(135deg, #0d9488, #059669)' : 'transparent',
                               color: activeCompositionTab === tIdx ? '#ffffff' : '#475569',
                               fontWeight: '700',
-                              fontSize: '0.8rem',
+                              fontSize: '0.82rem',
                               cursor: 'pointer',
                               transition: 'all 0.2s ease',
                               boxShadow: activeCompositionTab === tIdx ? '0 2px 8px rgba(13, 148, 136, 0.25)' : 'none'
@@ -1993,7 +2146,7 @@ export default function Home() {
                             <span style={{
                               fontSize: '0.68rem',
                               background: activeCompositionTab === tIdx ? 'rgba(255,255,255,0.25)' : '#f1f5f9',
-                              padding: '1px 5px',
+                              padding: '1px 6px',
                               borderRadius: '99px'
                             }}>
                               {tab.count}
@@ -2024,19 +2177,22 @@ export default function Home() {
                                     alignItems: 'center',
                                     background: '#ffffff',
                                     border: '1px solid #e2e8f0',
-                                    borderRadius: '8px',
-                                    padding: '6px 10px',
-                                    cursor: 'pointer'
+                                    borderRadius: '10px',
+                                    padding: '8px 12px',
+                                    cursor: 'pointer',
+                                    transition: 'border-color 0.15s ease'
                                   }}
+                                  onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--primary)'; }}
+                                  onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#e2e8f0'; }}
                                 >
                                   <div>
-                                    <strong style={{ fontSize: '0.82rem', color: '#0f172a' }}>{cm.brand_name}</strong>
+                                    <strong style={{ fontSize: '0.84rem', color: '#0f172a' }}>{cm.brand_name}</strong>
                                     <span style={{ fontSize: '0.72rem', color: '#64748b', marginLeft: '6px' }}>
                                       ({cm.dosage || 'Standard'} • {cm.form || 'Tablet'})
                                     </span>
                                   </div>
                                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                    <span style={{ fontSize: '0.82rem', fontWeight: 'bold', color: '#0d9488' }}>
+                                    <span style={{ fontSize: '0.84rem', fontWeight: 'bold', color: '#0d9488' }}>
                                       ₹{cm.price_mrp || '45.00'}
                                     </span>
                                     <button
@@ -2046,14 +2202,14 @@ export default function Home() {
                                         background: '#0d9488',
                                         color: '#ffffff',
                                         border: 'none',
-                                        padding: '3px 8px',
-                                        borderRadius: '6px',
-                                        fontSize: '0.72rem',
+                                        padding: '4px 10px',
+                                        borderRadius: '7px',
+                                        fontSize: '0.74rem',
                                         fontWeight: 'bold',
                                         cursor: 'pointer'
                                       }}
                                     >
-                                      + Add
+                                      + ADD
                                     </button>
                                   </div>
                                 </div>
@@ -2076,16 +2232,16 @@ export default function Home() {
                           background: 'linear-gradient(135deg, #FF6B00 0%, #FFA800 100%)',
                           color: '#ffffff',
                           border: 'none',
-                          padding: '7px 12px',
-                          borderRadius: '8px',
+                          padding: '8px 14px',
+                          borderRadius: '10px',
                           fontWeight: '800',
-                          fontSize: '0.78rem',
+                          fontSize: '0.8rem',
                           cursor: 'pointer',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
                           gap: '6px',
-                          boxShadow: '0 2px 8px rgba(255, 107, 0, 0.25)'
+                          boxShadow: '0 2px 10px rgba(255, 107, 0, 0.25)'
                         }}
                       >
                         <span>⚡ Add Both Compositions ({multiCompositionSplit.tabs[0].name} + {multiCompositionSplit.tabs[1].name}) in 1-Click</span>
@@ -2095,76 +2251,181 @@ export default function Home() {
 
                   {/* Standard Search Results List */}
                   {searchResults.length === 0 && !multiCompositionSplit ? (
-                    <div style={{ padding: '1.5rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.88rem' }}>
-                      <span style={{ fontSize: '1.6rem', display: 'block', marginBottom: '6px' }}>🧪</span>
+                    <div style={{ padding: '1.75rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.88rem' }}>
+                      <span style={{ fontSize: '1.8rem', display: 'block', marginBottom: '6px' }}>🧪</span>
                       No local pharmacy stock found for "<strong>{searchQuery}</strong>".<br />
                       <span style={{ fontSize: '0.8rem', color: '#f59e0b', marginTop: '6px', display: 'inline-block', fontWeight: 'bold' }}>
                         📡 An urgent inquiry broadcast has been dispatched to all partner pharmacies!
                       </span>
                     </div>
                   ) : (
-                    searchResults.map((item, idx) => (
-                      <div
-                        key={idx}
-                        onClick={() => addToCart(item)}
-                        style={{
-                          padding: '0.85rem 1rem',
-                          borderRadius: '12px',
-                          cursor: 'pointer',
-                          background: focusedIndex === idx ? 'rgba(13, 148, 136, 0.08)' : 'transparent',
-                          transition: 'background 0.15s ease',
-                          borderBottom: idx !== searchResults.length - 1 ? '1px solid #f1f5f9' : 'none'
-                        }}
-                        onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(13, 148, 136, 0.06)'; }}
-                        onMouseLeave={(e) => { e.currentTarget.style.background = focusedIndex === idx ? 'rgba(13, 148, 136, 0.08)' : 'transparent'; }}
-                      >
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '4px' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                            <strong style={{ fontSize: '1rem', color: 'var(--text-main)' }}>
-                              {highlightMatch(item.brand_name, searchQuery)}
-                            </strong>
-                            {item.compound_badge && (
-                              <span style={{
-                                background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.15), rgba(13, 148, 136, 0.2))',
-                                color: '#0f766e',
-                                border: '1px solid rgba(13, 148, 136, 0.3)',
-                                padding: '2px 8px',
-                                borderRadius: '99px',
+                    searchResults.map((item, idx) => {
+                      const itemCartQty = getItemCartCount(item.medicine_id);
+                      return (
+                        <div
+                          key={idx}
+                          onClick={() => {
+                            setShowSuggestions(false);
+                            setSelectedMedicineDetail(item);
+                          }}
+                          style={{
+                            padding: '0.75rem 0.9rem',
+                            borderRadius: '14px',
+                            cursor: 'pointer',
+                            background: focusedIndex === idx ? 'rgba(13, 148, 136, 0.08)' : 'transparent',
+                            transition: 'all 0.15s ease',
+                            borderBottom: idx !== searchResults.length - 1 ? '1px solid #f1f5f9' : 'none',
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            gap: '12px'
+                          }}
+                          onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(13, 148, 136, 0.06)'; }}
+                          onMouseLeave={(e) => { e.currentTarget.style.background = focusedIndex === idx ? 'rgba(13, 148, 136, 0.08)' : 'transparent'; }}
+                        >
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '3px' }}>
+                              <strong style={{ fontSize: '0.96rem', color: 'var(--text-main)' }}>
+                                {highlightMatch(item.brand_name, searchQuery)}
+                              </strong>
+                              {item.dosage && (
+                                <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: '600' }}>
+                                  ({item.dosage})
+                                </span>
+                              )}
+                              {item.compound_badge && (
+                                <span style={{
+                                  background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.15), rgba(13, 148, 136, 0.2))',
+                                  color: '#0f766e',
+                                  border: '1px solid rgba(13, 148, 136, 0.3)',
+                                  padding: '2px 8px',
+                                  borderRadius: '99px',
+                                  fontSize: '0.7rem',
+                                  fontWeight: 'bold'
+                                }}>
+                                  🤖 {item.compound_badge}
+                                </span>
+                              )}
+                            </div>
+
+                            {item.compound_note && (
+                              <div style={{
                                 fontSize: '0.72rem',
-                                fontWeight: 'bold'
+                                color: '#0369a1',
+                                background: '#f0f9ff',
+                                border: '1px solid #bae6fd',
+                                padding: '2px 7px',
+                                borderRadius: '6px',
+                                marginBottom: '4px',
+                                display: 'inline-block'
                               }}>
-                                🤖 {item.compound_badge}
+                                💡 {item.compound_note}
+                              </div>
+                            )}
+
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.76rem', color: 'var(--text-muted)', flexWrap: 'wrap' }}>
+                              <span>🧪 <strong>{highlightMatch(item.generic_name, searchQuery)}</strong></span>
+                              {item.manufacturer && <span>• {item.manufacturer}</span>}
+                              <span style={{ color: item.stock_status === 'In Stock' ? 'var(--green)' : '#f59e0b', fontWeight: '700' }}>
+                                {item.stock_status || (item.available_stock > 0 ? '✓ In Stock' : 'Low Stock')}
                               </span>
+                            </div>
+                          </div>
+
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
+                            <span style={{ fontWeight: '800', color: 'var(--primary)', fontSize: '1rem' }}>
+                              ₹{item.price_mrp || item.price}
+                            </span>
+                            {itemCartQty > 0 ? (
+                              <div 
+                                onClick={(e) => e.stopPropagation()}
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '4px',
+                                  background: '#f0fdf4',
+                                  border: '1.5px solid #16a34a',
+                                  borderRadius: '8px',
+                                  padding: '2px 6px'
+                                }}
+                              >
+                                <button
+                                  type="button"
+                                  onClick={() => handleUpdateItemQuantity(item, -1)}
+                                  style={{ background: 'transparent', border: 'none', color: '#16a34a', fontWeight: '800', cursor: 'pointer', padding: '0 3px' }}
+                                >
+                                  −
+                                </button>
+                                <span style={{ fontWeight: '800', fontSize: '0.78rem', color: '#16a34a', minWidth: '14px', textAlign: 'center' }}>
+                                  {itemCartQty}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleUpdateItemQuantity(item, 1)}
+                                  style={{ background: 'transparent', border: 'none', color: '#16a34a', fontWeight: '800', cursor: 'pointer', padding: '0 3px' }}
+                                >
+                                  +
+                                </button>
+                              </div>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleUpdateItemQuantity(item, 1);
+                                }}
+                                style={{
+                                  background: 'linear-gradient(135deg, #0d9488 0%, #059669 100%)',
+                                  color: '#ffffff',
+                                  border: 'none',
+                                  padding: '5px 12px',
+                                  borderRadius: '8px',
+                                  fontWeight: '800',
+                                  fontSize: '0.75rem',
+                                  cursor: 'pointer',
+                                  boxShadow: '0 2px 6px rgba(13, 148, 136, 0.25)'
+                                }}
+                              >
+                                + ADD
+                              </button>
                             )}
                           </div>
-                          <span style={{ fontWeight: '800', color: 'var(--primary)', fontSize: '0.95rem' }}>
-                            ₹{item.price_mrp || item.price}
-                          </span>
                         </div>
+                      );
+                    })
+                  )}
 
-                        {item.compound_note && (
-                          <div style={{
-                            fontSize: '0.75rem',
-                            color: '#0369a1',
-                            background: '#f0f9ff',
-                            border: '1px solid #bae6fd',
-                            padding: '3px 8px',
-                            borderRadius: '6px',
-                            marginBottom: '6px',
-                            display: 'inline-block'
-                          }}>
-                            💡 {item.compound_note}
-                          </div>
-                        )}
-
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-                          <span>🧪 Generic Salt: <strong>{item.generic_name}</strong></span>
-                          <span style={{ color: item.stock_status === 'In Stock' ? 'var(--green)' : '#f59e0b', fontWeight: 'bold' }}>
-                            {item.stock_status || (item.available_stock > 0 ? '✓ In Stock' : 'Low Stock')}
-                          </span>
-                        </div>
-                      </div>
-                    ))
+                  {/* Dropdown Footer: Scroll to Full Results */}
+                  {searchResults.length > 0 && (
+                    <div style={{
+                      marginTop: '0.5rem',
+                      paddingTop: '0.5rem',
+                      borderTop: '1px solid #f1f5f9',
+                      textAlign: 'center'
+                    }}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowSuggestions(false);
+                          const el = document.getElementById('search-results-section');
+                          if (el) el.scrollIntoView({ behavior: 'smooth' });
+                        }}
+                        style={{
+                          background: 'transparent',
+                          border: 'none',
+                          color: 'var(--primary)',
+                          fontWeight: '700',
+                          fontSize: '0.8rem',
+                          cursor: 'pointer',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '4px'
+                        }}
+                      >
+                        <span>View all {searchResults.length} matched products in catalogue</span>
+                        <span>↓</span>
+                      </button>
+                    </div>
                   )}
                 </div>
               )}
@@ -2793,198 +3054,341 @@ export default function Home() {
           )}
 
           {/* Amazon/Instamart-style Medicine Search Results */}
-            {searchResults.length > 0 && (
-              <div id="search-results-section" className="animate-fade-in" style={{ width: '100%', marginBottom: '3rem', textAlign: 'left' }}>
-                <h3 style={{ marginBottom: '1.25rem', color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '0.6rem', fontSize: '1.3rem', fontWeight: 'bold' }}>
-                  <span>📦</span> Matched Products ({searchResults.length})
-                </h3>
-                <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))',
-                  gap: '1.5rem',
-                  width: '100%'
-                }}>
-                  {searchResults.map((med, idx) => {
-                    const cartQty = getItemCartCount(med.medicine_id);
-                    const inCart = cartQty > 0;
-                    return (
-                      <div 
-                        key={idx} 
-                        className="glass-panel"
-                        onClick={() => setSelectedMedicineDetail(med)}
+          {searchResults.length > 0 && (
+            <div id="search-results-section" className="animate-fade-in" style={{ width: '100%', marginBottom: '3.5rem', textAlign: 'left' }}>
+              {/* Section Header with Category Tabs */}
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                flexWrap: 'wrap',
+                gap: '1rem',
+                marginBottom: '1.25rem',
+                borderBottom: '2px solid rgba(13, 148, 136, 0.15)',
+                paddingBottom: '0.85rem'
+              }}>
+                <div>
+                  <h3 style={{ margin: 0, color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '0.6rem', fontSize: '1.35rem', fontWeight: '800' }}>
+                    <span>📦</span> Matched Catalog Products ({searchResults.length})
+                  </h3>
+                  {searchQuery && (
+                    <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '3px' }}>
+                      Showing verified inventory for "<strong>{searchQuery}</strong>" near {selectedAddress?.area || 'your location'}
+                    </div>
+                  )}
+                </div>
+
+                {/* Filter Pills & Clear Button */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                  {['All', 'Tablets & Capsules', 'Syrups & Liquids', 'Fast Dispatch (10m)'].map(tab => (
+                    <button
+                      key={tab}
+                      type="button"
+                      onClick={() => setSearchCategoryFilter(tab)}
+                      style={{
+                        padding: '6px 14px',
+                        borderRadius: '99px',
+                        border: searchCategoryFilter === tab ? '1.5px solid var(--primary)' : '1px solid #cbd5e1',
+                        background: searchCategoryFilter === tab ? 'linear-gradient(135deg, #0d9488 0%, #059669 100%)' : '#ffffff',
+                        color: searchCategoryFilter === tab ? '#ffffff' : '#475569',
+                        fontWeight: '700',
+                        fontSize: '0.78rem',
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease',
+                        boxShadow: searchCategoryFilter === tab ? '0 2px 8px rgba(13, 148, 136, 0.25)' : 'none'
+                      }}
+                    >
+                      {tab}
+                    </button>
+                  ))}
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSearchQuery('');
+                      setSearchResults([]);
+                      setMultiCompositionSplit(null);
+                      setShowSuggestions(false);
+                    }}
+                    style={{
+                      padding: '6px 12px',
+                      borderRadius: '99px',
+                      border: '1px solid #fecaca',
+                      background: '#fff5f5',
+                      color: '#dc2626',
+                      fontWeight: '700',
+                      fontSize: '0.78rem',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease'
+                    }}
+                    title="Clear search results"
+                  >
+                    ✕ Clear
+                  </button>
+                </div>
+              </div>
+
+              {/* Grid of Results */}
+              {(() => {
+                const filtered = searchResults.filter(med => {
+                  if (searchCategoryFilter === 'All') return true;
+                  const form = `${med.dosage_form || ''} ${med.dosage || ''} ${med.form || ''} ${med.category || ''}`.toLowerCase();
+                  if (searchCategoryFilter === 'Tablets & Capsules') {
+                    return form.includes('tab') || form.includes('cap') || form.includes('pill');
+                  }
+                  if (searchCategoryFilter === 'Syrups & Liquids') {
+                    return form.includes('syr') || form.includes('liq') || form.includes('susp') || form.includes('drop');
+                  }
+                  if (searchCategoryFilter === 'Fast Dispatch (10m)') {
+                    return med.instamart?.nearest_pharmacy != null;
+                  }
+                  return true;
+                });
+
+                if (filtered.length === 0) {
+                  return (
+                    <div style={{
+                      padding: '2.5rem',
+                      textAlign: 'center',
+                      background: '#ffffff',
+                      borderRadius: '16px',
+                      border: '1px solid #e2e8f0',
+                      color: 'var(--text-muted)'
+                    }}>
+                      <span style={{ fontSize: '2rem', display: 'block', marginBottom: '8px' }}>🔍</span>
+                      No medicines match the "<strong>{searchCategoryFilter}</strong>" filter.<br />
+                      <button
+                        type="button"
+                        onClick={() => setSearchCategoryFilter('All')}
                         style={{
-                          padding: '1.5rem',
-                          borderRadius: '20px',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          justifyContent: 'space-between',
-                          border: '1px solid rgba(226, 232, 240, 0.9)',
-                          background: '#ffffff',
-                          transition: 'all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1)',
-                          position: 'relative',
-                          overflow: 'hidden',
-                          cursor: 'pointer',
-                          boxShadow: '0 4px 16px rgba(0, 0, 0, 0.03)'
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.transform = 'translateY(-6px)';
-                          e.currentTarget.style.boxShadow = '0 12px 30px rgba(13, 148, 136, 0.12)';
-                          e.currentTarget.style.borderColor = 'var(--primary)';
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.transform = 'none';
-                          e.currentTarget.style.boxShadow = '0 4px 16px rgba(0, 0, 0, 0.03)';
-                          e.currentTarget.style.borderColor = 'rgba(226, 232, 240, 0.9)';
+                          marginTop: '10px',
+                          background: 'var(--primary)',
+                          color: '#ffffff',
+                          border: 'none',
+                          padding: '6px 14px',
+                          borderRadius: '8px',
+                          fontWeight: '700',
+                          fontSize: '0.8rem',
+                          cursor: 'pointer'
                         }}
                       >
-                        <div>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.75rem' }}>
-                            <span style={{
-                              fontSize: '0.68rem',
-                              background: 'rgba(13, 148, 136, 0.1)',
-                              border: '1px solid rgba(13, 148, 136, 0.25)',
-                              padding: '2px 8px',
-                              borderRadius: '6px',
-                              color: 'var(--primary)',
-                              textTransform: 'uppercase',
-                              fontWeight: 'bold'
-                            }}>
-                              {med.category || 'Prescription'}
-                            </span>
-                            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 'bold' }}>{med.dosage}</span>
-                          </div>
-                          <h4 style={{ margin: '0 0 6px 0', fontSize: '1.15rem', color: 'var(--text-main)', fontWeight: 'bold', lineHeight: '1.3' }}>
-                            {highlightMatch(med.brand_name, searchQuery)}
-                          </h4>
-                          <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', margin: '8px 0 0 0', lineHeight: '1.45' }}>
-                            <span style={{ display: 'block', marginBottom: '3px' }}><strong>Salt:</strong> {highlightMatch(med.generic_name, searchQuery)}</span>
-                            <span><strong>Mfg:</strong> {med.manufacturer}</span>
-                          </p>
+                        Show All {searchResults.length} Products
+                      </button>
+                    </div>
+                  );
+                }
 
-                          {/* Instamart Faster Delivery Possible Badge */}
-                          {med.instamart?.nearest_pharmacy ? (
-                            <div style={{
-                              background: '#fff7ed',
-                              border: '1px solid rgba(255, 107, 0, 0.25)',
-                              borderRadius: '10px',
-                              padding: '8px 10px',
-                              marginTop: '0.8rem',
-                              display: 'flex',
-                              flexDirection: 'column',
-                              gap: '2px'
-                            }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                <span style={{ fontSize: '0.9rem' }}>⚡</span>
-                                <span style={{ fontSize: '0.74rem', color: '#c2410c', fontWeight: '800' }}>
-                                  Faster delivery in {med.instamart.nearest_pharmacy.delivery_time}
-                                </span>
-                              </div>
-                              <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>
-                                Available at {med.instamart.nearest_pharmacy.pharmacy_name} ({med.instamart.nearest_pharmacy.distance_km} km away • {med.instamart.nearest_pharmacy.quantity} in stock)
-                              </div>
-                              {med.instamart.stores_count > 1 && (
-                                <div style={{ fontSize: '0.65rem', color: 'var(--primary)', marginTop: '2px', fontWeight: '600' }}>
-                                  ✓ Also in stock at {med.instamart.stores_count - 1} other local partner pharmacies
-                                </div>
-                              )}
-                            </div>
-                          ) : (
-                            <div style={{
-                              background: '#f8fafc',
-                              border: '1px solid #e2e8f0',
-                              borderRadius: '8px',
-                              padding: '6px 10px',
-                              marginTop: '0.8rem',
-                              fontSize: '0.72rem',
-                              color: 'var(--text-muted)'
-                            }}>
-                              ⚡ Standard 15-25 min delivery from regional warehouse
-                            </div>
-                          )}
-                        </div>
+                return (
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))',
+                    gap: '1.5rem',
+                    width: '100%'
+                  }}>
+                    {filtered.map((med, idx) => {
+                      const cartQty = getItemCartCount(med.medicine_id);
+                      const inCart = cartQty > 0;
+                      const formStr = (med.dosage_form || med.dosage || med.form || '').toLowerCase();
+                      const formIcon = formStr.includes('syr') || formStr.includes('liq') ? '🧴' : formStr.includes('drop') ? '💧' : '💊';
 
-                        <div style={{ marginTop: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid rgba(226, 232, 240, 0.8)', paddingTop: '0.9rem' }}>
-                          <span style={{ fontSize: '1.3rem', fontWeight: '800', color: 'var(--primary)' }}>₹{med.price_mrp}</span>
-
-                          {inCart ? (
-                            <div 
-                              onClick={(e) => e.stopPropagation()}
-                              style={{
+                      return (
+                        <div 
+                          key={idx} 
+                          className="glass-panel"
+                          onClick={() => setSelectedMedicineDetail(med)}
+                          style={{
+                            padding: '1.4rem',
+                            borderRadius: '20px',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            justifyContent: 'space-between',
+                            border: '1px solid rgba(226, 232, 240, 0.9)',
+                            background: '#ffffff',
+                            transition: 'all 0.25s cubic-bezier(0.25, 0.8, 0.25, 1)',
+                            position: 'relative',
+                            overflow: 'hidden',
+                            cursor: 'pointer',
+                            boxShadow: '0 4px 18px rgba(0, 0, 0, 0.04)'
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.transform = 'translateY(-5px)';
+                            e.currentTarget.style.boxShadow = '0 14px 30px rgba(13, 148, 136, 0.14)';
+                            e.currentTarget.style.borderColor = 'var(--primary)';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.transform = 'none';
+                            e.currentTarget.style.boxShadow = '0 4px 18px rgba(0, 0, 0, 0.04)';
+                            e.currentTarget.style.borderColor = 'rgba(226, 232, 240, 0.9)';
+                          }}
+                        >
+                          <div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.75rem' }}>
+                              <span style={{
+                                fontSize: '0.68rem',
+                                background: 'rgba(13, 148, 136, 0.1)',
+                                border: '1px solid rgba(13, 148, 136, 0.25)',
+                                padding: '2px 8px',
+                                borderRadius: '6px',
+                                color: 'var(--primary)',
+                                textTransform: 'uppercase',
+                                fontWeight: '800',
                                 display: 'flex',
                                 alignItems: 'center',
-                                gap: '6px',
-                                background: '#f0fdf4',
-                                border: '1.5px solid #16a34a',
-                                borderRadius: '10px',
-                                padding: '3px 8px'
-                              }}
-                            >
-                              <button
-                                type="button"
-                                onClick={() => handleUpdateItemQuantity(med, -1)}
-                                style={{
-                                  background: 'transparent',
-                                  border: 'none',
-                                  color: '#16a34a',
-                                  fontSize: '1rem',
-                                  fontWeight: '800',
-                                  cursor: 'pointer',
-                                  padding: '0 4px'
-                                }}
-                                title="Decrease quantity"
-                              >
-                                −
-                              </button>
-                              <span style={{ fontWeight: '800', fontSize: '0.85rem', color: '#16a34a', minWidth: '18px', textAlign: 'center' }}>
-                                {cartQty}
+                                gap: '3px'
+                              }}>
+                                <span>{formIcon}</span>
+                                <span>{med.category || 'Prescription'}</span>
                               </span>
-                              <button
-                                type="button"
-                                onClick={() => handleUpdateItemQuantity(med, 1)}
-                                style={{
-                                  background: 'transparent',
-                                  border: 'none',
-                                  color: '#16a34a',
-                                  fontSize: '1rem',
-                                  fontWeight: '800',
-                                  cursor: 'pointer',
-                                  padding: '0 4px'
-                                }}
-                                title="Increase quantity"
-                              >
-                                +
-                              </button>
+                              <span style={{ fontSize: '0.76rem', color: 'var(--text-muted)', fontWeight: '700' }}>{med.dosage}</span>
                             </div>
-                          ) : (
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleUpdateItemQuantity(med, 1);
-                              }}
-                              className="btn-primary"
-                              style={{ padding: '0.5rem 1.15rem', fontSize: '0.82rem', borderRadius: '10px', fontWeight: 'bold' }}
-                            >
-                              + Add to Cart
-                            </button>
-                          )}
+                            <h4 style={{ margin: '0 0 6px 0', fontSize: '1.15rem', color: 'var(--text-main)', fontWeight: '800', lineHeight: '1.3' }}>
+                              {highlightMatch(med.brand_name, searchQuery)}
+                            </h4>
+                            <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', margin: '6px 0 0 0', lineHeight: '1.45' }}>
+                              <span style={{ display: 'block', marginBottom: '3px' }}><strong>Salt:</strong> {highlightMatch(med.generic_name, searchQuery)}</span>
+                              {med.manufacturer && <span><strong>Mfg:</strong> {med.manufacturer}</span>}
+                            </p>
+
+                            {/* Compound Match Note */}
+                            {med.compound_note && (
+                              <div style={{
+                                fontSize: '0.72rem',
+                                color: '#0369a1',
+                                background: '#f0f9ff',
+                                border: '1px solid #bae6fd',
+                                padding: '3px 8px',
+                                borderRadius: '6px',
+                                marginTop: '6px'
+                              }}>
+                                💡 {med.compound_note}
+                              </div>
+                            )}
+
+                            {/* Instamart Faster Delivery Possible Badge */}
+                            {med.instamart?.nearest_pharmacy ? (
+                              <div style={{
+                                background: '#fff7ed',
+                                border: '1px solid rgba(255, 107, 0, 0.25)',
+                                borderRadius: '10px',
+                                padding: '7px 10px',
+                                marginTop: '0.8rem',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '2px'
+                              }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                  <span style={{ fontSize: '0.9rem' }}>⚡</span>
+                                  <span style={{ fontSize: '0.74rem', color: '#c2410c', fontWeight: '800' }}>
+                                    Faster delivery in {med.instamart.nearest_pharmacy.delivery_time}
+                                  </span>
+                                </div>
+                                <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>
+                                  At {med.instamart.nearest_pharmacy.pharmacy_name} ({med.instamart.nearest_pharmacy.distance_km} km • {med.instamart.nearest_pharmacy.quantity} in stock)
+                                </div>
+                              </div>
+                            ) : (
+                              <div style={{
+                                background: '#f8fafc',
+                                border: '1px solid #e2e8f0',
+                                borderRadius: '8px',
+                                padding: '6px 10px',
+                                marginTop: '0.8rem',
+                                fontSize: '0.72rem',
+                                color: 'var(--text-muted)'
+                              }}>
+                                ⚡ Standard 15-25 min delivery from local warehouse
+                              </div>
+                            )}
+                          </div>
+
+                          <div style={{ marginTop: '1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid rgba(226, 232, 240, 0.8)', paddingTop: '0.85rem' }}>
+                            <div>
+                              <span style={{ fontSize: '1.25rem', fontWeight: '800', color: 'var(--primary)' }}>₹{med.price_mrp}</span>
+                              <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', display: 'block' }}>MRP incl. taxes</span>
+                            </div>
+
+                            {inCart ? (
+                              <div 
+                                onClick={(e) => e.stopPropagation()}
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '6px',
+                                  background: '#f0fdf4',
+                                  border: '1.5px solid #16a34a',
+                                  borderRadius: '10px',
+                                  padding: '3px 8px'
+                                }}
+                              >
+                                <button
+                                  type="button"
+                                  onClick={() => handleUpdateItemQuantity(med, -1)}
+                                  style={{
+                                    background: 'transparent',
+                                    border: 'none',
+                                    color: '#16a34a',
+                                    fontSize: '1.1rem',
+                                    fontWeight: '800',
+                                    cursor: 'pointer',
+                                    padding: '0 4px'
+                                  }}
+                                  title="Decrease quantity"
+                                >
+                                  −
+                                </button>
+                                <span style={{ fontWeight: '800', fontSize: '0.85rem', color: '#16a34a', minWidth: '18px', textAlign: 'center' }}>
+                                  {cartQty}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleUpdateItemQuantity(med, 1)}
+                                  style={{
+                                    background: 'transparent',
+                                    border: 'none',
+                                    color: '#16a34a',
+                                    fontSize: '1.1rem',
+                                    fontWeight: '800',
+                                    cursor: 'pointer',
+                                    padding: '0 4px'
+                                  }}
+                                  title="Increase quantity"
+                                >
+                                  +
+                                </button>
+                              </div>
+                            ) : (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleUpdateItemQuantity(med, 1);
+                                }}
+                                className="btn-primary"
+                                style={{ padding: '0.55rem 1.15rem', fontSize: '0.82rem', borderRadius: '10px', fontWeight: '800' }}
+                              >
+                                + Add to Cart
+                              </button>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    );
-                  })}
-                </div>
-                {cart.length > 0 && (
-                  <div style={{ marginTop: '1.5rem', textAlign: 'center' }}>
-                    <a 
-                      href="/cart"
-                      className="btn-primary"
-                      style={{ background: 'var(--primary)', padding: '0.85rem 2.2rem', textDecoration: 'none', fontWeight: 'bold', display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}
-                    >
-                      <span>View Cart ({cart.length} {cart.length === 1 ? 'item' : 'items'}) 🛒</span>
-                    </a>
+                      );
+                    })}
                   </div>
-                )}
-              </div>
-            )}
+                );
+              })()}
+
+              {cart.length > 0 && (
+                <div style={{ marginTop: '2rem', textAlign: 'center' }}>
+                  <a 
+                    href="/cart"
+                    className="btn-primary"
+                    style={{ background: 'var(--primary)', padding: '0.85rem 2.2rem', textDecoration: 'none', fontWeight: 'bold', display: 'inline-flex', alignItems: 'center', gap: '0.5rem', borderRadius: '14px' }}
+                  >
+                    <span>Proceed to Cart ({cart.length} {cart.length === 1 ? 'item' : 'items'}) 🛒</span>
+                  </a>
+                </div>
+              )}
+            </div>
+          )}
 
 
 

@@ -2,5 +2,6 @@ id,full_name,role,email,phone,username,password,status,must_change_password,addr
 usr_admin_1,MEDORA System Administrator,admin,admin@medora.com,+919000000000,admin,admin,active,0,,,,,2026-01-01T00:00:00Z
 usr_patient_1,Adhwaith (Patient),patient,patient@medora.com,+919999999999,patient,patient123,active,0,,,,,2026-01-01T00:00:00Z
 usr_pharmacy_1,Vamanjoor Pharmacy Admin,pharmacy,pharmacy@medora.com,+918888888888,pharmacy,pharmacy123,active,0,"Airport Road, Vamanjoor",KA-MN-2024-PH998,,,2026-01-01T00:00:00Z
+usr_rider_1,Rider AGT-591,delivery,rider@medora.com,+917777777777,rider,rider123,active,0,"Kodialbail, Mangalore",,"Electric Scooter",DL-KA19-202300091,2026-01-01T00:00:00Z
 usr_a2ecb766,Raju,pharmacy,adhwaithkr2005@gmail.com,9809803257,adhwaithkr2005,password123,active,0,Vamanjoor Junction,KA 5481698,,,2026-10-01T00:25:45.707786Z
 usr_73a07761,Adhwaith K R,patient,23g02.adhwaith@sjec.ac.in,5424774854,23g02.adhwaith,medora123,active,0,,,,,2026-10-01T00:33:52.428667Z

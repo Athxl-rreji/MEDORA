@@ -521,38 +521,85 @@ class PrototypeDataStore:
                 logger.error(f"Failed to mirror deleted users to {path}: {e}")
 
     def load_users(self):
-        """Loads registered users from SQLite database into memory cache and updates CSV mirror."""
+        """Loads registered user credentials directly from registered_users.csv and syncs to SQLite."""
         self.load_deleted_users()
         loaded = []
+        seen_emails = set()
+        seen_ids = set()
+
+        # Primary load from registered_users.csv across dataset dirs
+        for d in self.get_all_dataset_dirs():
+            path = os.path.join(d, 'registered_users.csv')
+            if os.path.exists(path):
+                try:
+                    with open(path, mode='r', encoding='utf-8') as f:
+                        reader = csv.DictReader(f)
+                        for r in reader:
+                            uid = str(r.get("id", "")).strip().lower()
+                            uemail = str(r.get("email", "")).strip().lower()
+                            uname = str(r.get("username", "")).strip().lower()
+                            if not uemail:
+                                continue
+                            if uid in self.deleted_users or uemail in self.deleted_users or uname in self.deleted_users:
+                                continue
+                            if uemail in seen_emails or uid in seen_ids:
+                                continue
+
+                            d_user = dict(r)
+                            must_val = d_user.get("must_change_password", 0)
+                            d_user["must_change_password"] = bool(int(must_val)) if str(must_val).isdigit() else bool(must_val)
+                            loaded.append(d_user)
+                            seen_emails.add(uemail)
+                            seen_ids.add(uid)
+                except Exception as e:
+                    logger.error(f"Error reading users from CSV {path}: {e}")
+
+        # Ensure default accounts are present
+        default_users = [
+            {"id": "usr_admin_1", "full_name": "MEDORA System Administrator", "role": "admin", "email": "admin@medora.com", "phone": "+919000000000", "username": "admin", "password": "admin", "status": "active", "must_change_password": False, "address": "", "pharmacy_license": "", "vehicle_type": "", "driving_license": "", "created_at": "2026-01-01T00:00:00Z"},
+            {"id": "usr_patient_1", "full_name": "Adhwaith (Patient)", "role": "patient", "email": "patient@medora.com", "phone": "+919999999999", "username": "patient", "password": "patient123", "status": "active", "must_change_password": False, "address": "", "pharmacy_license": "", "vehicle_type": "", "driving_license": "", "created_at": "2026-01-01T00:00:00Z"},
+            {"id": "usr_pharmacy_1", "full_name": "Vamanjoor Pharmacy Admin", "role": "pharmacy", "email": "pharmacy@medora.com", "phone": "+918888888888", "username": "pharmacy", "password": "pharmacy123", "status": "active", "must_change_password": False, "address": "Airport Road, Vamanjoor", "pharmacy_license": "KA-MN-2024-PH998", "vehicle_type": "", "driving_license": "", "created_at": "2026-01-01T00:00:00Z"},
+            {"id": "usr_rider_1", "full_name": "Rider AGT-591", "role": "delivery", "email": "rider@medora.com", "phone": "+917777777777", "username": "rider", "password": "rider123", "status": "active", "must_change_password": False, "address": "Kodialbail, Mangalore", "pharmacy_license": "", "vehicle_type": "Electric Scooter", "driving_license": "DL-KA19-202300091", "created_at": "2026-01-01T00:00:00Z"}
+        ]
+        for du in default_users:
+            em = du["email"].lower()
+            if em not in seen_emails and em not in self.deleted_users:
+                loaded.append(du)
+                seen_emails.add(em)
+                seen_ids.add(du["id"].lower())
+
+        self.users = loaded
+        self.save_users_to_csv()
+        self.sync_users_to_sqlite()
+        logger.info(f"Loaded {len(self.users)} active credentials from registered_users.csv.")
+
+    def sync_users_to_sqlite(self):
+        """Synchronizes in-memory and CSV users into SQLite table."""
         try:
             with self.get_db() as conn:
                 cur = conn.cursor()
-                cur.execute("""
-                    SELECT id, full_name, role, email, phone, username, password, status,
-                           must_change_password, address, pharmacy_license, vehicle_type,
-                           driving_license, created_at, updated_at
-                    FROM users
-                    ORDER BY created_at ASC
-                """)
-                for r in cur.fetchall():
-                    uid = str(r["id"]).strip().lower()
-                    uemail = str(r["email"]).strip().lower()
-                    uname = str(r["username"]).strip().lower()
-
-                    if uid in self.deleted_users or uemail in self.deleted_users or uname in self.deleted_users:
-                        continue
-
-                    d = dict(r)
-                    d["must_change_password"] = bool(d.get("must_change_password", 0))
-                    loaded.append(d)
-            self.users = loaded
-            self.save_users_to_csv()
-            logger.info(f"Loaded {len(self.users)} active accounts from SQLite database.")
+                for u in self.users:
+                    must_val = 1 if u.get("must_change_password") else 0
+                    cur.execute("""
+                        INSERT OR REPLACE INTO users (
+                            id, full_name, role, email, phone, username, password, status,
+                            must_change_password, address, pharmacy_license, vehicle_type,
+                            driving_license, created_at
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """, (
+                        u.get("id"), u.get("full_name", "User"), u.get("role", "patient"),
+                        u.get("email").strip(), u.get("phone", ""), u.get("username", ""),
+                        u.get("password", ""), u.get("status", "active"),
+                        must_val, u.get("address", ""), u.get("pharmacy_license", ""),
+                        u.get("vehicle_type", ""), u.get("driving_license", ""),
+                        u.get("created_at", datetime.now().isoformat())
+                    ))
+                conn.commit()
         except Exception as e:
-            logger.error(f"Error querying users from SQLite: {e}")
+            logger.error(f"Error syncing users to SQLite: {e}")
 
     def save_users_to_csv(self):
-        """Saves a mirror of user credentials to registered_users.csv across all dataset directories."""
+        """Saves user credentials directly to registered_users.csv across all dataset directories."""
         fieldnames = [
             "id", "full_name", "role", "email", "phone", 
             "username", "password", "status", "must_change_password", "address",
@@ -576,7 +623,7 @@ class PrototypeDataStore:
                         row["must_change_password"] = 1 if row.get("must_change_password") else 0
                         writer.writerow(row)
             except Exception as e:
-                logger.error(f"Failed to mirror users to CSV at {path}: {e}")
+                logger.error(f"Failed to write users to CSV at {path}: {e}")
 
     def load_data(self):
         med_path = os.path.join(DATASETS_DIR, 'core_medicines.csv')
