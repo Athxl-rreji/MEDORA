@@ -41,7 +41,8 @@ export default function SwiggyAddressDrawer({
   onClose,
   currentAddress,
   onSelectAddress,
-  activeUser
+  activeUser,
+  isFirstTimeSetup = false
 }) {
   const [viewMode, setViewMode] = useState('list'); // 'list' | 'add'
   const [savedAddresses, setSavedAddresses] = useState(DEFAULT_SAVED_ADDRESSES);
@@ -59,6 +60,12 @@ export default function SwiggyAddressDrawer({
   const [receiverName, setReceiverName] = useState(activeUser?.name || 'Adhwaith');
   const [receiverPhone, setReceiverPhone] = useState(activeUser?.phone || '+91 99999 99999');
   const [detectedCoords, setDetectedCoords] = useState({ lat: 19.0760, lng: 72.8777, accuracy: null });
+
+  // Update receiver fields whenever activeUser changes
+  useEffect(() => {
+    if (activeUser?.name) setReceiverName(activeUser.name);
+    if (activeUser?.phone) setReceiverPhone(activeUser.phone);
+  }, [activeUser]);
 
   // Load saved addresses from localStorage
   useEffect(() => {
@@ -183,13 +190,23 @@ export default function SwiggyAddressDrawer({
       receiverPhone: receiverPhone.trim() || "+91 99999 99999",
       latitude: detectedCoords.lat,
       longitude: detectedCoords.lng,
-      isDefault: false
+      isDefault: true
     };
 
-    const updated = [newAddr, ...savedAddresses];
+    const updated = [newAddr, ...savedAddresses.map(a => ({ ...a, isDefault: false }))];
     saveAddressesToStorage(updated);
     onSelectAddress(newAddr);
     setViewMode('list');
+    onClose();
+  };
+
+  const handleSelectSavedAddress = (addr) => {
+    const updated = savedAddresses.map(a => ({
+      ...a,
+      isDefault: a.id === addr.id
+    }));
+    saveAddressesToStorage(updated);
+    onSelectAddress({ ...addr, isDefault: true });
     onClose();
   };
 
@@ -272,7 +289,7 @@ export default function SwiggyAddressDrawer({
                 {viewMode === 'list' ? 'Delivery Location' : 'Save Delivery Address'}
               </h2>
               <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
-                {viewMode === 'list' ? 'Instant 10-15 min delivery address' : 'Swiggy Instamart Standard Address'}
+                {viewMode === 'list' ? 'Instant 10-15 min delivery address' : 'MEDORA Verified Delivery Address'}
               </span>
             </div>
           </div>
@@ -299,6 +316,30 @@ export default function SwiggyAddressDrawer({
 
         {/* Content Body */}
         <div style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1.2rem', flex: 1 }}>
+
+          {/* First Time Sign-In Prompt Banner */}
+          {isFirstTimeSetup && (
+            <div style={{
+              background: 'linear-gradient(135deg, rgba(45, 212, 191, 0.16) 0%, rgba(56, 189, 248, 0.12) 100%)',
+              border: '1.5px solid rgba(45, 212, 191, 0.45)',
+              borderRadius: '14px',
+              padding: '1rem',
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: '12px',
+              boxShadow: '0 4px 16px rgba(0, 0, 0, 0.25)'
+            }}>
+              <span style={{ fontSize: '1.6rem', lineHeight: 1 }}>📍</span>
+              <div>
+                <strong style={{ display: 'block', fontSize: '0.92rem', color: '#5eead4', fontWeight: '800' }}>
+                  First Time Setup • Set Default Delivery Address
+                </strong>
+                <span style={{ fontSize: '0.78rem', color: '#cbd5e1', lineHeight: '1.45', display: 'block', marginTop: '3px' }}>
+                  Welcome to MEDORA! Please set or confirm your delivery address. This will be saved as your <strong>default delivery address</strong> so emergency 10-minute medicine dispatches reach you seamlessly.
+                </span>
+              </div>
+            </div>
+          )}
 
           {viewMode === 'list' && (
             <>
@@ -433,10 +474,7 @@ export default function SwiggyAddressDrawer({
                     return (
                       <div
                         key={addr.id}
-                        onClick={() => {
-                          onSelectAddress(addr);
-                          onClose();
-                        }}
+                        onClick={() => handleSelectSavedAddress(addr)}
                         style={{
                           background: isSelected ? '#1c2436' : '#181e2b',
                           border: isSelected ? '2px solid #2dd4bf' : '1px solid rgba(255, 255, 255, 0.08)',

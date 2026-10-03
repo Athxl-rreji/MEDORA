@@ -553,27 +553,68 @@ export default function DeliveryDashboard() {
             <p className="hint">Orders appear here once pharmacy marks them &quot;Ready&quot;</p>
           </div>
         ) : (
-          readyOrders.map(order => (
-            <div key={order.id} className="order-card">
-              <div className="order-top">
-                <span className="order-id">{order.id}</span>
-                <span className="tag-urgent pulse">URGENT MEDICAL</span>
-              </div>
-              <div className="order-pharmacy">📍 Vamanjoor Pharmacy, Mangalore</div>
-              <div className="order-items">{formatItems(order.items)}</div>
-              <div className="payout-row">
-                <span className="payout">Payout: ₹45.00</span>
-                <span className="distance">~2.5 km</span>
-              </div>
-              <button
-                className="btn-accept"
-                onClick={() => handleAccept(order)}
-                disabled={updatingId === order.id}
+          readyOrders.map(order => {
+            const isDirectStoreAssigned = order.assigned_rider_id === AGENT_ID || 
+              (typeof window !== 'undefined' && localStorage.getItem(`medora_order_preferred_rider_${order.id}`) === AGENT_ID);
+            const isAssignedToOther = order.assigned_rider_id && order.assigned_rider_id !== AGENT_ID;
+
+            return (
+              <div
+                key={order.id}
+                className="order-card"
+                style={isDirectStoreAssigned ? {
+                  border: '2px solid #2dd4bf',
+                  background: 'rgba(13, 148, 136, 0.15)',
+                  boxShadow: '0 0 20px rgba(45, 212, 191, 0.25)'
+                } : {}}
               >
-                {updatingId === order.id ? 'Accepting...' : '🛵 Accept & Pick Up'}
-              </button>
-            </div>
-          ))
+                <div className="order-top" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '6px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                    <span className="order-id">{order.id}</span>
+                    {isDirectStoreAssigned && (
+                      <span style={{
+                        background: 'linear-gradient(135deg, #f59e0b, #d97706)',
+                        color: '#fff',
+                        fontSize: '0.68rem',
+                        fontWeight: '800',
+                        padding: '2px 8px',
+                        borderRadius: '99px',
+                        letterSpacing: '0.03em'
+                      }}>
+                        ⭐ STORE PREFERRED DIRECT ASSIGNMENT
+                      </span>
+                    )}
+                    {isAssignedToOther && (
+                      <span style={{
+                        background: 'rgba(255, 255, 255, 0.1)',
+                        color: '#cbd5e1',
+                        fontSize: '0.68rem',
+                        padding: '2px 8px',
+                        borderRadius: '99px'
+                      }}>
+                        🛵 Reserved for Store Rider {order.assigned_rider_name || order.assigned_rider_id}
+                      </span>
+                    )}
+                  </div>
+                  <span className="tag-urgent pulse">URGENT MEDICAL</span>
+                </div>
+                <div className="order-pharmacy">📍 Vamanjoor Pharmacy, Mangalore</div>
+                <div className="order-items">{formatItems(order.items)}</div>
+                <div className="payout-row">
+                  <span className="payout">Payout: ₹45.00</span>
+                  <span className="distance">~2.5 km</span>
+                </div>
+                <button
+                  className="btn-accept"
+                  style={isDirectStoreAssigned ? { background: 'linear-gradient(135deg, #0d9488, #14b8a6)', color: '#fff', fontWeight: '800' } : {}}
+                  onClick={() => handleAccept(order)}
+                  disabled={updatingId === order.id}
+                >
+                  {updatingId === order.id ? 'Accepting...' : isDirectStoreAssigned ? '⭐ Accept Preferred Delivery 🛵' : '🛵 Accept & Pick Up'}
+                </button>
+              </div>
+            );
+          })
         )}
       </div>
     </main>

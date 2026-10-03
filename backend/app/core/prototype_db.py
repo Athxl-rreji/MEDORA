@@ -1064,10 +1064,14 @@ class PrototypeDataStore:
             or str(o.get("user_id", "")).strip().lower() == clean_target
         ]
 
-    def update_order_status(self, order_id: str, new_status: str):
+    def update_order_status(self, order_id: str, new_status: str, assigned_rider_id: str = None, assigned_rider_name: str = None):
         for o in self.orders:
             if o["id"] == order_id:
                 o["status"] = new_status
+                if assigned_rider_id:
+                    o["assigned_rider_id"] = assigned_rider_id
+                if assigned_rider_name:
+                    o["assigned_rider_name"] = assigned_rider_name
                 return o
         return None
 

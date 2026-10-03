@@ -583,36 +583,77 @@ export default function RiderView() {
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              {readyOrders.map(order => (
-                <div key={order.id} style={{ background: 'rgba(0,0,0,0.25)', border: '1px solid var(--border-color)', borderRadius: '14px', padding: '1.2rem' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.6rem' }}>
-                    <strong style={{ fontSize: '1.05rem', color: '#fff' }}>Order #{order.id}</strong>
-                    <span style={{ background: 'var(--red)', color: '#fff', fontSize: '0.7rem', fontWeight: 'bold', padding: '2px 8px', borderRadius: '99px' }}>
-                      URGENT MEDICAL
-                    </span>
-                  </div>
+              {readyOrders.map(order => {
+                const isDirectStoreAssigned = order.assigned_rider_id === AGENT_ID || 
+                  (typeof window !== 'undefined' && localStorage.getItem(`medora_order_preferred_rider_${order.id}`) === AGENT_ID);
+                const isAssignedToOther = order.assigned_rider_id && order.assigned_rider_id !== AGENT_ID;
 
-                  <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '0.8rem' }}>
-                    📍 Vamanjoor Pharmacy, Mangalore <br />
-                    🧾 {formatItems(order.items)}
-                  </div>
-
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '0.75rem' }}>
-                    <div>
-                      <span style={{ color: 'var(--green)', fontWeight: 'bold', fontSize: '1.1rem' }}>Payout: ₹45.00</span>
-                      <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginLeft: '8px' }}>~2.5 km</span>
+                return (
+                  <div
+                    key={order.id}
+                    style={{
+                      background: isDirectStoreAssigned ? 'rgba(13, 148, 136, 0.15)' : 'rgba(0,0,0,0.25)',
+                      border: isDirectStoreAssigned ? '2px solid #2dd4bf' : '1px solid var(--border-color)',
+                      borderRadius: '14px',
+                      padding: '1.2rem',
+                      boxShadow: isDirectStoreAssigned ? '0 0 20px rgba(45, 212, 191, 0.25)' : 'none'
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.6rem', flexWrap: 'wrap', gap: '6px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                        <strong style={{ fontSize: '1.05rem', color: '#fff' }}>Order #{order.id}</strong>
+                        {isDirectStoreAssigned && (
+                          <span style={{
+                            background: 'linear-gradient(135deg, #f59e0b, #d97706)',
+                            color: '#fff',
+                            fontSize: '0.68rem',
+                            fontWeight: '800',
+                            padding: '2px 8px',
+                            borderRadius: '99px',
+                            letterSpacing: '0.03em'
+                          }}>
+                            ⭐ STORE PREFERRED DIRECT ASSIGNMENT
+                          </span>
+                        )}
+                        {isAssignedToOther && (
+                          <span style={{
+                            background: 'rgba(255, 255, 255, 0.1)',
+                            color: '#cbd5e1',
+                            fontSize: '0.68rem',
+                            padding: '2px 8px',
+                            borderRadius: '99px'
+                          }}>
+                            🛵 Reserved for Store Rider {order.assigned_rider_name || order.assigned_rider_id}
+                          </span>
+                        )}
+                      </div>
+                      <span style={{ background: 'var(--red)', color: '#fff', fontSize: '0.7rem', fontWeight: 'bold', padding: '2px 8px', borderRadius: '99px' }}>
+                        URGENT MEDICAL
+                      </span>
                     </div>
-                    <button
-                      onClick={() => handleAccept(order)}
-                      disabled={updatingId === order.id}
-                      className="btn-primary"
-                      style={{ padding: '0.6rem 1.4rem', fontSize: '0.88rem', fontWeight: 'bold' }}
-                    >
-                      {updatingId === order.id ? 'Accepting...' : 'Accept & Pick Up 🛵'}
-                    </button>
+
+                    <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '0.8rem' }}>
+                      📍 Vamanjoor Pharmacy, Mangalore <br />
+                      🧾 {formatItems(order.items)}
+                    </div>
+
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '0.75rem' }}>
+                      <div>
+                        <span style={{ color: 'var(--green)', fontWeight: 'bold', fontSize: '1.1rem' }}>Payout: ₹45.00</span>
+                        <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginLeft: '8px' }}>~2.5 km</span>
+                      </div>
+                      <button
+                        onClick={() => handleAccept(order)}
+                        disabled={updatingId === order.id}
+                        className="btn-primary"
+                        style={{ padding: '0.6rem 1.4rem', fontSize: '0.88rem', fontWeight: 'bold' }}
+                      >
+                        {updatingId === order.id ? 'Accepting...' : isDirectStoreAssigned ? 'Accept Preferred Delivery 🛵' : 'Accept & Pick Up 🛵'}
+                      </button>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>

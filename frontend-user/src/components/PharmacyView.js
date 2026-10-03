@@ -81,9 +81,108 @@ export default function PharmacyView() {
   const [pharmacyToast, setPharmacyToast] = useState(null);
   const videoRef = useRef(null);
 
-  const showPharmacyToast = (msg, icon = '✓', isError = false) => {
-    setPharmacyToast({ msg, icon, isError });
-    setTimeout(() => setPharmacyToast(null), 4000);
+  // Store Preferred Riders & In-House Fleet State
+  const DEFAULT_PREFERRED_RIDERS = [
+    {
+      id: "AGT-591",
+      name: "Rahul Kumar (Rider AGT-591)",
+      phone: "+91 77777 77777",
+      vehicle: "Electric Scooter",
+      zone: "Vamanjoor & Airport Road",
+      isFavorite: true
+    },
+    {
+      id: "AGT-102",
+      name: "Suresh M (Rider AGT-102)",
+      phone: "+91 98888 11111",
+      vehicle: "Motorcycle",
+      zone: "Kadri Hills & Kuntikan",
+      isFavorite: true
+    }
+  ];
+
+  const [preferredRiders, setPreferredRiders] = useState(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('medora_store_preferred_riders');
+        if (saved) return JSON.parse(saved);
+      } catch (e) {}
+    }
+    return DEFAULT_PREFERRED_RIDERS;
+  });
+
+  const [newRiderId, setNewRiderId] = useState('');
+  const [newRiderName, setNewRiderName] = useState('');
+  const [newRiderPhone, setNewRiderPhone] = useState('');
+  const [newRiderVehicle, setNewRiderVehicle] = useState('Electric Scooter');
+  const [newRiderZone, setNewRiderZone] = useState('Vamanjoor & Surrounds');
+  const [orderRiderAssignments, setOrderRiderAssignments] = useState({});
+
+  const savePreferredRiders = (list) => {
+    setPreferredRiders(list);
+    try {
+      localStorage.setItem('medora_store_preferred_riders', JSON.stringify(list));
+    } catch (e) {}
+  };
+
+  const handleAddPreferredRider = (e) => {
+    if (e) e.preventDefault();
+    if (!newRiderId.trim() || !newRiderName.trim()) {
+      showPharmacyToast("Please enter Rider ID and Name.", "⚠️", true);
+      return;
+    }
+    const cleanId = newRiderId.trim().toUpperCase();
+    if (preferredRiders.some(r => r.id === cleanId)) {
+      showPharmacyToast(`Rider ${cleanId} is already in your preferred fleet!`, "ℹ️");
+      return;
+    }
+    const rider = {
+      id: cleanId,
+      name: newRiderName.trim(),
+      phone: newRiderPhone.trim() || "+91 99999 00000",
+      vehicle: newRiderVehicle,
+      zone: newRiderZone.trim() || "Local Hub",
+      isFavorite: true
+    };
+    const updated = [rider, ...preferredRiders];
+    savePreferredRiders(updated);
+    setNewRiderId('');
+    setNewRiderName('');
+    setNewRiderPhone('');
+    showPharmacyToast(`Added ${rider.name} to Store Preferred Riders! ⭐`, "🛵");
+  };
+
+  const handleQuickAddRider = (rider) => {
+    if (preferredRiders.some(r => r.id === rider.id)) {
+      showPharmacyToast(`${rider.name} is already in preferred list!`, "ℹ️");
+      return;
+    }
+    const updated = [...preferredRiders, { ...rider, isFavorite: true }];
+    savePreferredRiders(updated);
+    showPharmacyToast(`Added ${rider.name} as Preferred In-House Agent! ⭐`, "🛵");
+  };
+
+  const handleRemovePreferredRider = (riderId) => {
+    const updated = preferredRiders.filter(r => r.id !== riderId);
+    savePreferredRiders(updated);
+    showPharmacyToast(`Rider ${riderId} removed from store favorites.`, "🗑️");
+  };
+
+  const handleAssignRiderToOrder = (orderId, riderId, riderName) => {
+    setOrderRiderAssignments(prev => ({ ...prev, [orderId]: riderId }));
+    try {
+      if (riderId) {
+        localStorage.setItem(`medora_order_preferred_rider_${orderId}`, riderId);
+      } else {
+        localStorage.removeItem(`medora_order_preferred_rider_${orderId}`);
+      }
+    } catch (e) {}
+    setOrders(prev => prev.map(o => o.id === orderId ? {
+      ...o,
+      assigned_rider_id: riderId || null,
+      assigned_rider_name: riderName || null
+    } : o));
+    showPharmacyToast(riderId ? `Assigned order #${orderId} to preferred rider ${riderName}` : `Set order #${orderId} to open pool`, '🛵');
   };
 
   // ─── DATA FETCHING ───
@@ -200,14 +299,31 @@ export default function PharmacyView() {
   const handleStatusUpdate = async (orderId, newStatus) => {
     setUpdatingId(orderId);
     try {
+      const assignedRider = orderRiderAssignments[orderId] || orders.find(o => o.id === orderId)?.assigned_rider_id || null;
+      const assignedName = assignedRider ? (preferredRiders.find(r => r.id === assignedRider)?.name || assignedRider) : null;
+
+      const payload = { status: newStatus };
+      if (assignedRider) {
+        payload.assigned_rider_id = assignedRider;
+        payload.assigned_rider_name = assignedName;
+        try {
+          localStorage.setItem(`medora_order_preferred_rider_${orderId}`, assignedRider);
+        } catch (e) {}
+      }
+
       const res = await fetch(`${API}/api/v1/orders/${orderId}/status`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: newStatus })
+        body: JSON.stringify(payload)
       });
       if (res.ok) {
-        setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: newStatus } : o));
-        showPharmacyToast(`Order #${orderId} moved to ${newStatus.replace(/_/g, ' ')}`, '📦');
+        setOrders(prev => prev.map(o => o.id === orderId ? { 
+          ...o, 
+          status: newStatus,
+          assigned_rider_id: assignedRider || o.assigned_rider_id,
+          assigned_rider_name: assignedName || o.assigned_rider_name
+        } : o));
+        showPharmacyToast(`Order #${orderId} moved to ${newStatus.replace(/_/g, ' ')}${assignedRider ? ` (Assigned to ${assignedName})` : ''}`, '📦');
       } else {
         showPharmacyToast(`Failed to update order ${orderId}`, '⚠️', true);
       }
@@ -1126,6 +1242,40 @@ export default function PharmacyView() {
             </span>
           )}
         </button>
+
+        {/* Tab 7: Store Preferred Riders (Requested Feature!) */}
+        <button
+          onClick={() => setActiveTab('riders')}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            background: activeTab === 'riders' ? 'linear-gradient(135deg, #0d9488, #059669)' : 'transparent',
+            border: 'none',
+            color: activeTab === 'riders' ? '#ffffff' : '#94a3b8',
+            padding: '10px 18px',
+            borderRadius: '12px',
+            fontWeight: '700',
+            fontSize: '0.88rem',
+            cursor: 'pointer',
+            transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
+            whiteSpace: 'nowrap',
+            boxShadow: activeTab === 'riders' ? '0 4px 16px rgba(13, 148, 136, 0.4)' : 'none'
+          }}
+        >
+          <span style={{ fontSize: '1.1rem' }}>🛵</span>
+          <span>Store Preferred Riders</span>
+          <span style={{
+            background: 'rgba(45, 212, 191, 0.2)',
+            color: '#2dd4bf',
+            fontSize: '0.72rem',
+            padding: '2px 7px',
+            borderRadius: '99px',
+            fontWeight: '800'
+          }}>
+            {preferredRiders.length}
+          </span>
+        </button>
       </nav>
 
       {/* ─── TAB 1: LIVE ORDERS FEED ─── */}
@@ -1193,6 +1343,48 @@ export default function PharmacyView() {
                             💳 Payment: {order.payment_method.toUpperCase()} ({order.payment_status || 'paid'})
                           </div>
                         )}
+
+                        {/* Store Preferred Rider Assignment Selector */}
+                        <div style={{
+                          marginTop: '8px',
+                          padding: '8px 10px',
+                          background: 'rgba(255, 255, 255, 0.03)',
+                          borderRadius: '10px',
+                          border: '1px solid rgba(255, 255, 255, 0.08)'
+                        }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                            <span style={{ fontSize: '0.74rem', color: '#94a3b8', fontWeight: '700' }}>🛵 Preferred Rider Assignment:</span>
+                            {(order.assigned_rider_id || orderRiderAssignments[order.id]) && (
+                              <span style={{ fontSize: '0.68rem', color: '#fbbf24', fontWeight: '800' }}>⭐ DIRECT ASSIGNED</span>
+                            )}
+                          </div>
+                          <select
+                            value={order.assigned_rider_id || orderRiderAssignments[order.id] || ''}
+                            onChange={(e) => {
+                              const rId = e.target.value;
+                              const rObj = preferredRiders.find(r => r.id === rId);
+                              handleAssignRiderToOrder(order.id, rId, rObj ? rObj.name : '');
+                            }}
+                            style={{
+                              width: '100%',
+                              background: '#121620',
+                              border: '1px solid rgba(56, 189, 248, 0.25)',
+                              borderRadius: '8px',
+                              color: '#f1f5f9',
+                              padding: '5px 8px',
+                              fontSize: '0.78rem',
+                              outline: 'none',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            <option value="">🌐 Open Delivery Pool (Any Available Rider)</option>
+                            {preferredRiders.map(r => (
+                              <option key={r.id} value={r.id}>
+                                ⭐ {r.name} ({r.vehicle})
+                              </option>
+                            ))}
+                          </select>
+                        </div>
                       </div>
                     </div>
 
@@ -2993,6 +3185,414 @@ export default function PharmacyView() {
 
             </div>
 
+          </div>
+        </section>
+      )}
+
+      {/* ─── TAB 7: STORE PREFERRED RIDERS & IN-HOUSE FLEET ─── */}
+      {activeTab === 'riders' && (
+        <section className="glass-panel" style={{ padding: '2rem', borderRadius: '20px' }}>
+          {/* Header */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.75rem', flexWrap: 'wrap', gap: '1rem' }}>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                <span style={{ fontSize: '1.6rem' }}>🛵</span>
+                <h2 style={{ fontSize: '1.45rem', color: '#fff', margin: 0, fontWeight: '800' }}>
+                  Store Preferred Riders & In-House Delivery Fleet
+                </h2>
+              </div>
+              <p style={{ color: 'var(--text-muted)', fontSize: '0.88rem', margin: '4px 0 0 0', maxWidth: '780px' }}>
+                Register and save your preferred delivery partners or in-house delivery agents. When an emergency medicine order is ready, you can assign it directly to your preferred rider so they receive priority dispatch notifications!
+              </p>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ background: 'rgba(45, 212, 191, 0.15)', color: '#2dd4bf', padding: '6px 14px', borderRadius: '99px', fontSize: '0.82rem', fontWeight: '800', border: '1px solid rgba(45, 212, 191, 0.3)' }}>
+                ⭐ {preferredRiders.length} Active Preferred Riders
+              </span>
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(320px, 1fr) minmax(360px, 1.35fr)', gap: '1.75rem' }}>
+            {/* Left Column: Add / Register In-House Rider Form */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+              <div style={{
+                background: '#121620',
+                border: '1px solid rgba(255, 255, 255, 0.08)',
+                borderRadius: '16px',
+                padding: '1.5rem',
+                boxShadow: 'var(--neo-shadow-raised)'
+              }}>
+                <h3 style={{ margin: '0 0 0.5rem 0', fontSize: '1.05rem', color: '#f8fafc', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span>➕</span> Add Registered Rider as Favorite
+                </h3>
+                <p style={{ margin: '0 0 1.25rem 0', fontSize: '0.78rem', color: '#94a3b8', lineHeight: '1.45' }}>
+                  Enter the credentials of any registered MEDORA rider to add them to your store's priority dispatch roster.
+                </p>
+
+                <form onSubmit={handleAddPreferredRider} style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: '700', color: '#cbd5e1', marginBottom: '4px' }}>
+                      Rider ID / Code *
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. AGT-591, AGT-102"
+                      value={newRiderId}
+                      onChange={e => setNewRiderId(e.target.value)}
+                      style={{
+                        width: '100%',
+                        background: '#181e2b',
+                        border: '1px solid rgba(255, 255, 255, 0.12)',
+                        borderRadius: '10px',
+                        padding: '9px 12px',
+                        color: '#f8fafc',
+                        fontSize: '0.86rem',
+                        outline: 'none'
+                      }}
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: '700', color: '#cbd5e1', marginBottom: '4px' }}>
+                      Rider Full Name *
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Rahul Kumar, Suresh M"
+                      value={newRiderName}
+                      onChange={e => setNewRiderName(e.target.value)}
+                      style={{
+                        width: '100%',
+                        background: '#181e2b',
+                        border: '1px solid rgba(255, 255, 255, 0.12)',
+                        borderRadius: '10px',
+                        padding: '9px 12px',
+                        color: '#f8fafc',
+                        fontSize: '0.86rem',
+                        outline: 'none'
+                      }}
+                      required
+                    />
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: '700', color: '#cbd5e1', marginBottom: '4px' }}>
+                        Mobile Phone
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="+91 99999 00000"
+                        value={newRiderPhone}
+                        onChange={e => setNewRiderPhone(e.target.value)}
+                        style={{
+                          width: '100%',
+                          background: '#181e2b',
+                          border: '1px solid rgba(255, 255, 255, 0.12)',
+                          borderRadius: '10px',
+                          padding: '9px 12px',
+                          color: '#f8fafc',
+                          fontSize: '0.86rem',
+                          outline: 'none'
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: '700', color: '#cbd5e1', marginBottom: '4px' }}>
+                        Vehicle Type
+                      </label>
+                      <select
+                        value={newRiderVehicle}
+                        onChange={e => setNewRiderVehicle(e.target.value)}
+                        style={{
+                          width: '100%',
+                          background: '#181e2b',
+                          border: '1px solid rgba(255, 255, 255, 0.12)',
+                          borderRadius: '10px',
+                          padding: '9px 12px',
+                          color: '#f8fafc',
+                          fontSize: '0.86rem',
+                          outline: 'none'
+                        }}
+                      >
+                        <option value="Electric Scooter">⚡ Electric Scooter</option>
+                        <option value="Motorcycle">🏍️ Motorcycle</option>
+                        <option value="Bicycle / EV">🚲 Bicycle / EV</option>
+                        <option value="Car / Van">🚗 Car / Van</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: '700', color: '#cbd5e1', marginBottom: '4px' }}>
+                      Delivery Zone
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Vamanjoor, Airport Road, Kadri"
+                      value={newRiderZone}
+                      onChange={e => setNewRiderZone(e.target.value)}
+                      style={{
+                        width: '100%',
+                        background: '#181e2b',
+                        border: '1px solid rgba(255, 255, 255, 0.12)',
+                        borderRadius: '10px',
+                        padding: '9px 12px',
+                        color: '#f8fafc',
+                        fontSize: '0.86rem',
+                        outline: 'none'
+                      }}
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    className="btn-primary"
+                    style={{
+                      marginTop: '6px',
+                      padding: '11px',
+                      justifyContent: 'center',
+                      fontWeight: '800',
+                      fontSize: '0.88rem'
+                    }}
+                  >
+                    ⭐ Save as Store Preferred Rider
+                  </button>
+                </form>
+              </div>
+
+              {/* Quick Add from Registered Pool */}
+              <div style={{
+                background: '#121620',
+                border: '1px solid rgba(255, 255, 255, 0.08)',
+                borderRadius: '16px',
+                padding: '1.25rem'
+              }}>
+                <h4 style={{ margin: '0 0 0.5rem 0', fontSize: '0.92rem', color: '#38bdf8', fontWeight: '800' }}>
+                  ⚡ Quick-Pick Registered MEDORA Delivery Partners
+                </h4>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {[
+                    { id: 'AGT-591', name: 'Rahul Kumar (Rider AGT-591)', phone: '+91 77777 77777', vehicle: 'Electric Scooter', zone: 'Vamanjoor & Airport Road' },
+                    { id: 'AGT-102', name: 'Suresh M (Rider AGT-102)', phone: '+91 98888 11111', vehicle: 'Motorcycle', zone: 'Kadri Hills & Kuntikan' },
+                    { id: 'AGT-304', name: 'Mohammed Riaz (Rider AGT-304)', phone: '+91 97777 22222', vehicle: 'Electric Scooter', zone: 'Bejai & Hampankatta' },
+                    { id: 'AGT-712', name: 'Vikram Nayak (Rider AGT-712)', phone: '+91 96666 33333', vehicle: 'Motorcycle', zone: 'Derebail & Lalbagh' }
+                  ].map(r => {
+                    const isAdded = preferredRiders.some(pr => pr.id === r.id);
+                    return (
+                      <div
+                        key={r.id}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          padding: '8px 12px',
+                          background: '#181e2b',
+                          borderRadius: '10px',
+                          border: isAdded ? '1px solid rgba(45, 212, 191, 0.3)' : '1px solid rgba(255,255,255,0.06)'
+                        }}
+                      >
+                        <div>
+                          <div style={{ fontSize: '0.82rem', fontWeight: '800', color: '#f1f5f9' }}>{r.name}</div>
+                          <div style={{ fontSize: '0.7rem', color: '#94a3b8' }}>{r.phone} • {r.vehicle}</div>
+                        </div>
+                        {isAdded ? (
+                          <span style={{ fontSize: '0.72rem', color: '#2dd4bf', fontWeight: '800' }}>✓ In Fleet</span>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => handleQuickAddRider(r)}
+                            style={{
+                              background: 'rgba(56, 189, 248, 0.15)',
+                              border: '1px solid rgba(56, 189, 248, 0.3)',
+                              color: '#38bdf8',
+                              borderRadius: '6px',
+                              padding: '4px 10px',
+                              fontSize: '0.74rem',
+                              fontWeight: '700',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            + Add Favorite
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            {/* Right Column: Preferred Riders List */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 4px' }}>
+                <span style={{ fontSize: '0.92rem', fontWeight: '800', color: '#f8fafc' }}>
+                  Current Preferred Dispatch Fleet ({preferredRiders.length})
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('orders')}
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    color: '#2dd4bf',
+                    fontSize: '0.8rem',
+                    fontWeight: '700',
+                    cursor: 'pointer'
+                  }}
+                >
+                  View Active Orders ➔
+                </button>
+              </div>
+
+              {preferredRiders.length === 0 ? (
+                <div style={{ padding: '3rem 2rem', textAlign: 'center', background: '#121620', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.08)' }}>
+                  <div style={{ fontSize: '2.5rem', marginBottom: '8px' }}>🛵</div>
+                  <strong style={{ display: 'block', color: '#f8fafc', fontSize: '1rem' }}>No Preferred Store Riders Added Yet</strong>
+                  <p style={{ color: '#94a3b8', fontSize: '0.82rem', margin: '6px 0 0 0' }}>
+                    Use the form on the left or click quick-pick partners to add your favorite delivery riders.
+                  </p>
+                </div>
+              ) : (
+                preferredRiders.map((rider, idx) => (
+                  <div
+                    key={rider.id || idx}
+                    style={{
+                      background: '#121620',
+                      border: '1.5px solid rgba(45, 212, 191, 0.3)',
+                      borderRadius: '16px',
+                      padding: '1.25rem',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '0.85rem',
+                      boxShadow: 'var(--neo-shadow-raised-sm)',
+                      transition: 'all 0.2s ease'
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <div style={{
+                          width: '46px',
+                          height: '46px',
+                          borderRadius: '12px',
+                          background: 'linear-gradient(135deg, #0d9488, #059669)',
+                          color: '#fff',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: '1.5rem',
+                          flexShrink: 0
+                        }}>
+                          🛵
+                        </div>
+                        <div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <h4 style={{ margin: 0, fontSize: '1rem', color: '#f8fafc', fontWeight: '800' }}>
+                              {rider.name}
+                            </h4>
+                            <span style={{
+                              background: 'rgba(251, 191, 36, 0.15)',
+                              color: '#fbbf24',
+                              border: '1px solid rgba(251, 191, 36, 0.3)',
+                              padding: '2px 8px',
+                              borderRadius: '99px',
+                              fontSize: '0.68rem',
+                              fontWeight: '800'
+                            }}>
+                              ⭐ PREFERRED
+                            </span>
+                          </div>
+                          <div style={{ fontSize: '0.78rem', color: '#94a3b8', marginTop: '3px' }}>
+                            ID: <strong style={{ color: '#cbd5e1' }}>{rider.id}</strong> • {rider.phone}
+                          </div>
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => handleRemovePreferredRider(rider.id)}
+                        style={{
+                          background: 'rgba(239, 68, 68, 0.12)',
+                          border: '1px solid rgba(239, 68, 68, 0.25)',
+                          color: '#ef4444',
+                          borderRadius: '8px',
+                          padding: '5px 10px',
+                          fontSize: '0.72rem',
+                          fontWeight: '700',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        ✕ Remove
+                      </button>
+                    </div>
+
+                    <div style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))',
+                      gap: '8px',
+                      background: '#181e2b',
+                      borderRadius: '10px',
+                      padding: '10px',
+                      fontSize: '0.76rem'
+                    }}>
+                      <div>
+                        <span style={{ color: '#94a3b8', display: 'block' }}>Vehicle:</span>
+                        <strong style={{ color: '#f1f5f9' }}>{rider.vehicle || 'Electric Scooter'}</strong>
+                      </div>
+                      <div>
+                        <span style={{ color: '#94a3b8', display: 'block' }}>Zone:</span>
+                        <strong style={{ color: '#f1f5f9' }}>{rider.zone || 'Vamanjoor Hub'}</strong>
+                      </div>
+                      <div>
+                        <span style={{ color: '#94a3b8', display: 'block' }}>Dispatch Priority:</span>
+                        <strong style={{ color: '#2dd4bf' }}>Rank #1 Direct</strong>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                      <a
+                        href={`tel:${rider.phone}`}
+                        style={{
+                          textDecoration: 'none',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          background: '#181e2b',
+                          border: '1px solid rgba(255, 255, 255, 0.1)',
+                          color: '#f8fafc',
+                          padding: '6px 14px',
+                          borderRadius: '8px',
+                          fontSize: '0.78rem',
+                          fontWeight: '700'
+                        }}
+                      >
+                        📞 Call Rider
+                      </a>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setActiveTab('orders');
+                          showPharmacyToast(`Assign pending orders to ${rider.name} using the dropdown on order cards.`, '🛵');
+                        }}
+                        style={{
+                          background: 'linear-gradient(135deg, #0d9488 0%, #059669 100%)',
+                          border: 'none',
+                          color: '#ffffff',
+                          padding: '6px 14px',
+                          borderRadius: '8px',
+                          fontSize: '0.78rem',
+                          fontWeight: '800',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        📦 Dispatch Orders to Rider
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
           </div>
         </section>
       )}

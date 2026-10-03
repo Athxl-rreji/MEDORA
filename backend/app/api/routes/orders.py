@@ -40,6 +40,8 @@ class OrderCreateRequest(BaseModel):
 
 class OrderStatusUpdate(BaseModel):
     status: str
+    assigned_rider_id: Optional[str] = None
+    assigned_rider_name: Optional[str] = None
 
 
 @router.post("/create")
@@ -172,15 +174,20 @@ def update_order_status(
 ):
     if payload.status not in VALID_STATUSES:
         raise HTTPException(status_code=400, detail=f"Invalid status. Must be one of: {VALID_STATUSES}")
-    logger.info(f"Updating order {order_id} to status: {payload.status}")
+    logger.info(f"Updating order {order_id} to status: {payload.status} (rider: {payload.assigned_rider_id})")
     try:
-        updated = db.table("orders").update({"status": payload.status}).eq("id", order_id).execute()
+        update_data = {"status": payload.status}
+        if payload.assigned_rider_id:
+            update_data["assigned_rider_id"] = payload.assigned_rider_id
+        if payload.assigned_rider_name:
+            update_data["assigned_rider_name"] = payload.assigned_rider_name
+        updated = db.table("orders").update(update_data).eq("id", order_id).execute()
         if not updated.data:
             raise HTTPException(status_code=404, detail="Order not found")
         return {"status": "success", "order": updated.data[0]}
     except Exception as e:
         logger.warning(f"Supabase update failed: {e}. Falling back to Prototype DB.")
-        updated = mock_db.update_order_status(order_id, payload.status)
+        updated = mock_db.update_order_status(order_id, payload.status, payload.assigned_rider_id, payload.assigned_rider_name)
         if not updated:
             raise HTTPException(status_code=404, detail="Order not found")
         return {"status": "success", "order": updated}

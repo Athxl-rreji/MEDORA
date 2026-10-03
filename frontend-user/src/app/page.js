@@ -28,7 +28,7 @@ function TrackingBar({ status }) {
         {/* Progress line behind */}
         <div style={{
           position: 'absolute', top: '22px', left: '22px', right: '22px', height: '4px',
-          background: 'rgba(255,255,255,0.06)', borderRadius: '4px', zIndex: 0
+          background: 'rgba(255,255,255,0.12)', borderRadius: '4px', zIndex: 0
         }} />
         <div style={{
           position: 'absolute', top: '22px', left: '22px', height: '4px',
@@ -47,23 +47,23 @@ function TrackingBar({ status }) {
                 width: '44px',
                 height: '44px',
                 borderRadius: '50%',
-                background: done ? 'var(--primary)' : '#25272C',
-                border: active ? '3px solid var(--primary)' : done ? '2px solid var(--green)' : '2px solid rgba(255,255,255,0.1)',
+                background: done ? 'var(--primary)' : '#1e2433',
+                border: active ? '3px solid var(--primary)' : done ? '2px solid var(--green)' : '2px solid rgba(255,255,255,0.2)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 fontSize: '1.2rem',
                 boxShadow: active ? '0 0 20px rgba(184, 247, 228, 0.4)' : 'none',
                 transition: 'all 0.5s ease',
-                color: done ? '#16171a' : '#fff'
+                color: done ? '#16171a' : '#cbd5e1'
               }}>
                 {stage.icon}
               </div>
               <span style={{
-                fontSize: '0.7rem', marginTop: '8px', textAlign: 'center',
-                color: done ? 'var(--primary)' : 'rgba(255,255,255,0.3)',
-                fontWeight: active ? '700' : '400',
-                maxWidth: '80px', lineHeight: '1.2'
+                fontSize: '0.74rem', marginTop: '8px', textAlign: 'center',
+                color: done ? 'var(--primary)' : '#94a3b8',
+                fontWeight: active ? '800' : '600',
+                maxWidth: '85px', lineHeight: '1.2'
               }}>
                 {stage.label}
               </span>
@@ -121,10 +121,24 @@ export default function Home() {
     }
   }, []);
 
+  const [isFirstTimeAddressSetup, setIsFirstTimeAddressSetup] = useState(false);
+
   const handleLoginSuccess = (userData) => {
     setActiveUser(userData);
     if (typeof window !== 'undefined') {
       localStorage.setItem('medora_active_user', JSON.stringify(userData));
+
+      // First-time address prompt for patients
+      const role = userData?.role || 'patient';
+      if (role === 'patient') {
+        const userKey = (userData?.email || userData?.id || 'patient').toLowerCase();
+        const hasConfigured = localStorage.getItem(`medora_address_configured_${userKey}`);
+        if (!hasConfigured) {
+          setIsFirstTimeAddressSetup(true);
+          setIsAddressDrawerOpen(true);
+          showToast("📍 Welcome to MEDORA! Please set your delivery address to start receiving 10-minute medicine deliveries.", "👋");
+        }
+      }
     }
   };
 
@@ -240,9 +254,14 @@ export default function Home() {
   }, [selectedAddress, perimeterKm]);
 
   const handleSelectAddress = (addr) => {
-    setSelectedAddress(addr);
+    const updated = { ...addr, isDefault: true };
+    setSelectedAddress(updated);
     try {
-      localStorage.setItem('medora_selected_address', JSON.stringify(addr));
+      localStorage.setItem('medora_selected_address', JSON.stringify(updated));
+      const userKey = (activeUser?.email || activeUser?.id || 'patient').toLowerCase();
+      localStorage.setItem(`medora_address_configured_${userKey}`, 'true');
+      setIsFirstTimeAddressSetup(false);
+      showToast(`📍 Default delivery address set to ${addr.tag || 'Home'} (${addr.area || 'Mangalore'})`, '✅');
     } catch (e) {}
   };
   
@@ -793,7 +812,7 @@ export default function Home() {
     { medicine_id: 'bs_dolo650', brand_name: 'Dolo 650 Tablet', generic_name: 'Paracetamol 650mg', dosage: '650mg', form: 'Tablet', category: 'Pain & Fever', rating: '4.9', reviews: '3.4k', price_mrp: 32, original_mrp: 42, icon: '💊', badge: '#1 Best Seller' },
     { medicine_id: 'bs_aug625', brand_name: 'Augmentin 625 Duo', generic_name: 'Amoxicillin + Clavulanic Acid', dosage: '625mg', form: 'Tablet', category: 'Antibiotics', rating: '4.8', reviews: '2.1k', price_mrp: 204, original_mrp: 245, icon: '💊', badge: 'Doctor Choice' },
     { medicine_id: 'bs_pan40', brand_name: 'Pan 40 Tablet', generic_name: 'Pantoprazole Gastro-Resistant', dosage: '40mg', form: 'Tablet', category: 'Acidity & Digestion', rating: '4.8', reviews: '1.9k', price_mrp: 155, original_mrp: 185, icon: '💊', badge: 'Top Rated' },
-    { medicine_id: 'bs_crocin', brand_name: 'Crocin Advance 500mg', generic_name: 'Fast Release Paracetamol', dosage: '500mg', form: 'Tablet', category: 'Pain & Fever', rating: '4.7', reviews: '1.4k', price_mrp: 18, original_mrp: 24, icon: '💊', badge: 'Amazon Choice' },
+    { medicine_id: 'bs_crocin', brand_name: 'Crocin Advance 500mg', generic_name: 'Fast Release Paracetamol', dosage: '500mg', form: 'Tablet', category: 'Pain & Fever', rating: '4.7', reviews: '1.4k', price_mrp: 18, original_mrp: 24, icon: '💊', badge: 'MEDORA Choice' },
     { medicine_id: 'bs_shelcal', brand_name: 'Shelcal 500 Tablet', generic_name: 'Calcium 500mg + Vitamin D3 250IU', dosage: '500mg', form: 'Tablet', category: 'Vitamins & Supplements', rating: '4.9', reviews: '4.2k', price_mrp: 132, original_mrp: 160, icon: '💊', badge: '#1 in Vitamins' },
     { medicine_id: 'bs_allegra', brand_name: 'Allegra 120mg Tablet', generic_name: 'Fexofenadine HCl Non-Drowsy', dosage: '120mg', form: 'Tablet', category: 'Cold & Cough', rating: '4.8', reviews: '1.8k', price_mrp: 215, original_mrp: 258, icon: '💊', badge: 'Fast Relief' },
     { medicine_id: 'bs_betadine', brand_name: 'Betadine 5% Ointment 20g', generic_name: 'Povidone-Iodine 5% w/w', dosage: '20g Tube', form: 'Ointment', category: 'First Aid & Antiseptic', rating: '4.9', reviews: '2.9k', price_mrp: 125, original_mrp: 145, icon: '🧴', badge: 'First Aid Must-Have' },
@@ -1153,7 +1172,7 @@ export default function Home() {
         if (part.startsWith('**') && part.endsWith('**')) {
           const cleanName = part.slice(2, -2).trim();
           return (
-            <strong key={idx} style={{ color: '#0f172a', fontWeight: '800' }}>
+            <strong key={idx} style={{ color: '#38bdf8', fontWeight: '800' }}>
               {cleanName}
             </strong>
           );
@@ -1364,16 +1383,16 @@ export default function Home() {
             alignItems: 'flex-start',
             gap: '8px',
             margin: '0.35rem 0',
-            background: matchedMed ? '#ffffff' : 'transparent',
-            border: matchedMed ? '1px solid #e2e8f0' : 'none',
+            background: matchedMed ? 'rgba(255, 255, 255, 0.05)' : 'transparent',
+            border: matchedMed ? '1px solid rgba(255, 255, 255, 0.12)' : 'none',
             borderRadius: matchedMed ? '10px' : '0',
             padding: matchedMed ? '8px 10px' : '2px 0 2px 4px',
-            boxShadow: matchedMed ? '0 1px 4px rgba(0,0,0,0.03)' : 'none'
+            boxShadow: matchedMed ? '0 1px 4px rgba(0,0,0,0.15)' : 'none'
           }}>
-            <span style={{ color: matchedMed ? 'var(--primary)' : '#64748b', fontSize: '0.8rem', marginTop: '2px' }}>
+            <span style={{ color: matchedMed ? 'var(--primary)' : '#94a3b8', fontSize: '0.8rem', marginTop: '2px' }}>
               {matchedMed ? '💊' : '•'}
             </span>
-            <div style={{ flex: 1, fontSize: '0.88rem', color: '#1e293b', lineHeight: '1.55' }}>
+            <div style={{ flex: 1, fontSize: '0.88rem', color: '#f1f5f9', lineHeight: '1.55' }}>
               {parseBold(cleanLine)}
             </div>
             {matchedMed && (
@@ -1384,9 +1403,9 @@ export default function Home() {
                   handleSuggestedMedicineClick(matchedMed);
                 }}
                 style={{
-                  background: '#f0fdf4',
-                  border: '1px solid #86efac',
-                  color: '#15803d',
+                  background: 'rgba(16, 185, 129, 0.15)',
+                  border: '1px solid rgba(16, 185, 129, 0.4)',
+                  color: '#34d399',
                   borderRadius: '6px',
                   padding: '3px 8px',
                   fontSize: '0.72rem',
@@ -1406,7 +1425,7 @@ export default function Home() {
 
       // Default plain paragraph
       return (
-        <p key={lineIdx} style={{ margin: '0 0 0.45rem 0', color: '#1e293b', lineHeight: '1.55', fontSize: '0.88rem' }}>
+        <p key={lineIdx} style={{ margin: '0 0 0.45rem 0', color: '#f1f5f9', lineHeight: '1.55', fontSize: '0.88rem' }}>
           {parseBold(trimmed)}
         </p>
       );
@@ -1419,11 +1438,11 @@ export default function Home() {
           <div style={{
             marginTop: '0.75rem',
             padding: '0.6rem 0.85rem',
-            background: '#f8fafc',
-            border: '1px solid #e2e8f0',
+            background: 'rgba(255, 255, 255, 0.04)',
+            border: '1px solid rgba(255, 255, 255, 0.08)',
             borderRadius: '8px',
             fontSize: '0.73rem',
-            color: '#64748b',
+            color: '#94a3b8',
             fontStyle: 'italic',
             lineHeight: '1.45',
             display: 'flex',
@@ -2462,7 +2481,7 @@ export default function Home() {
                 boxShadow: activeMainView === 'account' ? '0 0 14px rgba(56, 189, 248, 0.35)' : 'var(--neo-shadow-raised-sm)',
                 transition: 'all 0.2s ease'
               }}
-              title="Open Amazon Style Account Management"
+              title="Your Account & Settings"
             >
               <span>👤</span>
               <span>Your Account</span>
@@ -2756,7 +2775,7 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Amazon-Style Pharmacy Search Bar Container */}
+          {/* Pharmacy Search Bar Container */}
           <div 
             ref={searchContainerRef}
             className="search-container" 
@@ -2771,7 +2790,8 @@ export default function Home() {
               boxShadow: isSearchFocused 
                 ? '0 0 20px rgba(56, 189, 248, 0.35), inset 2px 2px 6px rgba(0, 0, 0, 0.6)' 
                 : 'inset 2px 2px 6px rgba(0, 0, 0, 0.6), -2px -2px 6px rgba(255, 255, 255, 0.02)',
-              transition: 'all 0.2s ease',
+              transition: 'all 0.25s ease',
+              scrollMarginTop: '16px',
               zIndex: 100
             }}
           >
@@ -2785,7 +2805,7 @@ export default function Home() {
                 overflow: 'hidden'
               }}
             >
-              {/* 1. Amazon Department / Category Dropdown */}
+              {/* 1. Category / Department Dropdown */}
               <div style={{
                 position: 'relative',
                 display: 'flex',
@@ -2830,7 +2850,7 @@ export default function Home() {
               <div style={{ flex: 1, display: 'flex', alignItems: 'center', padding: '0 10px', background: '#121620', minWidth: 0 }}>
                 <input
                   type="text"
-                  placeholder="Search Amazon Pharmacy - medicines, generic salt, symptoms (e.g. Dolo 650, Augmentin, Crocin)..."
+                  placeholder="Search medicines, generic salt, symptoms (e.g. Dolo 650, Augmentin, Crocin)..."
                   value={searchQuery}
                   onChange={e => {
                     setSearchQuery(e.target.value);
@@ -2839,6 +2859,12 @@ export default function Home() {
                   onFocus={() => {
                     setIsSearchFocused(true);
                     setShowSuggestions(true);
+                    scrollToSearchBarTop();
+                  }}
+                  onClick={() => {
+                    setIsSearchFocused(true);
+                    setShowSuggestions(true);
+                    scrollToSearchBarTop();
                   }}
                   onKeyDown={handleKeyDown}
                   style={{ 
@@ -2971,7 +2997,7 @@ export default function Home() {
                   borderRadius: '4px',
                   letterSpacing: '0.03em'
                 }}>
-                  ⚡ PRIME
+                  ⚡ EXPRESS
                 </span>
                 <span style={{ fontWeight: '600', color: '#f1f5f9' }}>
                   FREE 10-15 Min Express Delivery in {selectedAddress?.area || 'Mangalore'}
@@ -3096,7 +3122,7 @@ export default function Home() {
                           padding: '0 4px'
                         }}>
                           <span style={{ fontSize: '0.82rem', fontWeight: '800', color: '#f1f5f9', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <span>🔥</span> Best Sellers in Pharmacy (10-15 Min Prime)
+                            <span>🔥</span> Best Sellers in Pharmacy (10-15 Min Express)
                           </span>
                           <span style={{
                             background: 'rgba(255, 119, 0, 0.16)',
@@ -3173,8 +3199,6 @@ export default function Home() {
                                   <div style={{ fontSize: '0.68rem', color: '#94a3b8', display: 'flex', alignItems: 'center', gap: '4px' }}>
                                     <span style={{ color: '#f59e0b' }}>⭐ {bs.rating}</span>
                                     <span>({bs.reviews})</span>
-                                    <span>•</span>
-                                    <span style={{ color: '#38bdf8', fontWeight: '700' }}>⚡ Prime</span>
                                   </div>
                                 </div>
                               </div>
@@ -3286,7 +3310,7 @@ export default function Home() {
                               )}
                             </span>
                             <span style={{ fontSize: '0.72rem', color: '#38bdf8', fontWeight: '700' }}>
-                              ⚡ PRIME FREE Express Delivery (10-15 Min)
+                              ⚡ FREE Express Delivery (10-15 Min)
                             </span>
                           </div>
 
@@ -3588,24 +3612,12 @@ export default function Home() {
                                       {item.manufacturer && <span style={{ color: '#94a3b8' }}>• {item.manufacturer}</span>}
                                     </div>
 
-                                    {/* Amazon Star Rating & Prime Delivery line */}
+                                    {/* Star Rating & Delivery line */}
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px', fontSize: '0.7rem', flexWrap: 'wrap' }}>
                                       <span style={{ color: '#f59e0b', fontWeight: '700' }}>⭐⭐⭐⭐½ 4.8</span>
                                       <span style={{ color: '#94a3b8' }}>(1,240+)</span>
-                                      <span style={{ color: 'rgba(255, 255, 255, 0.2)' }}>•</span>
-                                      <span style={{
-                                        background: '#0284c7',
-                                        color: '#ffffff',
-                                        padding: '1px 5px',
-                                        borderRadius: '3px',
-                                        fontWeight: '800',
-                                        fontSize: '0.62rem',
-                                        letterSpacing: '0.02em'
-                                      }}>
-                                        ⚡ PRIME
-                                      </span>
                                       <span style={{ color: '#34d399', fontWeight: '700' }}>
-                                        10-15 Min Express Delivery
+                                        • 10-15 Min Express Delivery
                                       </span>
                                     </div>
                                   </div>
@@ -3723,7 +3735,7 @@ export default function Home() {
                               borderTop: '1px solid rgba(255, 255, 255, 0.08)'
                             }}>
                               <div style={{ fontSize: '0.72rem', fontWeight: '800', color: '#94a3b8', marginBottom: '6px' }}>
-                                🔍 Related Searches on Amazon Pharmacy:
+                                🔍 Related Medicine Searches:
                               </div>
                               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
                                 {[
@@ -3831,21 +3843,21 @@ export default function Home() {
                     display: 'inline-flex',
                     alignItems: 'center',
                     gap: '6px',
-                    background: '#ffffff',
-                    border: '1.5px solid #e2e8f0',
+                    background: '#151a24',
+                    border: '1px solid rgba(255, 255, 255, 0.12)',
                     borderRadius: '99px',
                     padding: '6px 14px',
                     fontSize: '0.78rem',
                     fontWeight: '700',
-                    color: '#334155',
+                    color: '#cbd5e1',
                     cursor: 'pointer',
                     whiteSpace: 'nowrap',
-                    boxShadow: '0 2px 6px rgba(0,0,0,0.03)',
+                    boxShadow: '0 2px 6px rgba(0,0,0,0.2)',
                     transition: 'all 0.15s ease',
                     flexShrink: 0
                   }}
-                  onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--primary)'; e.currentTarget.style.background = '#f0fdfa'; e.currentTarget.style.color = 'var(--primary)'; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#e2e8f0'; e.currentTarget.style.background = '#ffffff'; e.currentTarget.style.color = '#334155'; }}
+                  onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#38bdf8'; e.currentTarget.style.background = 'rgba(56, 189, 248, 0.15)'; e.currentTarget.style.color = '#38bdf8'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.12)'; e.currentTarget.style.background = '#151a24'; e.currentTarget.style.color = '#cbd5e1'; }}
                 >
                   {pill.label}
                 </button>
@@ -3873,17 +3885,17 @@ export default function Home() {
                     display: 'flex',
                     alignItems: 'center',
                     gap: '10px',
-                    background: 'rgba(255, 255, 255, 0.7)',
-                    border: '1px solid rgba(226, 232, 240, 0.8)',
+                    background: '#151a24',
+                    border: '1px solid rgba(255, 255, 255, 0.08)',
                     borderRadius: '12px',
                     padding: '8px 12px',
-                    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.02)'
+                    boxShadow: 'var(--neo-shadow-raised-sm)'
                   }}
                 >
                   <span style={{ fontSize: '1.3rem' }}>{item.icon}</span>
                   <div>
-                    <strong style={{ display: 'block', fontSize: '0.8rem', color: '#0f172a' }}>{item.title}</strong>
-                    <span style={{ fontSize: '0.68rem', color: '#64748b' }}>{item.desc}</span>
+                    <strong style={{ display: 'block', fontSize: '0.8rem', color: '#f8fafc' }}>{item.title}</strong>
+                    <span style={{ fontSize: '0.68rem', color: '#94a3b8' }}>{item.desc}</span>
                   </div>
                 </div>
               ))}
@@ -3892,11 +3904,11 @@ export default function Home() {
             {/* Dedicated Doctor Prescription Upload Card (Handwritten & Printed) */}
             <div style={{
               marginTop: '1.75rem',
-              background: 'linear-gradient(135deg, #ffffff 0%, #f0fdfa 100%)',
-              border: '1.5px solid #99f6e4',
+              background: 'linear-gradient(135deg, #151a24 0%, #101e28 100%)',
+              border: '1.5px solid rgba(45, 212, 191, 0.3)',
               borderRadius: '22px',
               padding: '1.35rem 1.8rem',
-              boxShadow: '0 10px 30px rgba(13, 148, 136, 0.08)',
+              boxShadow: '0 10px 30px rgba(0, 0, 0, 0.35)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
@@ -4090,24 +4102,24 @@ export default function Home() {
                   </div>
                   <div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <h2 style={{ margin: 0, fontSize: '1.45rem', color: '#0f172a', fontWeight: '800' }}>
+                      <h2 style={{ margin: 0, fontSize: '1.45rem', color: '#f8fafc', fontWeight: '800' }}>
                         {accountEditName || activeUser?.name || 'Your Account'}
                       </h2>
-                      <span className="amazon-gold-badge">
-                        MEDORA PRIME ⚡
+                      <span className="amazon-gold-badge" style={{ background: 'linear-gradient(135deg, #0d9488 0%, #059669 100%)' }}>
+                        VERIFIED PATIENT ✓
                       </span>
                     </div>
-                    <div style={{ fontSize: '0.82rem', color: '#64748b', marginTop: '3px' }}>
+                    <div style={{ fontSize: '0.82rem', color: '#94a3b8', marginTop: '3px' }}>
                       {accountEditEmail || activeUser?.email || 'patient@medora.com'} • {accountEditPhone} • ID: #{activeUser?.id || activeUser?.email || 'MED-88421'}
                     </div>
                     <div style={{ display: 'flex', gap: '6px', marginTop: '6px', flexWrap: 'wrap' }}>
-                      <span style={{ fontSize: '0.72rem', background: '#fee2e2', color: '#991b1b', padding: '2px 8px', borderRadius: '4px', fontWeight: '700' }}>
+                      <span style={{ fontSize: '0.72rem', background: 'rgba(239, 68, 68, 0.15)', color: '#fca5a5', border: '1px solid rgba(239, 68, 68, 0.3)', padding: '2px 8px', borderRadius: '4px', fontWeight: '700' }}>
                         Allergies: {accountEditAllergies || 'None'}
                       </span>
-                      <span style={{ fontSize: '0.72rem', background: '#e0f2fe', color: '#0369a1', padding: '2px 8px', borderRadius: '4px', fontWeight: '700' }}>
+                      <span style={{ fontSize: '0.72rem', background: 'rgba(56, 189, 248, 0.15)', color: '#7dd3fc', border: '1px solid rgba(56, 189, 248, 0.3)', padding: '2px 8px', borderRadius: '4px', fontWeight: '700' }}>
                         Conditions: {accountEditConditions || 'None'}
                       </span>
-                      <span style={{ fontSize: '0.72rem', background: '#f0fdf4', color: '#166534', padding: '2px 8px', borderRadius: '4px', fontWeight: '700' }}>
+                      <span style={{ fontSize: '0.72rem', background: 'rgba(16, 185, 129, 0.15)', color: '#6ee7b7', border: '1px solid rgba(16, 185, 129, 0.3)', padding: '2px 8px', borderRadius: '4px', fontWeight: '700' }}>
                         Blood: {accountEditBlood || 'O+'}
                       </span>
                     </div>
@@ -4119,9 +4131,9 @@ export default function Home() {
                     <button
                       onClick={() => setActiveAccountSection('hub')}
                       style={{
-                        background: '#f1f5f9',
-                        border: '1px solid #cbd5e1',
-                        color: '#334155',
+                        background: '#1e2433',
+                        border: '1px solid rgba(255, 255, 255, 0.12)',
+                        color: '#f1f5f9',
                         padding: '0.6rem 1.1rem',
                         borderRadius: '12px',
                         fontWeight: '700',
@@ -4152,7 +4164,7 @@ export default function Home() {
                 </div>
               </div>
 
-              {/* 1. MAIN AMAZON ACCOUNT TILES GRID */}
+              {/* 1. MAIN ACCOUNT TILES GRID */}
               {activeAccountSection === 'hub' && (
                 <div>
                   <div style={{
@@ -4168,10 +4180,10 @@ export default function Home() {
                     >
                       <div className="amazon-account-tile-icon">📦</div>
                       <div>
-                        <h4 style={{ margin: '0 0 4px 0', fontSize: '1.05rem', color: '#0f172a', fontWeight: '800' }}>
+                        <h4 style={{ margin: '0 0 4px 0', fontSize: '1.05rem', color: '#f8fafc', fontWeight: '800' }}>
                           Your Orders
                         </h4>
-                        <p style={{ margin: 0, fontSize: '0.82rem', color: '#64748b', lineHeight: '1.4' }}>
+                        <p style={{ margin: 0, fontSize: '0.82rem', color: '#94a3b8', lineHeight: '1.4' }}>
                           Track active deliveries, view receipt history, or buy medicines again.
                         </p>
                       </div>
@@ -4184,26 +4196,26 @@ export default function Home() {
                     >
                       <div className="amazon-account-tile-icon">🔒</div>
                       <div>
-                        <h4 style={{ margin: '0 0 4px 0', fontSize: '1.05rem', color: '#0f172a', fontWeight: '800' }}>
+                        <h4 style={{ margin: '0 0 4px 0', fontSize: '1.05rem', color: '#f8fafc', fontWeight: '800' }}>
                           Login & Security
                         </h4>
-                        <p style={{ margin: 0, fontSize: '0.82rem', color: '#64748b', lineHeight: '1.4' }}>
+                        <p style={{ margin: 0, fontSize: '0.82rem', color: '#94a3b8', lineHeight: '1.4' }}>
                           Edit name, mobile number, email, and update account password.
                         </p>
                       </div>
                     </div>
 
-                    {/* Tile 3: Prime / Medora Express */}
+                    {/* Tile 3: Express 10-Min Delivery */}
                     <div
                       className="amazon-account-tile"
                       onClick={() => setActiveAccountSection('prime')}
                     >
                       <div className="amazon-account-tile-icon">⚡</div>
                       <div>
-                        <h4 style={{ margin: '0 0 4px 0', fontSize: '1.05rem', color: '#0f172a', fontWeight: '800' }}>
-                          Medora Prime Express
+                        <h4 style={{ margin: '0 0 4px 0', fontSize: '1.05rem', color: '#f8fafc', fontWeight: '800' }}>
+                          Express 10-Min Delivery
                         </h4>
-                        <p style={{ margin: 0, fontSize: '0.82rem', color: '#64748b', lineHeight: '1.4' }}>
+                        <p style={{ margin: 0, fontSize: '0.82rem', color: '#94a3b8', lineHeight: '1.4' }}>
                           Manage 10-minute medicine delivery perks, ₹0 delivery fee benefits.
                         </p>
                       </div>
@@ -4216,10 +4228,10 @@ export default function Home() {
                     >
                       <div className="amazon-account-tile-icon">📍</div>
                       <div>
-                        <h4 style={{ margin: '0 0 4px 0', fontSize: '1.05rem', color: '#0f172a', fontWeight: '800' }}>
+                        <h4 style={{ margin: '0 0 4px 0', fontSize: '1.05rem', color: '#f8fafc', fontWeight: '800' }}>
                           Your Addresses
                         </h4>
-                        <p style={{ margin: 0, fontSize: '0.82rem', color: '#64748b', lineHeight: '1.4' }}>
+                        <p style={{ margin: 0, fontSize: '0.82rem', color: '#94a3b8', lineHeight: '1.4' }}>
                           Edit delivery addresses, GPS pin locations, and apartment numbers.
                         </p>
                       </div>
@@ -4232,10 +4244,10 @@ export default function Home() {
                     >
                       <div className="amazon-account-tile-icon">💳</div>
                       <div>
-                        <h4 style={{ margin: '0 0 4px 0', fontSize: '1.05rem', color: '#0f172a', fontWeight: '800' }}>
+                        <h4 style={{ margin: '0 0 4px 0', fontSize: '1.05rem', color: '#f8fafc', fontWeight: '800' }}>
                           Payment Options & UPI
                         </h4>
-                        <p style={{ margin: 0, fontSize: '0.82rem', color: '#64748b', lineHeight: '1.4' }}>
+                        <p style={{ margin: 0, fontSize: '0.82rem', color: '#94a3b8', lineHeight: '1.4' }}>
                           Manage saved UPI IDs, credit/debit cards, and payment preferences.
                         </p>
                       </div>
@@ -4248,10 +4260,10 @@ export default function Home() {
                     >
                       <div className="amazon-account-tile-icon">📄</div>
                       <div>
-                        <h4 style={{ margin: '0 0 4px 0', fontSize: '1.05rem', color: '#0f172a', fontWeight: '800' }}>
+                        <h4 style={{ margin: '0 0 4px 0', fontSize: '1.05rem', color: '#f8fafc', fontWeight: '800' }}>
                           Your Prescriptions & Rx
                         </h4>
-                        <p style={{ margin: 0, fontSize: '0.82rem', color: '#64748b', lineHeight: '1.4' }}>
+                        <p style={{ margin: 0, fontSize: '0.82rem', color: '#94a3b8', lineHeight: '1.4' }}>
                           Access Gemini AI scanned handwritten prescriptions & OPD records.
                         </p>
                       </div>
@@ -4264,10 +4276,10 @@ export default function Home() {
                     >
                       <div className="amazon-account-tile-icon">👨‍👩‍👧</div>
                       <div>
-                        <h4 style={{ margin: '0 0 4px 0', fontSize: '1.05rem', color: '#0f172a', fontWeight: '800' }}>
+                        <h4 style={{ margin: '0 0 4px 0', fontSize: '1.05rem', color: '#f8fafc', fontWeight: '800' }}>
                           Family Health Profiles
                         </h4>
-                        <p style={{ margin: 0, fontSize: '0.82rem', color: '#64748b', lineHeight: '1.4' }}>
+                        <p style={{ margin: 0, fontSize: '0.82rem', color: '#94a3b8', lineHeight: '1.4' }}>
                           Manage medical profiles for parents & family (Allergies, Blood Group).
                         </p>
                       </div>
@@ -4280,10 +4292,10 @@ export default function Home() {
                     >
                       <div className="amazon-account-tile-icon">🩺</div>
                       <div>
-                        <h4 style={{ margin: '0 0 4px 0', fontSize: '1.05rem', color: '#0f172a', fontWeight: '800' }}>
+                        <h4 style={{ margin: '0 0 4px 0', fontSize: '1.05rem', color: '#f8fafc', fontWeight: '800' }}>
                           Customer Service / AI Doctor
                         </h4>
-                        <p style={{ margin: 0, fontSize: '0.82rem', color: '#64748b', lineHeight: '1.4' }}>
+                        <p style={{ margin: 0, fontSize: '0.82rem', color: '#94a3b8', lineHeight: '1.4' }}>
                           Instant 24/7 Clinical AI Doctor chat, dosage guidance & order help.
                         </p>
                       </div>
@@ -4297,10 +4309,10 @@ export default function Home() {
                 const displayOrders = (allUserOrders && allUserOrders.length > 0 ? allUserOrders : activeOrders);
                 return (
                   <div className="metallic-card" style={{ padding: '2rem' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '1rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', borderBottom: '1px solid rgba(255, 255, 255, 0.08)', paddingBottom: '1rem' }}>
                       <div>
-                        <h3 style={{ margin: 0, color: '#0f172a', fontSize: '1.3rem' }}>Your Orders ({displayOrders.length})</h3>
-                        <p style={{ margin: '4px 0 0 0', fontSize: '0.82rem', color: '#64748b' }}>Account: {accountEditEmail || activeUser?.email || 'Current Patient'}</p>
+                        <h3 style={{ margin: 0, color: '#f8fafc', fontSize: '1.3rem' }}>Your Orders ({displayOrders.length})</h3>
+                        <p style={{ margin: '4px 0 0 0', fontSize: '0.82rem', color: '#94a3b8' }}>Account: {accountEditEmail || activeUser?.email || 'Current Patient'}</p>
                       </div>
                       <button
                         onClick={() => setIsTrackingOpen(true)}
@@ -4311,9 +4323,9 @@ export default function Home() {
                     </div>
 
                     {displayOrders.length === 0 ? (
-                      <div style={{ textAlign: 'center', padding: '3rem 0', color: '#64748b' }}>
+                      <div style={{ textAlign: 'center', padding: '3rem 0', color: '#94a3b8' }}>
                         <span style={{ fontSize: '2.5rem', display: 'block', marginBottom: '0.75rem' }}>📦</span>
-                        <p style={{ fontWeight: '700', color: '#1e293b' }}>No orders placed yet for this account</p>
+                        <p style={{ fontWeight: '700', color: '#f8fafc' }}>No orders placed yet for this account</p>
                         <p style={{ fontSize: '0.85rem' }}>Search for medicines and checkout to initiate your first order!</p>
                         <button
                           onClick={() => setActiveMainView('home')}
@@ -4326,12 +4338,12 @@ export default function Home() {
                     ) : (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
                         {displayOrders.map(order => (
-                          <div key={order.id} style={{ border: '1px solid #cbd5e1', borderRadius: '14px', padding: '1.25rem', background: '#ffffff' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #f1f5f9', paddingBottom: '0.75rem', marginBottom: '0.85rem' }}>
+                          <div key={order.id} style={{ border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '14px', padding: '1.25rem', background: '#161c28' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255, 255, 255, 0.08)', paddingBottom: '0.75rem', marginBottom: '0.85rem' }}>
                               <div>
-                                <strong style={{ fontSize: '1rem', color: '#0f172a' }}>Order #{order.id}</strong>
-                                <span style={{ fontSize: '0.78rem', color: '#64748b', marginLeft: '12px' }}>
-                                  Fulfilling Pharmacy: <strong>{order.pharmacy_id || 'Dark-store Hub'}</strong>
+                                <strong style={{ fontSize: '1rem', color: '#f8fafc' }}>Order #{order.id}</strong>
+                                <span style={{ fontSize: '0.78rem', color: '#94a3b8', marginLeft: '12px' }}>
+                                  Fulfilling Pharmacy: <strong style={{ color: '#f1f5f9' }}>{order.pharmacy_id || 'Dark-store Hub'}</strong>
                                 </span>
                               </div>
                               <span style={{
@@ -4339,38 +4351,39 @@ export default function Home() {
                                 borderRadius: '99px',
                                 fontSize: '0.75rem',
                                 fontWeight: '800',
-                                background: order.status === 'delivered' ? '#dcfce7' : order.status === 'out_for_delivery' ? '#fef3c7' : '#ccfbf1',
-                                color: order.status === 'delivered' ? '#15803d' : order.status === 'out_for_delivery' ? '#b45309' : '#0f766e'
+                                background: order.status === 'delivered' ? 'rgba(16, 185, 129, 0.15)' : order.status === 'out_for_delivery' ? 'rgba(245, 158, 11, 0.15)' : 'rgba(20, 184, 166, 0.15)',
+                                color: order.status === 'delivered' ? '#34d399' : order.status === 'out_for_delivery' ? '#fbbf24' : '#2dd4bf',
+                                border: `1px solid ${order.status === 'delivered' ? 'rgba(16, 185, 129, 0.3)' : order.status === 'out_for_delivery' ? 'rgba(245, 158, 11, 0.3)' : 'rgba(20, 184, 166, 0.3)'}`
                               }}>
                                 {order.status?.replace(/_/g, ' ').toUpperCase()}
                               </span>
                             </div>
                             
-                            <div style={{ fontSize: '0.85rem', color: '#334155', marginBottom: '0.75rem' }}>
-                              <strong>Items:</strong> {Array.isArray(order.items) ? order.items.map(i => `${i.quantity || 1}x ${i.brand_name || i.name}`).join(', ') : order.items}
+                            <div style={{ fontSize: '0.85rem', color: '#cbd5e1', marginBottom: '0.75rem' }}>
+                              <strong style={{ color: '#f8fafc' }}>Items:</strong> {Array.isArray(order.items) ? order.items.map(i => `${i.quantity || 1}x ${i.brand_name || i.name}`).join(', ') : order.items}
                             </div>
 
                             <TrackingBar status={order.status} />
 
                             {/* Rider Doorstep QR on active order */}
                             {(order.rider_qr_image || (typeof window !== 'undefined' && (localStorage.getItem(`medora_order_qr_${order.id}`) || localStorage.getItem('medora_rider_main_qr')))) && (
-                              <div style={{ marginTop: '1rem', padding: '0.85rem', background: '#f8fafc', border: '1px dashed #0d9488', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                              <div style={{ marginTop: '1rem', padding: '0.85rem', background: '#1c2331', border: '1px dashed #0d9488', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '1rem' }}>
                                 <img
                                   src={order.rider_qr_image || (typeof window !== 'undefined' && (localStorage.getItem(`medora_order_qr_${order.id}`) || localStorage.getItem('medora_rider_main_qr')))}
                                   alt="Rider Doorstep QR"
-                                  style={{ width: '80px', height: '80px', objectFit: 'contain', background: '#fff', padding: '4px', borderRadius: '8px', border: '1px solid #cbd5e1' }}
+                                  style={{ width: '80px', height: '80px', objectFit: 'contain', background: '#fff', padding: '4px', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.2)' }}
                                 />
                                 <div>
-                                  <strong style={{ fontSize: '0.85rem', color: '#0f172a', display: 'block' }}>🛵 Contactless Doorstep UPI QR Shared by Rider</strong>
-                                  <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Scan upon rider arrival using GPay, PhonePe, Paytm or any UPI App. Rider settles at pharmacy.</span>
+                                  <strong style={{ fontSize: '0.85rem', color: '#f8fafc', display: 'block' }}>🛵 Contactless Doorstep UPI QR Shared by Rider</strong>
+                                  <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Scan upon rider arrival using GPay, PhonePe, Paytm or any UPI App. Rider settles at pharmacy.</span>
                                 </div>
                               </div>
                             )}
 
                             {/* Order Action Bar: Payment status & Reorder button */}
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.85rem', paddingTop: '0.85rem', borderTop: '1px solid #f1f5f9', flexWrap: 'wrap', gap: '8px' }}>
-                              <div style={{ fontSize: '0.82rem', color: '#64748b' }}>
-                                {order.payment_method && <span>Payment: <strong style={{ color: '#0f172a' }}>{String(order.payment_method).toUpperCase()}</strong> • </span>}
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.85rem', paddingTop: '0.85rem', borderTop: '1px solid rgba(255, 255, 255, 0.08)', flexWrap: 'wrap', gap: '8px' }}>
+                              <div style={{ fontSize: '0.82rem', color: '#94a3b8' }}>
+                                {order.payment_method && <span>Payment: <strong style={{ color: '#f8fafc' }}>{String(order.payment_method).toUpperCase()}</strong> • </span>}
                                 <span>Ref: #{order.id}</span>
                               </div>
                               <button
@@ -4411,48 +4424,48 @@ export default function Home() {
               {/* 3. SUBVIEW: PERSONAL PROFILE & HEALTH DATA */}
               {activeAccountSection === 'security' && (
                 <div className="metallic-card" style={{ padding: '2rem', maxWidth: '720px' }}>
-                  <h3 style={{ margin: '0 0 0.5rem 0', color: '#0f172a', fontSize: '1.3rem' }}>Personal & Medical Profile</h3>
-                  <p style={{ margin: '0 0 1.5rem 0', fontSize: '0.82rem', color: '#64748b' }}>
+                  <h3 style={{ margin: '0 0 0.5rem 0', color: '#f8fafc', fontSize: '1.3rem' }}>Personal & Medical Profile</h3>
+                  <p style={{ margin: '0 0 1.5rem 0', fontSize: '0.82rem', color: '#94a3b8' }}>
                     Each user has their unique persistent profile. Saved details auto-fill during rapid checkout and clinical triage.
                   </p>
 
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.2rem' }}>
                     <div>
-                      <label style={{ fontSize: '0.82rem', fontWeight: '700', color: '#334155', display: 'block', marginBottom: '4px' }}>Full Name</label>
+                      <label style={{ fontSize: '0.82rem', fontWeight: '700', color: '#cbd5e1', display: 'block', marginBottom: '4px' }}>Full Name</label>
                       <input
                         type="text"
                         value={accountEditName}
                         onChange={(e) => setAccountEditName(e.target.value)}
-                        style={{ width: '100%', boxSizing: 'border-box', padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.9rem', outline: 'none' }}
+                        style={{ width: '100%', boxSizing: 'border-box', padding: '10px 14px', borderRadius: '10px', border: '1px solid rgba(255, 255, 255, 0.12)', background: '#121620', color: '#f1f5f9', fontSize: '0.9rem', outline: 'none' }}
                       />
                     </div>
 
                     <div>
-                      <label style={{ fontSize: '0.82rem', fontWeight: '700', color: '#334155', display: 'block', marginBottom: '4px' }}>Mobile Phone Number</label>
+                      <label style={{ fontSize: '0.82rem', fontWeight: '700', color: '#cbd5e1', display: 'block', marginBottom: '4px' }}>Mobile Phone Number</label>
                       <input
                         type="text"
                         value={accountEditPhone}
                         onChange={(e) => setAccountEditPhone(e.target.value)}
-                        style={{ width: '100%', boxSizing: 'border-box', padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.9rem', outline: 'none' }}
+                        style={{ width: '100%', boxSizing: 'border-box', padding: '10px 14px', borderRadius: '10px', border: '1px solid rgba(255, 255, 255, 0.12)', background: '#121620', color: '#f1f5f9', fontSize: '0.9rem', outline: 'none' }}
                       />
                     </div>
 
                     <div>
-                      <label style={{ fontSize: '0.82rem', fontWeight: '700', color: '#334155', display: 'block', marginBottom: '4px' }}>Email Address</label>
+                      <label style={{ fontSize: '0.82rem', fontWeight: '700', color: '#cbd5e1', display: 'block', marginBottom: '4px' }}>Email Address</label>
                       <input
                         type="email"
                         value={accountEditEmail}
                         onChange={(e) => setAccountEditEmail(e.target.value)}
-                        style={{ width: '100%', boxSizing: 'border-box', padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.9rem', outline: 'none' }}
+                        style={{ width: '100%', boxSizing: 'border-box', padding: '10px 14px', borderRadius: '10px', border: '1px solid rgba(255, 255, 255, 0.12)', background: '#121620', color: '#f1f5f9', fontSize: '0.9rem', outline: 'none' }}
                       />
                     </div>
 
                     <div>
-                      <label style={{ fontSize: '0.82rem', fontWeight: '700', color: '#334155', display: 'block', marginBottom: '4px' }}>Blood Group</label>
+                      <label style={{ fontSize: '0.82rem', fontWeight: '700', color: '#cbd5e1', display: 'block', marginBottom: '4px' }}>Blood Group</label>
                       <select
                         value={accountEditBlood}
                         onChange={(e) => setAccountEditBlood(e.target.value)}
-                        style={{ width: '100%', boxSizing: 'border-box', padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.9rem', outline: 'none', background: '#fff' }}
+                        style={{ width: '100%', boxSizing: 'border-box', padding: '10px 14px', borderRadius: '10px', border: '1px solid rgba(255, 255, 255, 0.12)', background: '#121620', color: '#f1f5f9', fontSize: '0.9rem', outline: 'none' }}
                       >
                         {['O+', 'O-', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-'].map(b => (
                           <option key={b} value={b}>{b}</option>
@@ -4461,57 +4474,57 @@ export default function Home() {
                     </div>
 
                     <div style={{ gridColumn: 'span 2' }}>
-                      <label style={{ fontSize: '0.82rem', fontWeight: '700', color: '#334155', display: 'block', marginBottom: '4px' }}>Primary Delivery Address</label>
+                      <label style={{ fontSize: '0.82rem', fontWeight: '700', color: '#cbd5e1', display: 'block', marginBottom: '4px' }}>Primary Delivery Address</label>
                       <input
                         type="text"
                         placeholder="House / Flat No, Street, Landmark, Area, Pincode"
                         value={accountEditAddress}
                         onChange={(e) => setAccountEditAddress(e.target.value)}
-                        style={{ width: '100%', boxSizing: 'border-box', padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.9rem', outline: 'none' }}
+                        style={{ width: '100%', boxSizing: 'border-box', padding: '10px 14px', borderRadius: '10px', border: '1px solid rgba(255, 255, 255, 0.12)', background: '#121620', color: '#f1f5f9', fontSize: '0.9rem', outline: 'none' }}
                       />
                     </div>
 
                     <div>
-                      <label style={{ fontSize: '0.82rem', fontWeight: '700', color: '#dc2626', display: 'block', marginBottom: '4px' }}>Known Drug Allergies</label>
+                      <label style={{ fontSize: '0.82rem', fontWeight: '700', color: '#f87171', display: 'block', marginBottom: '4px' }}>Known Drug Allergies</label>
                       <input
                         type="text"
                         placeholder="e.g. Sulfa drugs, Penicillin, Aspirin, None"
                         value={accountEditAllergies}
                         onChange={(e) => setAccountEditAllergies(e.target.value)}
-                        style={{ width: '100%', boxSizing: 'border-box', padding: '10px 14px', borderRadius: '10px', border: '1px solid #fca5a5', fontSize: '0.9rem', outline: 'none', background: '#fff5f5' }}
+                        style={{ width: '100%', boxSizing: 'border-box', padding: '10px 14px', borderRadius: '10px', border: '1px solid rgba(239, 68, 68, 0.3)', fontSize: '0.9rem', outline: 'none', background: 'rgba(239, 68, 68, 0.08)', color: '#fca5a5' }}
                       />
                     </div>
 
                     <div>
-                      <label style={{ fontSize: '0.82rem', fontWeight: '700', color: '#0284c7', display: 'block', marginBottom: '4px' }}>Chronic Medical Conditions</label>
+                      <label style={{ fontSize: '0.82rem', fontWeight: '700', color: '#38bdf8', display: 'block', marginBottom: '4px' }}>Chronic Medical Conditions</label>
                       <input
                         type="text"
                         placeholder="e.g. Type 2 Diabetes, Hypertension, Asthma, None"
                         value={accountEditConditions}
                         onChange={(e) => setAccountEditConditions(e.target.value)}
-                        style={{ width: '100%', boxSizing: 'border-box', padding: '10px 14px', borderRadius: '10px', border: '1px solid #bae6fd', fontSize: '0.9rem', outline: 'none', background: '#f0f9ff' }}
+                        style={{ width: '100%', boxSizing: 'border-box', padding: '10px 14px', borderRadius: '10px', border: '1px solid rgba(56, 189, 248, 0.3)', fontSize: '0.9rem', outline: 'none', background: 'rgba(56, 189, 248, 0.08)', color: '#7dd3fc' }}
                       />
                     </div>
 
                     <div>
-                      <label style={{ fontSize: '0.82rem', fontWeight: '700', color: '#334155', display: 'block', marginBottom: '4px' }}>Emergency Contact Phone</label>
+                      <label style={{ fontSize: '0.82rem', fontWeight: '700', color: '#cbd5e1', display: 'block', marginBottom: '4px' }}>Emergency Contact Phone</label>
                       <input
                         type="text"
                         placeholder="+91 98765 43210"
                         value={accountEditEmergencyPhone}
                         onChange={(e) => setAccountEditEmergencyPhone(e.target.value)}
-                        style={{ width: '100%', boxSizing: 'border-box', padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.9rem', outline: 'none' }}
+                        style={{ width: '100%', boxSizing: 'border-box', padding: '10px 14px', borderRadius: '10px', border: '1px solid rgba(255, 255, 255, 0.12)', background: '#121620', color: '#f1f5f9', fontSize: '0.9rem', outline: 'none' }}
                       />
                     </div>
 
                     <div>
-                      <label style={{ fontSize: '0.82rem', fontWeight: '700', color: '#334155', display: 'block', marginBottom: '4px' }}>New Password</label>
+                      <label style={{ fontSize: '0.82rem', fontWeight: '700', color: '#cbd5e1', display: 'block', marginBottom: '4px' }}>New Password</label>
                       <input
                         type="password"
                         placeholder="Leave blank to keep unchanged"
                         value={accountNewPassword}
                         onChange={(e) => setAccountNewPassword(e.target.value)}
-                        style={{ width: '100%', boxSizing: 'border-box', padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.9rem', outline: 'none' }}
+                        style={{ width: '100%', boxSizing: 'border-box', padding: '10px 14px', borderRadius: '10px', border: '1px solid rgba(255, 255, 255, 0.12)', background: '#121620', color: '#f1f5f9', fontSize: '0.9rem', outline: 'none' }}
                       />
                     </div>
                   </div>
@@ -4577,39 +4590,39 @@ export default function Home() {
                 </div>
               )}
 
-              {/* 4. SUBVIEW: PRIME / MEDORA EXPRESS */}
+              {/* 4. SUBVIEW: MEDORA EXPRESS DELIVERY */}
               {activeAccountSection === 'prime' && (
-                <div className="metallic-card" style={{ padding: '2rem', maxWidth: '700px' }}>
+                <div className="metallic-card" style={{ padding: '2rem', maxWidth: '700px', background: '#161c28', border: '1px solid rgba(255, 255, 255, 0.1)' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '1.25rem' }}>
-                    <div style={{ width: '50px', height: '50px', borderRadius: '12px', background: '#0d9488', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.75rem', color: '#fff' }}>
+                    <div style={{ width: '50px', height: '50px', borderRadius: '12px', background: 'linear-gradient(135deg, #0d9488 0%, #059669 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.75rem', color: '#fff' }}>
                       ⚡
                     </div>
                     <div>
-                      <h3 style={{ margin: 0, color: '#0f172a', fontSize: '1.4rem' }}>Medora Prime Express Membership</h3>
+                      <h3 style={{ margin: 0, color: '#f8fafc', fontSize: '1.4rem', fontWeight: '800' }}>MEDORA Express Delivery Membership</h3>
                       <span className="amazon-gold-badge" style={{ marginTop: '4px' }}>ACTIVE • RENEWS OCT 2027</span>
                     </div>
                   </div>
 
-                  <p style={{ fontSize: '0.88rem', color: '#475569', lineHeight: '1.5', margin: '0 0 1.5rem 0' }}>
-                    As a Medora Prime member, you enjoy guaranteed 10-15 minute emergency medicine dispatch, ₹0 delivery fee on all orders from local pharmacies, and priority prescription OCR validation.
+                  <p style={{ fontSize: '0.88rem', color: '#cbd5e1', lineHeight: '1.6', margin: '0 0 1.5rem 0' }}>
+                    As a MEDORA Express member, you enjoy guaranteed 10-15 minute emergency medicine dispatch, ₹0 delivery fee on all orders from local pharmacies, and priority prescription OCR validation.
                   </p>
 
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
-                    <div style={{ padding: '1rem', background: '#f0fdfa', borderRadius: '12px', border: '1px solid #ccfbf1' }}>
-                      <strong style={{ color: '#0d9488', display: 'block', fontSize: '0.9rem' }}>⚡ 10-Minute Guarantee</strong>
-                      <span style={{ fontSize: '0.78rem', color: '#64748b' }}>Automated priority rider assignment at zero surcharge</span>
+                    <div style={{ padding: '1rem', background: '#121620', borderRadius: '12px', border: '1px solid rgba(255, 255, 255, 0.08)' }}>
+                      <strong style={{ color: '#5eead4', display: 'block', fontSize: '0.9rem', marginBottom: '4px' }}>⚡ 10-Minute Guarantee</strong>
+                      <span style={{ fontSize: '0.78rem', color: '#94a3b8' }}>Automated priority rider assignment at zero surcharge</span>
                     </div>
-                    <div style={{ padding: '1rem', background: '#f0fdfa', borderRadius: '12px', border: '1px solid #ccfbf1' }}>
-                      <strong style={{ color: '#0d9488', display: 'block', fontSize: '0.9rem' }}>💸 Free Delivery Always</strong>
-                      <span style={{ fontSize: '0.78rem', color: '#64748b' }}>No minimum cart value required across any partner chemist</span>
+                    <div style={{ padding: '1rem', background: '#121620', borderRadius: '12px', border: '1px solid rgba(255, 255, 255, 0.08)' }}>
+                      <strong style={{ color: '#5eead4', display: 'block', fontSize: '0.9rem', marginBottom: '4px' }}>💸 Free Delivery Always</strong>
+                      <span style={{ fontSize: '0.78rem', color: '#94a3b8' }}>No minimum cart value required across any partner chemist</span>
                     </div>
-                    <div style={{ padding: '1rem', background: '#f0fdfa', borderRadius: '12px', border: '1px solid #ccfbf1' }}>
-                      <strong style={{ color: '#0d9488', display: 'block', fontSize: '0.9rem' }}>🛡️ AI Drug Interaction Safety</strong>
-                      <span style={{ fontSize: '0.78rem', color: '#64748b' }}>Automated clinical hazard cross-examination at checkout</span>
+                    <div style={{ padding: '1rem', background: '#121620', borderRadius: '12px', border: '1px solid rgba(255, 255, 255, 0.08)' }}>
+                      <strong style={{ color: '#5eead4', display: 'block', fontSize: '0.9rem', marginBottom: '4px' }}>🛡️ AI Drug Interaction Safety</strong>
+                      <span style={{ fontSize: '0.78rem', color: '#94a3b8' }}>Automated clinical hazard cross-examination at checkout</span>
                     </div>
-                    <div style={{ padding: '1rem', background: '#f0fdfa', borderRadius: '12px', border: '1px solid #ccfbf1' }}>
-                      <strong style={{ color: '#0d9488', display: 'block', fontSize: '0.9rem' }}>🩺 24/7 AI Doctor Access</strong>
-                      <span style={{ fontSize: '0.78rem', color: '#64748b' }}>Unlimited clinical triage and OTC consultations</span>
+                    <div style={{ padding: '1rem', background: '#121620', borderRadius: '12px', border: '1px solid rgba(255, 255, 255, 0.08)' }}>
+                      <strong style={{ color: '#5eead4', display: 'block', fontSize: '0.9rem', marginBottom: '4px' }}>🩺 24/7 AI Doctor Access</strong>
+                      <span style={{ fontSize: '0.78rem', color: '#94a3b8' }}>Unlimited clinical triage and OTC consultations</span>
                     </div>
                   </div>
                 </div>
@@ -4620,8 +4633,8 @@ export default function Home() {
                 <div className="metallic-card" style={{ padding: '2rem' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
                     <div>
-                      <h3 style={{ margin: 0, color: '#0f172a', fontSize: '1.3rem' }}>Your Addresses</h3>
-                      <p style={{ margin: '4px 0 0 0', fontSize: '0.82rem', color: '#64748b' }}>Manage your delivery locations and default home pin</p>
+                      <h3 style={{ margin: 0, color: '#f8fafc', fontSize: '1.3rem' }}>Your Addresses</h3>
+                      <p style={{ margin: '4px 0 0 0', fontSize: '0.82rem', color: '#94a3b8' }}>Manage your delivery locations and default home pin</p>
                     </div>
                     <button
                       onClick={() => setIsAddressDrawerOpen(true)}
@@ -4643,10 +4656,10 @@ export default function Home() {
                             showToast(`Default address set to ${addr.tag}`, '📍');
                           }}
                           style={{
-                            border: isSelected ? '2px solid var(--primary)' : '1px solid #cbd5e1',
+                            border: isSelected ? '2px solid var(--primary)' : '1px solid rgba(255, 255, 255, 0.1)',
                             borderRadius: '14px',
                             padding: '1.25rem',
-                            background: isSelected ? '#f0fdfa' : '#ffffff',
+                            background: isSelected ? 'rgba(20, 184, 166, 0.1)' : '#161c28',
                             cursor: 'pointer',
                             position: 'relative'
                           }}
@@ -4658,12 +4671,12 @@ export default function Home() {
                           )}
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
                             <span style={{ fontSize: '1.2rem' }}>{addr.icon || '📍'}</span>
-                            <strong style={{ fontSize: '0.95rem', color: '#0f172a' }}>{addr.tag}</strong>
+                            <strong style={{ fontSize: '0.95rem', color: '#f8fafc' }}>{addr.tag}</strong>
                           </div>
-                          <div style={{ fontSize: '0.85rem', color: '#334155', lineHeight: '1.4' }}>
+                          <div style={{ fontSize: '0.85rem', color: '#cbd5e1', lineHeight: '1.4' }}>
                             {addr.houseNo}, {addr.area}
                           </div>
-                          <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '6px' }}>
+                          <div style={{ fontSize: '0.78rem', color: '#94a3b8', marginTop: '6px' }}>
                             👤 {addr.receiverName} • 📞 {addr.receiverPhone}
                           </div>
                         </div>
@@ -4676,21 +4689,21 @@ export default function Home() {
               {/* 6. SUBVIEW: PAYMENT OPTIONS & UPI */}
               {activeAccountSection === 'payments' && (
                 <div className="metallic-card" style={{ padding: '2rem', maxWidth: '680px' }}>
-                  <h3 style={{ margin: '0 0 0.5rem 0', color: '#0f172a', fontSize: '1.3rem' }}>Payment Options & UPI</h3>
-                  <p style={{ margin: '0 0 1.5rem 0', fontSize: '0.82rem', color: '#64748b' }}>Manage your linked UPI VPA handles and payment preferences</p>
+                  <h3 style={{ margin: '0 0 0.5rem 0', color: '#f8fafc', fontSize: '1.3rem' }}>Payment Options & UPI</h3>
+                  <p style={{ margin: '0 0 1.5rem 0', fontSize: '0.82rem', color: '#94a3b8' }}>Manage your linked UPI VPA handles and payment preferences</p>
 
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '1.5rem' }}>
                     {savedUpiIds.map(upi => (
-                      <div key={upi.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem', background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '12px' }}>
+                      <div key={upi.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem', background: '#161c28', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '12px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                           <span style={{ fontSize: '1.4rem' }}>📱</span>
                           <div>
-                            <strong style={{ fontSize: '0.92rem', color: '#0f172a', display: 'block' }}>{upi.vpa}</strong>
-                            <span style={{ fontSize: '0.75rem', color: '#64748b' }}>{upi.bank}</span>
+                            <strong style={{ fontSize: '0.92rem', color: '#f8fafc', display: 'block' }}>{upi.vpa}</strong>
+                            <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>{upi.bank}</span>
                           </div>
                         </div>
                         {upi.isDefault ? (
-                          <span style={{ background: '#dcfce7', color: '#16a34a', fontWeight: '800', fontSize: '0.72rem', padding: '3px 8px', borderRadius: '4px' }}>
+                          <span style={{ background: 'rgba(16, 185, 129, 0.15)', color: '#34d399', border: '1px solid rgba(16, 185, 129, 0.3)', fontWeight: '800', fontSize: '0.72rem', padding: '3px 8px', borderRadius: '4px' }}>
                             PRIMARY UPI
                           </span>
                         ) : (
@@ -4699,7 +4712,7 @@ export default function Home() {
                               setSavedUpiIds(prev => prev.map(u => ({ ...u, isDefault: u.id === upi.id })));
                               showToast(`Set ${upi.vpa} as primary UPI`, '💳');
                             }}
-                            style={{ background: '#ffffff', border: '1px solid #cbd5e1', padding: '4px 10px', borderRadius: '6px', fontSize: '0.75rem', cursor: 'pointer' }}
+                            style={{ background: '#1e2433', border: '1px solid rgba(255, 255, 255, 0.12)', color: '#cbd5e1', padding: '4px 10px', borderRadius: '6px', fontSize: '0.75rem', cursor: 'pointer' }}
                           >
                             Set Primary
                           </button>
@@ -4709,22 +4722,22 @@ export default function Home() {
 
                     {/* Add New UPI VPA Row */}
                     {showAddUpiInput ? (
-                      <div style={{ padding: '1.1rem', background: '#f8fafc', border: '1.5px dashed var(--primary)', borderRadius: '12px', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                        <strong style={{ fontSize: '0.88rem', color: '#0f172a' }}>Link New UPI VPA</strong>
+                      <div style={{ padding: '1.1rem', background: '#161c28', border: '1.5px dashed var(--primary)', borderRadius: '12px', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                        <strong style={{ fontSize: '0.88rem', color: '#f8fafc' }}>Link New UPI VPA</strong>
                         <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: '8px' }}>
                           <input
                             type="text"
                             placeholder="e.g. yourname@okaxis"
                             value={newUpiVpaInput}
                             onChange={(e) => setNewUpiVpaInput(e.target.value)}
-                            style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.85rem' }}
+                            style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.12)', background: '#121620', color: '#f1f5f9', fontSize: '0.85rem' }}
                           />
                           <input
                             type="text"
                             placeholder="Bank (e.g. HDFC Bank)"
                             value={newUpiBankInput}
                             onChange={(e) => setNewUpiBankInput(e.target.value)}
-                            style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.85rem' }}
+                            style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.12)', background: '#121620', color: '#f1f5f9', fontSize: '0.85rem' }}
                           />
                         </div>
                         <div style={{ display: 'flex', gap: '8px' }}>
@@ -4800,8 +4813,8 @@ export default function Home() {
                 <div className="metallic-card" style={{ padding: '2rem' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
                     <div>
-                      <h3 style={{ margin: 0, color: '#0f172a', fontSize: '1.3rem' }}>Your Prescriptions & Rx</h3>
-                      <p style={{ margin: '4px 0 0 0', fontSize: '0.82rem', color: '#64748b' }}>Doctor prescriptions parsed via Gemini Vision AI</p>
+                      <h3 style={{ margin: 0, color: '#f8fafc', fontSize: '1.3rem' }}>Your Prescriptions & Rx</h3>
+                      <p style={{ margin: '4px 0 0 0', fontSize: '0.82rem', color: '#94a3b8' }}>Doctor prescriptions parsed via Gemini Vision AI</p>
                     </div>
                     <button
                       onClick={() => setIsOcrOpen(true)}
@@ -4813,21 +4826,21 @@ export default function Home() {
                   </div>
 
                   {uploadedPrescriptionId ? (
-                    <div style={{ border: '1px solid #cbd5e1', borderRadius: '14px', padding: '1.25rem', background: '#ffffff' }}>
+                    <div style={{ border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '14px', padding: '1.25rem', background: '#161c28' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                        <strong style={{ color: '#0f172a' }}>Prescription #{uploadedPrescriptionId}</strong>
-                        <span style={{ background: '#dcfce7', color: '#16a34a', fontWeight: '800', fontSize: '0.72rem', padding: '3px 8px', borderRadius: '4px' }}>
+                        <strong style={{ color: '#f8fafc' }}>Prescription #{uploadedPrescriptionId}</strong>
+                        <span style={{ background: 'rgba(16, 185, 129, 0.15)', color: '#34d399', border: '1px solid rgba(16, 185, 129, 0.3)', fontWeight: '800', fontSize: '0.72rem', padding: '3px 8px', borderRadius: '4px' }}>
                           ✓ DIGITALLY VERIFIED
                         </span>
                       </div>
-                      <p style={{ fontSize: '0.82rem', color: '#64748b', margin: 0 }}>
+                      <p style={{ fontSize: '0.82rem', color: '#94a3b8', margin: 0 }}>
                         Deciphered by Google Gemini Vision AI. Prescribed medicines automatically mapped to local inventory.
                       </p>
                     </div>
                   ) : (
-                    <div style={{ textAlign: 'center', padding: '3rem 0', color: '#64748b' }}>
+                    <div style={{ textAlign: 'center', padding: '3rem 0', color: '#94a3b8' }}>
                       <span style={{ fontSize: '2.5rem', display: 'block', marginBottom: '0.75rem' }}>📄</span>
-                      <p style={{ fontWeight: '700', color: '#1e293b' }}>No prescriptions uploaded yet</p>
+                      <p style={{ fontWeight: '700', color: '#f8fafc' }}>No prescriptions uploaded yet</p>
                       <p style={{ fontSize: '0.85rem' }}>Upload doctor handwritten slips to automatically order prescribed drugs!</p>
                       <button
                         onClick={() => setIsOcrOpen(true)}
@@ -4846,8 +4859,8 @@ export default function Home() {
                 <div className="metallic-card" style={{ padding: '2rem' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
                     <div>
-                      <h3 style={{ margin: 0, color: '#0f172a', fontSize: '1.3rem' }}>Family Health Profiles</h3>
-                      <p style={{ margin: '4px 0 0 0', fontSize: '0.82rem', color: '#64748b' }}>Store chronic conditions and drug allergies for safe medicine dispatch</p>
+                      <h3 style={{ margin: 0, color: '#f8fafc', fontSize: '1.3rem' }}>Family Health Profiles</h3>
+                      <p style={{ margin: '4px 0 0 0', fontSize: '0.82rem', color: '#94a3b8' }}>Store chronic conditions and drug allergies for safe medicine dispatch</p>
                     </div>
                     <button
                       onClick={() => setShowAddFamilyModal(v => !v)}
@@ -4860,25 +4873,25 @@ export default function Home() {
 
                   {/* Add Family Member Inline Card */}
                   {showAddFamilyModal && (
-                    <div style={{ padding: '1.25rem', background: '#f8fafc', border: '1.5px dashed var(--primary)', borderRadius: '16px', marginBottom: '1.5rem', display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
-                      <strong style={{ fontSize: '0.95rem', color: '#0f172a' }}>Add Family Medical Profile</strong>
+                    <div style={{ padding: '1.25rem', background: '#161c28', border: '1.5px dashed var(--primary)', borderRadius: '16px', marginBottom: '1.5rem', display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+                      <strong style={{ fontSize: '0.95rem', color: '#f8fafc' }}>Add Family Medical Profile</strong>
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '10px' }}>
                         <div>
-                          <label style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: '700', display: 'block', marginBottom: '3px' }}>Full Name / Nickname</label>
+                          <label style={{ fontSize: '0.75rem', color: '#cbd5e1', fontWeight: '700', display: 'block', marginBottom: '3px' }}>Full Name / Nickname</label>
                           <input
                             type="text"
                             placeholder="e.g. Grandma, Rohit (Brother)"
                             value={newFamName}
                             onChange={(e) => setNewFamName(e.target.value)}
-                            style={{ width: '100%', boxSizing: 'border-box', padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.85rem' }}
+                            style={{ width: '100%', boxSizing: 'border-box', padding: '8px 12px', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.12)', background: '#121620', color: '#f1f5f9', fontSize: '0.85rem' }}
                           />
                         </div>
                         <div>
-                          <label style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: '700', display: 'block', marginBottom: '3px' }}>Relation</label>
+                          <label style={{ fontSize: '0.75rem', color: '#cbd5e1', fontWeight: '700', display: 'block', marginBottom: '3px' }}>Relation</label>
                           <select
                             value={newFamRelation}
                             onChange={(e) => setNewFamRelation(e.target.value)}
-                            style={{ width: '100%', boxSizing: 'border-box', padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.85rem' }}
+                            style={{ width: '100%', boxSizing: 'border-box', padding: '8px 12px', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.12)', background: '#121620', color: '#f1f5f9', fontSize: '0.85rem' }}
                           >
                             <option value="Parent">Parent</option>
                             <option value="Father">Father</option>
@@ -4891,21 +4904,21 @@ export default function Home() {
                           </select>
                         </div>
                         <div>
-                          <label style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: '700', display: 'block', marginBottom: '3px' }}>Age (Years)</label>
+                          <label style={{ fontSize: '0.75rem', color: '#cbd5e1', fontWeight: '700', display: 'block', marginBottom: '3px' }}>Age (Years)</label>
                           <input
                             type="number"
                             placeholder="e.g. 62"
                             value={newFamAge}
                             onChange={(e) => setNewFamAge(e.target.value)}
-                            style={{ width: '100%', boxSizing: 'border-box', padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.85rem' }}
+                            style={{ width: '100%', boxSizing: 'border-box', padding: '8px 12px', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.12)', background: '#121620', color: '#f1f5f9', fontSize: '0.85rem' }}
                           />
                         </div>
                         <div>
-                          <label style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: '700', display: 'block', marginBottom: '3px' }}>Blood Group</label>
+                          <label style={{ fontSize: '0.75rem', color: '#cbd5e1', fontWeight: '700', display: 'block', marginBottom: '3px' }}>Blood Group</label>
                           <select
                             value={newFamBlood}
                             onChange={(e) => setNewFamBlood(e.target.value)}
-                            style={{ width: '100%', boxSizing: 'border-box', padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.85rem' }}
+                            style={{ width: '100%', boxSizing: 'border-box', padding: '8px 12px', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.12)', background: '#121620', color: '#f1f5f9', fontSize: '0.85rem' }}
                           >
                             <option value="A+">A+</option>
                             <option value="A-">A-</option>
@@ -4920,23 +4933,23 @@ export default function Home() {
                       </div>
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                         <div>
-                          <label style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: '700', display: 'block', marginBottom: '3px' }}>Drug Allergies</label>
+                          <label style={{ fontSize: '0.75rem', color: '#cbd5e1', fontWeight: '700', display: 'block', marginBottom: '3px' }}>Drug Allergies</label>
                           <input
                             type="text"
                             placeholder="e.g. Penicillin, Sulfa, None"
                             value={newFamAllergies}
                             onChange={(e) => setNewFamAllergies(e.target.value)}
-                            style={{ width: '100%', boxSizing: 'border-box', padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.85rem' }}
+                            style={{ width: '100%', boxSizing: 'border-box', padding: '8px 12px', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.12)', background: '#121620', color: '#f1f5f9', fontSize: '0.85rem' }}
                           />
                         </div>
                         <div>
-                          <label style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: '700', display: 'block', marginBottom: '3px' }}>Chronic Conditions</label>
+                          <label style={{ fontSize: '0.75rem', color: '#cbd5e1', fontWeight: '700', display: 'block', marginBottom: '3px' }}>Chronic Conditions</label>
                           <input
                             type="text"
                             placeholder="e.g. Hypertension, Asthma, None"
                             value={newFamConditions}
                             onChange={(e) => setNewFamConditions(e.target.value)}
-                            style={{ width: '100%', boxSizing: 'border-box', padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.85rem' }}
+                            style={{ width: '100%', boxSizing: 'border-box', padding: '8px 12px', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.12)', background: '#121620', color: '#f1f5f9', fontSize: '0.85rem' }}
                           />
                         </div>
                       </div>
@@ -4975,7 +4988,7 @@ export default function Home() {
                         <button
                           type="button"
                           onClick={() => setShowAddFamilyModal(false)}
-                          style={{ background: 'transparent', border: '1px solid #cbd5e1', padding: '8px 14px', borderRadius: '8px', fontSize: '0.82rem', cursor: 'pointer' }}
+                          style={{ background: 'transparent', border: '1px solid rgba(255, 255, 255, 0.15)', color: '#cbd5e1', padding: '8px 14px', borderRadius: '8px', fontSize: '0.82rem', cursor: 'pointer' }}
                         >
                           Cancel
                         </button>
@@ -4983,20 +4996,19 @@ export default function Home() {
                     </div>
                   )}
 
-
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1.25rem' }}>
                     {familyProfiles.map(member => (
-                      <div key={member.id} style={{ border: '1px solid #cbd5e1', borderRadius: '14px', padding: '1.25rem', background: '#ffffff' }}>
+                      <div key={member.id} style={{ border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '14px', padding: '1.25rem', background: '#161c28' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
-                          <strong style={{ fontSize: '1rem', color: '#0f172a' }}>{member.name}</strong>
-                          <span style={{ background: '#f1f5f9', color: '#475569', fontSize: '0.72rem', padding: '2px 8px', borderRadius: '4px', fontWeight: '700' }}>
+                          <strong style={{ fontSize: '1rem', color: '#f8fafc' }}>{member.name}</strong>
+                          <span style={{ background: 'rgba(255, 255, 255, 0.08)', color: '#cbd5e1', fontSize: '0.72rem', padding: '2px 8px', borderRadius: '4px', fontWeight: '700' }}>
                             {member.blood}
                           </span>
                         </div>
-                        <div style={{ fontSize: '0.8rem', color: '#334155', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <div style={{ fontSize: '0.8rem', color: '#cbd5e1', display: 'flex', flexDirection: 'column', gap: '4px' }}>
                           <div><strong>Age:</strong> {member.age} yrs • <strong>Relation:</strong> {member.relation}</div>
-                          <div><strong style={{ color: '#dc2626' }}>Allergies:</strong> {member.allergies}</div>
-                          <div><strong style={{ color: '#0284c7' }}>Conditions:</strong> {member.conditions}</div>
+                          <div><strong style={{ color: '#f87171' }}>Allergies:</strong> {member.allergies}</div>
+                          <div><strong style={{ color: '#38bdf8' }}>Conditions:</strong> {member.conditions}</div>
                         </div>
                       </div>
                     ))}
@@ -5012,8 +5024,8 @@ export default function Home() {
                       🩺
                     </div>
                     <div>
-                      <h3 style={{ margin: 0, color: '#0f172a', fontSize: '1.3rem' }}>24/7 Clinical AI Doctor Support</h3>
-                      <span style={{ fontSize: '0.78rem', color: '#16a34a', fontWeight: '700' }}>● ONLINE & READY TO CONSULT</span>
+                      <h3 style={{ margin: 0, color: '#f8fafc', fontSize: '1.3rem' }}>24/7 Clinical AI Doctor Support</h3>
+                      <span style={{ fontSize: '0.78rem', color: '#34d399', fontWeight: '700' }}>● ONLINE & READY TO CONSULT</span>
                     </div>
                   </div>
 
@@ -5602,7 +5614,7 @@ export default function Home() {
                         style={{ accentColor: '#14b8a6', cursor: 'pointer' }}
                       />
                       <span className="amazon-gold-badge" style={{ fontSize: '0.66rem', padding: '2px 6px' }}>
-                        ⚡ Prime Express
+                        ⚡ 10-Min Express
                       </span>
                     </label>
                     <span style={{ fontSize: '0.72rem', color: '#94a3b8', display: 'block', marginTop: '4px', marginLeft: '22px' }}>
@@ -5886,10 +5898,9 @@ export default function Home() {
                                   </span>
                                 </div>
 
-                                {/* Prime Delivery Badge */}
+                                {/* Express Delivery Badge */}
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.76rem', color: '#38bdf8', fontWeight: '700', marginBottom: '8px' }}>
-                                  <span className="amazon-gold-badge" style={{ fontSize: '0.62rem', padding: '1px 5px' }}>⚡ Prime</span>
-                                  <span>FREE delivery <strong style={{ color: '#34d399' }}>Today in 10-15 mins</strong></span>
+                                  <span>⚡ FREE delivery <strong style={{ color: '#34d399' }}>Today in 10-15 mins</strong></span>
                                 </div>
 
                                 {/* Local Pharmacy Availability */}
@@ -8241,10 +8252,14 @@ export default function Home() {
       {/* Swiggy Address Drawer */}
       <SwiggyAddressDrawer
         isOpen={isAddressDrawerOpen}
-        onClose={() => setIsAddressDrawerOpen(false)}
+        onClose={() => {
+          setIsAddressDrawerOpen(false);
+          setIsFirstTimeAddressSetup(false);
+        }}
         currentAddress={selectedAddress}
         onSelectAddress={handleSelectAddress}
         activeUser={activeUser}
+        isFirstTimeSetup={isFirstTimeAddressSetup}
       />
 
       {/* Mobile Sticky Bottom Navigation Bar */}

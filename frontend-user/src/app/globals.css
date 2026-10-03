@@ -358,7 +358,7 @@ h1, h2, h3, h4, h5, h6 {
 .feature-card {
   padding: 2.2rem;
   border-radius: 22px;
-  background: #ffffff;
+  background: var(--bg-card);
   border: 1px solid var(--border-color);
   box-shadow: var(--shadow-sm);
   transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
@@ -375,11 +375,11 @@ h1, h2, h3, h4, h5, h6 {
   font-size: 1.3rem;
   font-weight: 700;
   margin-bottom: 0.5rem;
-  color: var(--text-main);
+  color: #f1f5f9;
 }
 
 .card-desc {
-  color: var(--text-muted);
+  color: #94a3b8;
   font-size: 0.92rem;
   line-height: 1.55;
 }
@@ -879,6 +879,22 @@ h1, h2, h3, h4, h5, h6 {
   transform: translateY(-3px);
   border-color: var(--accent-mint);
   box-shadow: var(--neo-shadow-raised);
+}
+
+.metallic-card h1, .metallic-card h2, .metallic-card h3, .metallic-card h4, .metallic-card strong {
+  color: #f8fafc;
+}
+
+.metallic-card p, .metallic-card span, .metallic-card label {
+  color: #cbd5e1;
+}
+
+.amazon-account-tile h4 {
+  color: #f8fafc !important;
+}
+
+.amazon-account-tile p {
+  color: #94a3b8 !important;
 }
 
 .amazon-gold-badge {
