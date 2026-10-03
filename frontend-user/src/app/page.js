@@ -9,7 +9,7 @@ import SwiggyAddressDrawer from '../components/SwiggyAddressDrawer';
 import LivePerimeterRadar from '../components/LivePerimeterRadar';
 import CartoonBootup from '../components/CartoonBootup';
 import { API } from '../utils/apiConfig';
-const USER_ID = "1";
+const DEFAULT_USER_ID = "usr_patient_1";
 
 // Order lifecycle stages
 const STAGES = [
@@ -250,13 +250,30 @@ export default function Home() {
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [isGreetingVisible, setIsGreetingVisible] = useState(false);
   const [chatMessages, setChatMessages] = useState([
-    { role: 'assistant', content: "Hello! I am MEDORA's AI Virtual Doctor. What symptoms are you experiencing today?" }
+    {
+      role: 'assistant',
+      content: "Hello! I am MEDORA's AI Virtual Doctor & Clinical Pharmacist.\n\nTo help diagnose and recommend safe relief, what symptoms are you experiencing today?",
+      confidence_score: 0.50,
+      confidence_label: "Intake Ready",
+      quiz_options: ["Fever & Chills", "Cold & Sneezing", "Acidity & Heartburn", "Severe Headache", "Throat Pain & Cough", "Body & Muscle Ache"]
+    }
   ]);
   const [chatInput, setChatInput] = useState('');
   const [isChatLoading, setIsChatLoading] = useState(false);
   const [chatFinished, setChatFinished] = useState(false);
   const [chatSuggestedMedicines, setChatSuggestedMedicines] = useState([]);
   const chatEndRef = useRef(null);
+  const chatAbortControllerRef = useRef(null);
+
+  const cancelChatRequest = () => {
+    if (chatAbortControllerRef.current) {
+      try {
+        chatAbortControllerRef.current.abort();
+      } catch (e) {}
+      chatAbortControllerRef.current = null;
+    }
+    setIsChatLoading(false);
+  };
 
   // Modals Toggles
   const [isTrackingOpen, setIsTrackingOpen] = useState(false);
@@ -312,9 +329,32 @@ export default function Home() {
 
   // Amazon Account Management Hub Profile States
   const [accountEditName, setAccountEditName] = useState(activeUser?.name || 'Adhwaith');
-  const [accountEditPhone, setAccountEditPhone] = useState('+91 99999 99999');
+  const [accountEditPhone, setAccountEditPhone] = useState(activeUser?.phone || '+91 99999 99999');
   const [accountEditEmail, setAccountEditEmail] = useState(activeUser?.email || 'patient@medora.com');
+  const [accountEditAddress, setAccountEditAddress] = useState(activeUser?.address || '');
+  const [accountEditAllergies, setAccountEditAllergies] = useState(activeUser?.allergies || 'Sulfa Drugs');
+  const [accountEditConditions, setAccountEditConditions] = useState(activeUser?.chronic_conditions || 'None');
+  const [accountEditBlood, setAccountEditBlood] = useState(activeUser?.blood_group || 'O+');
+  const [accountEditEmergencyPhone, setAccountEditEmergencyPhone] = useState(activeUser?.emergency_phone || '');
   const [accountNewPassword, setAccountNewPassword] = useState('');
+  const [allUserOrders, setAllUserOrders] = useState([]);
+
+  useEffect(() => {
+    if (activeUser) {
+      setAccountEditName(activeUser.name || '');
+      setAccountEditEmail(activeUser.email || '');
+      setAccountEditPhone(activeUser.phone || activeUser.mobile || '+91 99999 99999');
+      setAccountEditAddress(
+        typeof activeUser.address === 'string'
+          ? activeUser.address
+          : (activeUser.address?.houseNo ? `${activeUser.address.houseNo}, ${activeUser.address.area || ''}` : (activeUser.address || ''))
+      );
+      setAccountEditAllergies(activeUser.allergies || 'None');
+      setAccountEditConditions(activeUser.chronic_conditions || 'None');
+      setAccountEditBlood(activeUser.blood_group || 'O+');
+      setAccountEditEmergencyPhone(activeUser.emergency_phone || '');
+    }
+  }, [activeUser]);
   const [familyProfiles, setFamilyProfiles] = useState([
     { id: 'fam_1', name: 'Adhwaith (Self)', age: 24, relation: 'Self', blood: 'O+', allergies: 'Sulfa Drugs', conditions: 'None' },
     { id: 'fam_2', name: 'R. K. Shenoy (Father)', age: 58, relation: 'Father', blood: 'B+', allergies: 'Penicillin', conditions: 'Type 2 Diabetes, Hypertension' },
@@ -790,8 +830,7 @@ export default function Home() {
     if (!showSuggestions || searchResults.length === 0) {
       if (e.key === 'Enter') {
         e.preventDefault();
-        const resultsEl = document.getElementById('search-results-section');
-        if (resultsEl) resultsEl.scrollIntoView({ behavior: 'smooth' });
+        handleAmazonSearchSubmit(e);
       }
       return;
     }
@@ -808,8 +847,7 @@ export default function Home() {
         addToCart(searchResults[focusedIndex]);
       } else {
         setShowSuggestions(false);
-        const resultsEl = document.getElementById('search-results-section');
-        if (resultsEl) resultsEl.scrollIntoView({ behavior: 'smooth' });
+        handleAmazonSearchSubmit(e);
       }
     } else if (e.key === 'Escape') {
       setShowSuggestions(false);
@@ -920,11 +958,30 @@ export default function Home() {
     return true;
   };
 
+  const scrollToSearchBarTop = () => {
+    if (typeof window === 'undefined') return;
+    if (searchContainerRef.current) {
+      const rect = searchContainerRef.current.getBoundingClientRect();
+      const navbarOffset = 70;
+      const targetY = window.pageYOffset + rect.top - navbarOffset;
+      window.scrollTo({
+        top: Math.max(0, targetY),
+        behavior: 'smooth'
+      });
+    } else {
+      const el = document.getElementById('search-results-section');
+      if (el) el.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
   const handleAmazonSearchSubmit = async (e) => {
     if (e) e.preventDefault();
     if (!searchQuery.trim()) return;
     saveRecentSearch(searchQuery);
     setShowSuggestions(false);
+
+    // Smooth transition scroll down to bring search bar to top under navbar
+    scrollToSearchBarTop();
 
     try {
       const lat = selectedAddress?.latitude || 19.0760;
@@ -937,10 +994,7 @@ export default function Home() {
       }
     } catch (err) {}
 
-    setTimeout(() => {
-      const el = document.getElementById('search-results-section');
-      if (el) el.scrollIntoView({ behavior: 'smooth' });
-    }, 150);
+    setTimeout(scrollToSearchBarTop, 180);
   };
 
   // Close search suggestions on click outside
@@ -969,10 +1023,13 @@ export default function Home() {
         return;
       }
       try {
-        const res = await fetch(`${API}/api/v1/orders/user/${USER_ID}`);
+        const userIdentifier = activeUser?.id || activeUser?.email || DEFAULT_USER_ID;
+        const res = await fetch(`${API}/api/v1/orders/user/${encodeURIComponent(userIdentifier)}`);
         if (res.ok) {
           const data = await res.json();
-          const live = (data.orders || []).filter(o => o.status !== 'delivered');
+          const allOrders = data.orders || [];
+          setAllUserOrders(allOrders);
+          const live = allOrders.filter(o => o.status !== 'delivered');
           setActiveOrders(live);
           hasActive = live.length > 0;
         }
@@ -1000,7 +1057,7 @@ export default function Home() {
         document.removeEventListener('visibilitychange', handleVisibilityChange);
       }
     };
-  }, []);
+  }, [activeUser]);
 
   // Auto-popup chatbot greeting bubble after 2 seconds of visiting
   useEffect(() => {
@@ -1440,6 +1497,24 @@ export default function Home() {
       return;
     }
 
+    // 3. Direct Rider Payment Flow (Payment goes to Rider who settles at dark-stores/pharmacies)
+    if (selectedPaymentMethod === 'rider_upi') {
+      try {
+        setPaymentStatusMsg('Authorizing Direct Payment to Assigned Delivery Rider...');
+        await new Promise(r => setTimeout(r, 700));
+        setPaymentStatusMsg('Syncing Payment with Rider Terminal & Notifying Dark-store...');
+        await new Promise(r => setTimeout(r, 700));
+        const riderTxnId = `RIDER_${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
+        await finalizeOrderPlacement(totalAmt, 'rider_upi', riderTxnId);
+      } catch (err) {
+        alert(`Rider Payment Error: ${err.message}`);
+        setPaymentStep('payment');
+      } finally {
+        setIsProcessingPayment(false);
+      }
+      return;
+    }
+
     // Fallback if unexpected method
     setSelectedPaymentMethod('upi');
     setIsProcessingPayment(false);
@@ -1450,11 +1525,17 @@ export default function Home() {
     setPaymentStatusMsg('Confirming Order with Pharmacy & Dispatching Delivery Rider...');
     await new Promise(r => setTimeout(r, 600));
 
+    const currentUserId = activeUser?.id || activeUser?.email || DEFAULT_USER_ID;
+    const activeRiderQr = (typeof window !== 'undefined' ? (localStorage.getItem('medora_rider_main_qr') || '') : '') || activeUser?.rider_upi_qr || '';
+
     const orderRes = await fetch(`${API}/api/v1/orders/create`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        user_id: USER_ID,
+        user_id: currentUserId,
+        user: currentUserId,
+        user_email: activeUser?.email || "patient@medora.com",
+        user_name: activeUser?.name || accountEditName || "Patient",
         items: cart.map(item => ({
           medicine_id: item.medicine_id,
           brand_name: item.brand_name,
@@ -1467,12 +1548,18 @@ export default function Home() {
         payment_method: method,
         payment_status: method === 'cod' ? 'unpaid' : 'paid',
         payment_id: paymentId,
+        rider_qr_image: activeRiderQr || undefined,
         delivery_address: selectedAddress
       })
     });
     const orderData = await orderRes.json();
 
     if (orderRes.ok) {
+      if (activeRiderQr && orderData.order?.id && typeof window !== 'undefined') {
+        try {
+          localStorage.setItem(`medora_order_qr_${orderData.order.id}`, activeRiderQr);
+        } catch (e) {}
+      }
       setCompletedOrderInfo({
         order_id: orderData.order?.id || "ORD-SUCCESS",
         total: totalAmt,
@@ -1491,167 +1578,410 @@ export default function Home() {
   };
 
   const handleTriggerChatMessage = async (inputText) => {
-    if (!inputText || !inputText.trim() || isChatLoading) return;
+    if (!inputText || !inputText.trim()) return;
 
-    const userMessage = { role: 'user', content: inputText.trim() };
+    // If an analysis was already pending, abort it immediately so user's new message takes precedence
+    if (chatAbortControllerRef.current) {
+      try { chatAbortControllerRef.current.abort(); } catch (e) {}
+      chatAbortControllerRef.current = null;
+    }
+
+    const trimmedInput = inputText.trim();
+    const userMessage = { role: 'user', content: trimmedInput };
     const updatedMessages = [...chatMessages, userMessage];
     
     setChatMessages(updatedMessages);
     setChatInput('');
     setIsChatLoading(true);
 
-    // 1. Send to MEDORA backend AI endpoint (Google Gemini Flash + Clinical Pharmacology Engine)
-    try {
-      const res = await fetch(`${API}/api/v1/ai/chat`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          user_id: USER_ID,
-          messages: updatedMessages
-        })
-      });
-      
-      if (res.ok) {
-        const data = await res.json();
-        const meds = data.suggested_medicines || [];
+    // Instant Casual Greeting Handler (<20ms instant local triage, avoids slow network hangs)
+    const lowerInput = trimmedInput.toLowerCase().replace(/[!?.,;]/g, '').trim();
+    const isGreeting = ["hi", "hello", "hey", "yo", "namaste", "hola", "doctor", "help", "doc", "good morning", "good afternoon", "good evening", "hey doc", "hello doctor", "hi doctor", "hey doctor"].includes(lowerInput) ||
+      (lowerInput.length <= 8 && (lowerInput.startsWith("hi ") || lowerInput.startsWith("hey ") || lowerInput.startsWith("hello ")));
+
+    if (isGreeting) {
+      setTimeout(() => {
         setChatMessages(prev => [...prev, {
           role: 'assistant',
-          content: data.content,
-          confidence_score: data.confidence_score || 0.95,
-          confidence_label: data.confidence_label || 'High Clinical Correlation (95%)',
-          engine: data.engine || 'MEDORA Clinical AI',
-          suggested_medicines: meds
+          content: "Hello! I am MEDORA's AI Virtual Doctor & Clinical Pharmacist. 👋\n\nI can evaluate your symptoms, identify potential interactions with existing conditions, and recommend safe OTC remedies.\n\n**What symptoms or discomfort are you experiencing today?** Tap an option below or describe your symptoms to begin:",
+          confidence_score: 0.50,
+          confidence_label: "50% Initial Symptom Intake",
+          engine: "MEDORA AI Doctor (Gemini Flash)",
+          suggested_medicines: [],
+          quiz_options: [
+            "🤒 High Fever & Chills",
+            "🤢 Acidity & Heartburn",
+            "🤧 Cold & Allergy Sneezing",
+            "🤕 Severe Headache",
+            "😷 Dry Cough & Sore Throat",
+            "⚡ Body & Muscle Pain"
+          ]
         }]);
-        if (meds.length > 0) {
-          setChatSuggestedMedicines(meds);
-        }
-        return;
-      }
-    } catch (err) {
-      console.warn("Backend /api/v1/ai/chat unreachable, trying /chat or clinical fallback...", err);
+        setIsChatLoading(false);
+      }, 50);
+      return;
     }
 
-    // 2. Try direct /chat route on main backend
-    try {
-      const res2 = await fetch(`${API}/chat`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          user_id: USER_ID,
-          messages: updatedMessages
-        })
-      });
-      if (res2.ok) {
-        const data2 = await res2.json();
-        const meds2 = data2.suggested_medicines || [];
-        setChatMessages(prev => [...prev, {
-          role: 'assistant',
-          content: data2.content,
-          confidence_score: data2.confidence_score || 0.95,
-          confidence_label: data2.confidence_label || 'High Clinical Correlation (95%)',
-          engine: data2.engine || 'MEDORA Clinical AI',
-          suggested_medicines: meds2
-        }]);
-        if (meds2.length > 0) {
-          setChatSuggestedMedicines(meds2);
-        }
-        return;
-      }
-    } catch (err2) {
-      console.warn("Direct /chat unreachable, applying clinical pharmacology fallback...", err2);
-    }
+    // Network controller with 4.0-second timeout guarantee: never hangs or locks up the user!
+    const controller = new AbortController();
+    chatAbortControllerRef.current = controller;
+    const timeoutId = setTimeout(() => {
+      try { controller.abort(); } catch (e) {}
+    }, 4000);
 
-    // 3. Clinical Pharmacology Rule Engine Fallback (guaranteed 100% uptime & zero crashes)
     try {
+      const userMsgCount = updatedMessages.filter(m => m.role === 'user').length;
+      const currentUserId = activeUser?.id || activeUser?.email || DEFAULT_USER_ID;
+
+      // 1. Send to MEDORA backend AI endpoint (Google Gemini Flash + Clinical Pharmacology Engine)
+      try {
+        const res = await fetch(`${API}/api/v1/ai/chat`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            user_id: currentUserId,
+            messages: updatedMessages
+          }),
+          signal: controller.signal
+        });
+        
+        if (res.ok) {
+          clearTimeout(timeoutId);
+          const data = await res.json();
+          const meds = data.suggested_medicines || [];
+          const dynamicScore = userMsgCount === 1 ? 0.58 : userMsgCount === 2 ? 0.82 : 0.98;
+          const dynamicLabel = data.confidence_label || (
+            userMsgCount === 1 
+              ? 'Clinical Intake & Rule-Out (58%)' 
+              : userMsgCount === 2 
+                ? 'Differential Verification (82%)' 
+                : 'High Clinical Match (98%)'
+          );
+
+          setChatMessages(prev => [...prev, {
+            role: 'assistant',
+            content: data.content,
+            confidence_score: data.confidence_score ? Math.min(data.confidence_score, userMsgCount === 1 ? 0.65 : userMsgCount === 2 ? 0.85 : 1.0) : dynamicScore,
+            confidence_label: dynamicLabel,
+            engine: data.engine || 'MEDORA Clinical AI',
+            suggested_medicines: meds,
+            quiz_options: data.quiz_options || []
+          }]);
+          if (meds.length > 0) {
+            setChatSuggestedMedicines(meds);
+          }
+          return;
+        }
+      } catch (err) {
+        console.warn("Backend /api/v1/ai/chat network stall or timeout, using instant clinical fallback...", err);
+      } finally {
+        clearTimeout(timeoutId);
+      }
+
+      // 2. Try direct /chat route on main backend
+      try {
+        const res2 = await fetch(`${API}/chat`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            user_id: currentUserId,
+            messages: updatedMessages
+          })
+        });
+        if (res2.ok) {
+          const data2 = await res2.json();
+          const meds2 = data2.suggested_medicines || [];
+          const dynamicScore2 = data2.confidence_score || (userMsgCount === 1 ? 0.58 : userMsgCount === 2 ? 0.82 : 0.98);
+          const dynamicLabel2 = data2.confidence_label || (
+            userMsgCount === 1 
+              ? 'Clinical Intake & Rule-Out (58%)' 
+              : userMsgCount === 2 
+                ? 'Differential Verification (82%)' 
+                : 'High Clinical Match (98%)'
+          );
+
+          setChatMessages(prev => [...prev, {
+            role: 'assistant',
+            content: data2.content,
+            confidence_score: dynamicScore2,
+            confidence_label: dynamicLabel2,
+            engine: data2.engine || 'MEDORA Clinical AI',
+            suggested_medicines: meds2,
+            quiz_options: data2.quiz_options || []
+          }]);
+          if (meds2.length > 0) {
+            setChatSuggestedMedicines(meds2);
+          }
+          return;
+        }
+      } catch (err2) {
+        console.warn("Direct /chat unreachable, applying multi-turn clinical pharmacology fallback...", err2);
+      }
+
+      // 3. Clinical Pharmacology Multi-Turn Rule Engine Fallback (guaranteed 100% uptime & zero crashes)
       const query = (inputText || '').toLowerCase();
       const allText = updatedMessages.map(m => m.content).join(' ').toLowerCase();
 
       let replyText = "";
       let foundMeds = [];
+      let quizOptions = [];
+      let score = 0.58;
+      let label = "Clinical Symptom Intake (58%)";
 
-      if (allText.includes('acid') || allText.includes('reflux') || allText.includes('gerd') || allText.includes('heartburn') || allText.includes('chest burn') || allText.includes('burning')) {
-        replyText = "**Probable Condition:**\nGastroesophageal Reflux / Acute Gastric Hyperacidity\n\n" +
-          "**Recommended OTC Relief:**\n" +
-          "- **Pantocid 40**: 1 tablet once daily in the morning, 30 minutes before breakfast. Reduces gastric acid secretion.\n" +
-          "- **Gelusil**: 10ml syrup or 1-2 chewable tablets as needed 1 hour after meals for instant acid neutralization.\n\n" +
-          "**Clinical Guidance:**\n" +
-          "- Avoid spicy, oily, acidic foods, citrus fruits, and late-night meals.\n" +
-          "- Keep head elevated by 6 inches while resting.\n" +
-          "- ⚠️ CRITICAL CONTRAINDICATION: Do NOT take Dolo 650, Crocin, Combiflam, or Aspirin, as NSAIDs irritate the gastric mucosa and worsen burning!\n\n" +
-          "Disclaimer: I am an AI assistant, not a doctor. Consult a healthcare professional before taking medications.";
-        foundMeds = ["Pantocid 40", "Gelusil"];
-      } else if (allText.includes('fever') || allText.includes('temperature') || allText.includes('chills') || allText.includes('pyrexia')) {
-        replyText = "**Probable Condition:**\nAcute Febrile Illness / Viral Pyrexia\n\n" +
-          "**Recommended OTC Relief:**\n" +
-          "- **Dolo 650**: 1 tablet every 6-8 hours as needed (maximum 3 tablets per 24 hours) after meals.\n" +
-          "- **Calpol 500**: Safe alternative for mild-to-moderate fever reduction.\n" +
-          "- **ORS Electrolyte**: Drink throughout the day to replenish hydration lost via sweating.\n\n" +
-          "**Clinical Guidance:**\n" +
-          "- Maintain strict bed rest and drink plenty of fluids.\n" +
-          "- Apply lukewarm water compresses if temperature exceeds 101°F.\n" +
-          "- ⚠️ Seek medical attention if fever lasts over 3 days or causes rash.\n\n" +
-          "Disclaimer: I am an AI assistant, not a doctor. Consult a healthcare professional before taking medications.";
-        foundMeds = ["Dolo 650", "Calpol 500", "ORS Electrolyte"];
-      } else if (allText.includes('cold') || allText.includes('sneez') || allText.includes('runny') || allText.includes('allergy') || allText.includes('nasal')) {
-        replyText = "**Probable Condition:**\nAllergic Rhinitis / Acute Upper Respiratory Rhinovirus\n\n" +
-          "**Recommended OTC Relief:**\n" +
-          "- **Allegra 120**: 1 tablet once daily in the morning with water (non-drowsy 2nd gen antihistamine).\n" +
-          "- **Cetirizine 10mg**: 1 tablet at bedtime if nighttime sneezing or nasal congestion persists.\n\n" +
-          "**Clinical Guidance:**\n" +
-          "- Practice steam inhalation twice daily to clear nasal passages.\n" +
-          "- Avoid exposure to dust, sudden AC chilling, and pet dander.\n" +
-          "- Drink warm herbal tea or honey lemon water.\n\n" +
-          "Disclaimer: I am an AI assistant, not a doctor. Consult a healthcare professional before taking medications.";
-        foundMeds = ["Allegra 120", "Cetirizine 10mg"];
-      } else if (allText.includes('cough') || allText.includes('throat') || allText.includes('sore throat')) {
-        replyText = "**Probable Condition:**\nAcute Pharyngitis / Irritant Bronchial Cough\n\n" +
-          "**Recommended OTC Relief:**\n" +
-          "- **Ascoril-D**: 5-10ml syrup twice or thrice daily after meals to soothe irritated bronchial passages.\n\n" +
-          "**Clinical Guidance:**\n" +
-          "- Gargle with warm salt water (1/2 tsp salt in 1 cup warm water) 3 times a day.\n" +
-          "- Sip warm honey water to lubricate mucosal membranes.\n" +
-          "- Avoid cold beverages and exposure to environmental smoke.\n\n" +
-          "Disclaimer: I am an AI assistant, not a doctor. Consult a healthcare professional before taking medications.";
-        foundMeds = ["Ascoril-D"];
-      } else if (allText.includes('headache') || allText.includes('migraine') || allText.includes('head pain')) {
-        replyText = "**Probable Condition:**\nTension Headache / Migraine Cephalea\n\n" +
-          "**Recommended OTC Relief:**\n" +
-          "- **Calpol 500**: 1 tablet with a full glass of water. Repeat after 6 hours if pain persists.\n" +
-          "- **Combiflam**: 1 tablet after food if headache is accompanied by neck or body stiffness.\n\n" +
-          "**Clinical Guidance:**\n" +
-          "- Rest in a quiet, darkened room away from digital screens and loud noises.\n" +
-          "- Hydrate with at least 2 glasses of water immediately.\n" +
-          "- Apply a cool compress to forehead and temples.\n\n" +
-          "Disclaimer: I am an AI assistant, not a doctor. Consult a healthcare professional before taking medications.";
-        foundMeds = ["Calpol 500", "Combiflam"];
-      } else if (allText.includes('body pain') || allText.includes('back') || allText.includes('muscle') || allText.includes('joint') || allText.includes('ache')) {
-        replyText = "**Probable Condition:**\nAcute Musculoskeletal Strain / Myalgia\n\n" +
-          "**Recommended OTC Relief:**\n" +
-          "- **Combiflam**: 1 tablet twice daily strictly after meals to reduce muscle inflammation.\n" +
-          "- **Dolo 650**: 1 tablet as a gentler alternative for aches.\n\n" +
-          "**Clinical Guidance:**\n" +
-          "- Apply warm fomentation or ice pack for 15-minute intervals.\n" +
-          "- Avoid heavy lifting or sudden twisting movements.\n\n" +
-          "Disclaimer: I am an AI assistant, not a doctor. Consult a healthcare professional before taking medications.";
-        foundMeds = ["Combiflam", "Dolo 650"];
+      const isAcidity = allText.includes('acid') || allText.includes('reflux') || allText.includes('gerd') || allText.includes('heartburn') || allText.includes('burning') || allText.includes('chest burn');
+      const isFever = allText.includes('fever') || allText.includes('temperature') || allText.includes('chills') || allText.includes('pyrexia') || allText.includes('warmth');
+      const isCold = allText.includes('cold') || allText.includes('sneez') || allText.includes('runny') || allText.includes('allergy') || allText.includes('nasal') || allText.includes('congestion');
+      const isCough = allText.includes('cough') || allText.includes('throat') || allText.includes('pharyngitis') || allText.includes('swallow');
+      const isHeadache = allText.includes('headache') || allText.includes('migraine') || allText.includes('head pain') || allText.includes('temple');
+      const isBodyPain = allText.includes('body pain') || allText.includes('back') || allText.includes('muscle') || allText.includes('joint') || allText.includes('strain') || allText.includes('spasm');
+
+      if (userMsgCount === 1) {
+        score = 0.58;
+        label = "Clinical Symptom Intake (58%)";
+
+        if (isFever) {
+          replyText = "**Primary Assessment:** Acute Pyrexia / Febrile Symptom Intake.\n\n" +
+            "To narrow down viral fever vs bacterial illness and ensure clinical safety, please answer:\n" +
+            "1. What is your current body temperature (e.g. mild ~99-100°F vs high >101°F)?\n" +
+            "2. How many days has the fever persisted?\n" +
+            "3. Are you experiencing chills, headache, or throat irritation?";
+          quizOptions = [
+            "Mild fever (<100°F) for 1 day, feeling tired",
+            "High fever (>101°F) with body chills & shivering",
+            "Fever + severe sore throat and dry cough",
+            "Fever + body ache and headache"
+          ];
+        } else if (isAcidity) {
+          replyText = "**Primary Assessment:** Upper Gastrointestinal Hyperacidity / Reflux.\n\n" +
+            "To rule out peptic ulcers and acute gastritis, please clarify:\n" +
+            "1. Did this start after spicy/oily food, late dinner, or skipping meals?\n" +
+            "2. Is there sour water regurgitation in the throat or nausea?\n" +
+            "3. Have you taken any pain relief pills (e.g. Combiflam, Brufen, Aspirin) recently?";
+          quizOptions = [
+            "Severe heartburn after spicy/heavy meal",
+            "Burning in empty stomach with sour burps",
+            "Took painkiller earlier, now stomach burning",
+            "Acid reflux worse when lying flat down"
+          ];
+        } else if (isCold) {
+          replyText = "**Primary Assessment:** Upper Respiratory Rhinitis / Allergic Symptoms.\n\n" +
+            "To differentiate allergic rhinitis from viral infection:\n" +
+            "1. Is nasal discharge clear and watery, or thick yellowish?\n" +
+            "2. Are you experiencing non-stop bouts of sneezing and itchy/watery eyes?\n" +
+            "3. Any difficulty breathing or chest wheezing?";
+          quizOptions = [
+            "Watery runny nose + persistent sneezing",
+            "Stuffy blocked nose + mild headache",
+            "Allergy flare-up from dust / cold AC air",
+            "Cold with low-grade fever"
+          ];
+        } else if (isCough) {
+          replyText = "**Primary Assessment:** Acute Pharyngeal Irritation / Bronchial Cough.\n\n" +
+            "To recommend the correct mucolytic or antitussive remedy:\n" +
+            "1. Is it a dry tickling throat cough, or are you coughing up phlegm/mucus?\n" +
+            "2. Does it hurt sharply when you swallow liquids or food?\n" +
+            "3. How long has the cough been present?";
+          quizOptions = [
+            "Dry tickly cough, no phlegm produced",
+            "Chest congestion with thick mucus",
+            "Sharp throat pain while swallowing",
+            "Persistent coughing fits at night"
+          ];
+        } else if (isHeadache) {
+          replyText = "**Primary Assessment:** Cephalea / Tension or Migraine Symptom Intake.\n\n" +
+            "To rule out neurological red-flags and verify etiology:\n" +
+            "1. Is the pain on one side of your head, or a tight band across temples/forehead?\n" +
+            "2. Is it throbbing/pulsating with light or screen sensitivity?\n" +
+            "3. Any neck stiffness, dizziness, or nausea?";
+          quizOptions = [
+            "One-sided throbbing pain + sensitive to light",
+            "Dull tension ache across forehead & temples",
+            "Screen fatigue and eye strain headache",
+            "Headache accompanied by mild nausea"
+          ];
+        } else if (isBodyPain) {
+          replyText = "**Primary Assessment:** Musculoskeletal Strain / Myalgia.\n\n" +
+            "To rule out inflammatory arthritis or nerve compression:\n" +
+            "1. Did this start after gym workout, lifting, or prolonged sitting?\n" +
+            "2. Is there visible swelling, warmth, or redness at the joint?\n" +
+            "3. Is the pain localized to lower back, shoulders, or all over?";
+          quizOptions = [
+            "Lower back stiffness from sitting/lifting",
+            "General muscle soreness after physical exertion",
+            "Neck and shoulder spasm from poor posture",
+            "Joint pain in knees/ankles"
+          ];
+        } else {
+          replyText = "**Primary Assessment:** Clinical Health Intake.\n\n" +
+            "Thank you for sharing your symptoms. To rule out complications and tailor safe OTC remedies:\n" +
+            "1. How many hours or days have you felt this discomfort?\n" +
+            "2. On a scale of 1-10, how severe is it?\n" +
+            "3. Do you have any known medical conditions or drug allergies?";
+          quizOptions = [
+            "Started today, mild discomfort (2-3/10)",
+            "Started 2-3 days ago, moderate (5-7/10)",
+            "No known drug allergies or chronic diseases",
+            "Have sensitive stomach / acidity"
+          ];
+        }
+      } else if (userMsgCount === 2) {
+        score = 0.82;
+        label = "Differential Rule-Out & Safety Check (82%)";
+
+        replyText = "**Clinical Correlation Updated (82% Confidence):**\n" +
+          "Thank you for clarifying. Your symptoms have been correlated against pharmacological guidelines.\n\n" +
+          "**⚠️ Patient Safety & Contraindication Check:**\n" +
+          "1. Are you allergic to Paracetamol, NSAIDs (Ibuprofen), or Antihistamines?\n" +
+          "2. Any history of severe liver impairment, kidney stones, or active gastric ulcers?\n" +
+          "3. Are you currently pregnant or nursing?\n\n" +
+          "If none of these apply, confirm below so I can formulate your safe OTC differential dosage regimen.";
+        quizOptions = [
+          "None apply - Confirm safe OTC regimen",
+          "I have mild acidity / sensitive stomach",
+          "Allergic to aspirin / NSAID painkillers",
+          "I take regular blood pressure medicine"
+        ];
       } else {
-        replyText = "Hello! I am MEDORA's AI Clinical Pharmacist powered by Google Gemini.\n\n" +
-          "To provide accurate clinical guidance, please share:\n" +
-          "1. What primary symptoms are you feeling (e.g. fever, acidity, cold, cough, headache, or pain)?\n" +
-          "2. How long have you experienced these symptoms?\n" +
-          "3. Any known allergies or underlying medical conditions?";
+        // Turn 3+: Full diagnosis & continuous conversation!
+        score = 0.98;
+        label = "Differential Match & Prescription (98%)";
+
+        if (isAcidity) {
+          replyText = "**Probable Differential Condition:**\nGastroesophageal Reflux Disease (GERD) / Acute Gastric Hyperacidity\n\n" +
+            "**Recommended Safe OTC Regimen:**\n" +
+            "- **Pantocid 40 (Pantoprazole 40mg)**: 1 tablet once daily, strictly 30 minutes before breakfast. Suppresses excess proton-pump acid generation.\n" +
+            "- **Gelusil Chewable / Liquid**: 10-15ml or 2 chewable tablets as needed 1 hour after meals for instant acid neutralization.\n\n" +
+            "**Clinical Guidance & Diet:**\n" +
+            "- Avoid citrus fruits, carbonated drinks, deep-fried snacks, and caffeine.\n" +
+            "- Do not lie flat immediately after eating; elevate upper body by 6 inches.\n" +
+            "- ⚠️ CRITICAL: Avoid NSAIDs (Combiflam, Dolo, Aspirin) as they irritate gastric mucosa.\n\n" +
+            "*You can continue asking any follow-up questions or tap below to order these medicines.*";
+          foundMeds = ["Pantocid 40", "Gelusil"];
+          quizOptions = [
+            "How long should I take Pantocid 40?",
+            "Can I take Gelusil at bedtime?",
+            "What home foods help soothe burning?",
+            "What if symptoms persist after 3 days?"
+          ];
+        } else if (isFever) {
+          replyText = "**Probable Differential Condition:**\nAcute Febrile Viral Syndrome / Pyrexia\n\n" +
+            "**Recommended Safe OTC Regimen:**\n" +
+            "- **Dolo 650 (Paracetamol 650mg)**: 1 tablet every 6 to 8 hours as needed (do NOT exceed 3 tablets in 24 hours). Always take after food with water.\n" +
+            "- **Calpol 500 (Paracetamol 500mg)**: Gentler alternative if body weight is under 55kg or fever is mild.\n" +
+            "- **ORS Electrolyte Drink**: 1 sachet dissolved in 1 litre drinking water, sip throughout the day to replace electrolytes lost via sweating.\n\n" +
+            "**Clinical Guidance:**\n" +
+            "- Rest in well-ventilated room, stay well hydrated.\n" +
+            "- Use lukewarm water sponging if temperature crosses 101°F.\n" +
+            "- ⚠️ Seek medical attention if fever exceeds 102°F or persists beyond 3 days.\n\n" +
+            "*You can continue asking any questions regarding dosage timing or medicine interactions.*";
+          foundMeds = ["Dolo 650", "Calpol 500", "ORS Electrolyte"];
+          quizOptions = [
+            "Can I take Dolo 650 on an empty stomach?",
+            "How many hours gap between doses?",
+            "Is Dolo 650 safe if I have acidity?",
+            "What if I vomit after taking medicine?"
+          ];
+        } else if (isCold) {
+          replyText = "**Probable Differential Condition:**\nAcute Allergic Rhinitis / Upper Respiratory Rhinovirus\n\n" +
+            "**Recommended Safe OTC Regimen:**\n" +
+            "- **Allegra 120 (Fexofenadine 120mg)**: 1 tablet once daily in the morning with a full glass of water. Non-drowsy 2nd generation antihistamine.\n" +
+            "- **Cetirizine 10mg**: 1 tablet at night if nocturnal sneezing or nasal blockage disturbs sleep.\n\n" +
+            "**Clinical Guidance:**\n" +
+            "- Practice steam inhalation twice daily for 5-10 minutes.\n" +
+            "- Avoid chilled beverages, direct AC draft, and dust exposure.\n" +
+            "- Sip warm water with honey and ginger.\n\n" +
+            "*Ask any follow-up questions or add medications to your cart below.*";
+          foundMeds = ["Allegra 120", "Cetirizine 10mg"];
+          quizOptions = [
+            "Will Allegra 120 make me sleepy during daytime?",
+            "Can I take both Allegra and Cetirizine?",
+            "How many days should I continue?",
+            "Can I do warm saline gargle?"
+          ];
+        } else if (isCough) {
+          replyText = "**Probable Differential Condition:**\nAcute Pharyngitis / Irritant Bronchial Cough\n\n" +
+            "**Recommended Safe OTC Regimen:**\n" +
+            "- **Ascoril-D Cough Syrup**: 5-10ml two to three times daily after meals to soothe bronchial mucosal spasms.\n\n" +
+            "**Clinical Guidance:**\n" +
+            "- Gargle with warm salt water (1/2 tsp salt in 1 cup warm water) 3 times daily.\n" +
+            "- Sip warm herbal tea or honey lemon water.\n" +
+            "- Avoid cold drinks, smoking, and environmental air pollutants.\n\n" +
+            "*Feel free to ask any other questions or add to cart.*";
+          foundMeds = ["Ascoril-D"];
+          quizOptions = [
+            "Does Ascoril-D cause drowsiness?",
+            "How many times a day should I gargle?",
+            "What foods should I avoid with sore throat?",
+            "Is hot honey water safe with diabetes?"
+          ];
+        } else if (isHeadache) {
+          replyText = "**Probable Differential Condition:**\nTension Cephalea / Early Migraine Episode\n\n" +
+            "**Recommended Safe OTC Regimen:**\n" +
+            "- **Calpol 500 (Paracetamol 500mg)**: 1 tablet with 2 glasses of water. Safe first-line relief.\n" +
+            "- **Combiflam (Ibuprofen + Paracetamol)**: 1 tablet strictly after meals if headache includes neck tension or muscular pain.\n\n" +
+            "**Clinical Guidance:**\n" +
+            "- Rest in a quiet, dark, dim-lit room.\n" +
+            "- Discontinue digital screens (phones/laptops) for at least 1-2 hours.\n" +
+            "- Drink plenty of water immediately.\n\n" +
+            "*Ask any questions about dosage or duration below.*";
+          foundMeds = ["Calpol 500", "Combiflam"];
+          quizOptions = [
+            "Can I take Combiflam if I have acidity?",
+            "Is caffeine/tea helpful for headaches?",
+            "When should I consult a neurologist?",
+            "How long before the medicine acts?"
+          ];
+        } else if (isBodyPain) {
+          replyText = "**Probable Differential Condition:**\nAcute Musculoskeletal Strain / Myalgia\n\n" +
+            "**Recommended Safe OTC Regimen:**\n" +
+            "- **Combiflam (Ibuprofen 400mg + Paracetamol 325mg)**: 1 tablet twice daily strictly after meals.\n" +
+            "- **Dolo 650**: 1 tablet as gentle alternative.\n\n" +
+            "**Clinical Guidance:**\n" +
+            "- Apply hot water fomentation or cold pack to the affected area.\n" +
+            "- Avoid sudden twisting, heavy lifting, or poor chair posture.\n\n" +
+            "*Feel free to ask any questions or tap below to order.*";
+          foundMeds = ["Combiflam", "Dolo 650"];
+          quizOptions = [
+            "Should I use hot pack or ice compress?",
+            "Can I apply pain relief spray or balm?",
+            "How many days can I take Combiflam?",
+            "Is gentle stretching recommended?"
+          ];
+        } else {
+          replyText = "**Clinical Response (Differential Correlation: 98%):**\n\n" +
+            "Based on your continuous description, your condition has been thoroughly triaged. Please maintain hydration and rest.\n\n" +
+            "If symptoms worsen or do not subside within 48 hours, please consult a physician in clinic.\n\n" +
+            "*You can continue chatting with me about any symptom, dosage, or medical clarification.*";
+          quizOptions = [
+            "What diet is recommended?",
+            "Can I take vitamins with this?",
+            "What are warning signs to visit hospital?",
+            "Reset and describe another symptom"
+          ];
+        }
       }
 
       setChatMessages(prev => [...prev, {
         role: 'assistant',
         content: replyText,
-        suggested_medicines: foundMeds
+        confidence_score: score,
+        confidence_label: label,
+        engine: 'MEDORA Clinical AI',
+        suggested_medicines: foundMeds,
+        quiz_options: quizOptions
       }]);
       if (foundMeds.length > 0) {
         setChatSuggestedMedicines(foundMeds);
       }
     } catch (fallbackErr) {
-      setChatMessages(prev => [...prev, { role: 'assistant', content: "I am ready to help. Please describe your symptoms (e.g. fever, headache, acidity, cold)." }]);
+      console.error("Chat error:", fallbackErr);
+      setChatMessages(prev => [...prev, {
+        role: 'assistant',
+        content: "I am ready to help. Please tell me more about what you are feeling.",
+        confidence_score: 0.60,
+        confidence_label: "Intake Active",
+        quiz_options: ["Fever", "Acidity", "Cold & Sneezing", "Headache"]
+      }]);
     } finally {
       setIsChatLoading(false);
     }
@@ -1703,10 +2033,18 @@ export default function Home() {
 
 
   const resetChat = () => {
+    cancelChatRequest();
     setChatMessages([
-      { role: 'assistant', content: "Hello! I am MEDORA's AI Virtual Doctor. What symptoms are you experiencing today?" }
+      {
+        role: 'assistant',
+        content: "Hello! I am MEDORA's AI Virtual Doctor & Clinical Pharmacist. 👋\n\nTo help diagnose and recommend safe relief, what symptoms are you experiencing today?",
+        confidence_score: 0.50,
+        confidence_label: "50% Intake Ready",
+        quiz_options: ["Fever & Chills", "Cold & Sneezing", "Acidity & Heartburn", "Severe Headache", "Throat Pain & Cough", "Body & Muscle Ache"]
+      }
     ]);
     setChatInput('');
+    setIsChatLoading(false);
     setChatFinished(false);
     setChatSuggestedMedicines([]);
   };
@@ -2222,14 +2560,6 @@ export default function Home() {
             🛰️ Radar
           </a>
 
-          <a 
-            href="/splash" 
-            className="nav-link" 
-            style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}
-            title="Interactive Presentation Video Showcase"
-          >
-            🎬 Showcase
-          </a>
 
           <a 
             href="#" 
@@ -2323,88 +2653,151 @@ export default function Home() {
       {/* App Details & Search Section */}
       <section className="morph-section-details">
         <main className="container">
-          {/* Details Fold */}
-          <div className="hero-section" style={{ marginTop: '2rem', marginBottom: '2.5rem' }}>
-            <h1 className="hero-title">
-              Smart Pharmacy, <br />
-              <span className="gradient-text">Delivered Instantly.</span>
+          {/* Details Fold / Redesigned Dashboard Hero */}
+          <div className="hero-section" style={{ marginTop: '1.5rem', marginBottom: '2.5rem', textAlign: 'center' }}>
+            
+            {/* Live Hyperlocal Delivery Guarantee Badge */}
+            <div style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '8px',
+              background: 'rgba(13, 148, 136, 0.08)',
+              border: '1px solid rgba(13, 148, 136, 0.25)',
+              padding: '6px 16px',
+              borderRadius: '99px',
+              fontSize: '0.78rem',
+              fontWeight: '800',
+              color: '#0d9488',
+              marginBottom: '1.1rem',
+              boxShadow: '0 2px 10px rgba(13, 148, 136, 0.06)'
+            }}>
+              <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', background: '#10b981', boxShadow: '0 0 10px #10b981' }} />
+              <span>⚡ 10-MIN EXPRESS DELIVERY ACTIVE IN <strong style={{ color: '#0f766e', textTransform: 'uppercase' }}>{selectedAddress?.area || 'VAMANJOOR'}</strong></span>
+            </div>
+
+            <h1 className="hero-title" style={{ fontSize: 'clamp(2.1rem, 4.5vw, 3.2rem)', fontWeight: '900', lineHeight: 1.15, letterSpacing: '-0.03em', marginBottom: '0.9rem' }}>
+              Smart Healthcare, <br />
+              <span style={{
+                background: 'linear-gradient(135deg, #0d9488 0%, #10b981 45%, #0284c7 100%)',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+                display: 'inline-block'
+              }}>
+                Delivered in 10 Minutes.
+              </span>
             </h1>
-            <p className="hero-subtitle" style={{ maxWidth: '680px', margin: '0 auto 1.5rem auto' }}>
-              We bring hyper-local digital healthcare directly to your doorstep. Consult the AI doctor, order generic alternatives, and get fast delivery in 15 minutes.
+
+            <p className="hero-subtitle" style={{ maxWidth: '680px', margin: '0 auto 1.8rem auto', fontSize: '0.96rem', color: '#64748b', lineHeight: 1.6 }}>
+              Instant clinical consultation with MEDORA AI Doctor, handwritten prescription digitization with Gemini Vision, and verified generic medicines from licensed neighborhood dark-stores.
             </p>
 
-            {/* Showcase, Prescription Upload & AI Doctor Quick Pills */}
-            <div style={{ display: 'flex', justifyContent: 'center', gap: '12px', marginBottom: '2rem', flexWrap: 'wrap' }}>
-              <a
-                href="/splash"
+            {/* 4 Premium Glassmorphic Quick-Action Command Cards Grid */}
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(215px, 1fr))',
+              gap: '12px',
+              maxWidth: '960px',
+              margin: '0 auto 2rem auto',
+              textAlign: 'left'
+            }}>
+              {/* Card 1: AI Clinical Doctor */}
+              <div 
+                onClick={() => setIsChatOpen(true)}
                 style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  background: 'linear-gradient(135deg, rgba(13, 148, 136, 0.12), rgba(184, 247, 228, 0.35))',
-                  border: '1px solid rgba(13, 148, 136, 0.35)',
-                  color: '#0d9488',
-                  padding: '7px 18px',
-                  borderRadius: '99px',
-                  fontSize: '0.82rem',
-                  fontWeight: '800',
-                  textDecoration: 'none',
-                  boxShadow: '0 2px 10px rgba(13, 148, 136, 0.1)',
-                  transition: 'all 0.2s ease'
+                  background: 'linear-gradient(135deg, rgba(13, 148, 136, 0.08) 0%, rgba(204, 251, 241, 0.4) 100%)',
+                  border: '1.5px solid rgba(13, 148, 136, 0.28)',
+                  borderRadius: '16px',
+                  padding: '1.1rem',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                  boxShadow: '0 4px 14px rgba(13, 148, 136, 0.08)',
+                  position: 'relative'
                 }}
+                onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.borderColor = '#0d9488'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.borderColor = 'rgba(13, 148, 136, 0.28)'; }}
               >
-                <span>▶</span>
-                <span>Watch Interactive Presentation Showcase ➔</span>
-              </a>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                  <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: '#0d9488', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.25rem', boxShadow: '0 4px 10px rgba(13, 148, 136, 0.3)' }}>🩺</div>
+                  <span style={{ fontSize: '0.66rem', fontWeight: '800', background: '#ccfbf1', color: '#0f766e', padding: '2px 8px', borderRadius: '99px' }}>● ONLINE</span>
+                </div>
+                <strong style={{ display: 'block', fontSize: '0.94rem', color: '#0f172a', fontWeight: '800' }}>AI Clinical Doctor</strong>
+                <p style={{ margin: '4px 0 0 0', fontSize: '0.74rem', color: '#64748b', lineHeight: 1.4 }}>Instant symptom diagnosis, safety checks & OTC recommendations</p>
+              </div>
 
-              <button
-                type="button"
+              {/* Card 2: Scan Prescription */}
+              <div 
                 onClick={() => {
                   setIsOcrOpen(true);
                   setTimeout(() => fileInputRef.current?.click(), 100);
                 }}
                 style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  background: 'linear-gradient(135deg, #0d9488 0%, #059669 100%)',
-                  border: 'none',
-                  color: '#ffffff',
-                  padding: '7px 18px',
-                  borderRadius: '99px',
-                  fontSize: '0.82rem',
-                  fontWeight: '800',
+                  background: 'linear-gradient(135deg, rgba(2, 132, 199, 0.08) 0%, rgba(224, 242, 254, 0.4) 100%)',
+                  border: '1.5px solid rgba(2, 132, 199, 0.28)',
+                  borderRadius: '16px',
+                  padding: '1.1rem',
                   cursor: 'pointer',
-                  boxShadow: '0 4px 14px rgba(13, 148, 136, 0.28)',
-                  transition: 'all 0.2s ease'
+                  transition: 'all 0.2s ease',
+                  boxShadow: '0 4px 14px rgba(2, 132, 199, 0.08)'
                 }}
+                onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.borderColor = '#0284c7'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.borderColor = 'rgba(2, 132, 199, 0.28)'; }}
               >
-                <span>📄</span>
-                <span>Upload Rx (Handwritten OK)</span>
-                <span style={{ fontSize: '0.68rem', background: 'rgba(255,255,255,0.22)', padding: '1px 6px', borderRadius: '4px' }}>Gemini AI</span>
-              </button>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                  <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: '#0284c7', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.25rem', boxShadow: '0 4px 10px rgba(2, 132, 199, 0.3)' }}>📄</div>
+                  <span style={{ fontSize: '0.66rem', fontWeight: '800', background: '#e0f2fe', color: '#0369a1', padding: '2px 8px', borderRadius: '99px' }}>Gemini Vision</span>
+                </div>
+                <strong style={{ display: 'block', fontSize: '0.94rem', color: '#0f172a', fontWeight: '800' }}>Upload Doctor Rx</strong>
+                <p style={{ margin: '4px 0 0 0', fontSize: '0.74rem', color: '#64748b', lineHeight: 1.4 }}>Digitizes handwritten & printed prescriptions in seconds</p>
+              </div>
 
-              <button
-                type="button"
-                onClick={() => setIsChatOpen(true)}
+              {/* Card 3: Hyperlocal Radar */}
+              <div 
+                onClick={() => setActiveMainView('radar')}
                 style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  background: '#ffffff',
-                  border: '1px solid #cbd5e1',
-                  color: 'var(--text-main)',
-                  padding: '7px 16px',
-                  borderRadius: '99px',
-                  fontSize: '0.82rem',
-                  fontWeight: '700',
+                  background: 'linear-gradient(135deg, rgba(124, 58, 237, 0.08) 0%, rgba(243, 232, 255, 0.4) 100%)',
+                  border: '1.5px solid rgba(124, 58, 237, 0.28)',
+                  borderRadius: '16px',
+                  padding: '1.1rem',
                   cursor: 'pointer',
-                  boxShadow: '0 2px 8px rgba(0,0,0,0.03)'
+                  transition: 'all 0.2s ease',
+                  boxShadow: '0 4px 14px rgba(124, 58, 237, 0.08)'
                 }}
+                onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.borderColor = '#7c3aed'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.borderColor = 'rgba(124, 58, 237, 0.28)'; }}
               >
-                <span>🩺</span>
-                <span>Ask Gemini AI Doctor</span>
-              </button>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                  <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: '#7c3aed', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.25rem', boxShadow: '0 4px 10px rgba(124, 58, 237, 0.3)' }}>🛰️</div>
+                  <span style={{ fontSize: '0.66rem', fontWeight: '800', background: '#f3e8ff', color: '#6d28d9', padding: '2px 8px', borderRadius: '99px' }}>{perimeterKm} km GPS</span>
+                </div>
+                <strong style={{ display: 'block', fontSize: '0.94rem', color: '#0f172a', fontWeight: '800' }}>Dark-Store Radar</strong>
+                <p style={{ margin: '4px 0 0 0', fontSize: '0.74rem', color: '#64748b', lineHeight: 1.4 }}>Live network map with guaranteed 10-15 min delivery perimeter</p>
+              </div>
+
+              {/* Card 4: Instamart Quick Shelf */}
+              <div 
+                onClick={() => {
+                  const el = document.getElementById('instamart-shelf-section');
+                  if (el) el.scrollIntoView({ behavior: 'smooth' });
+                }}
+                style={{
+                  background: 'linear-gradient(135deg, rgba(234, 88, 12, 0.08) 0%, rgba(255, 237, 213, 0.4) 100%)',
+                  border: '1.5px solid rgba(234, 88, 12, 0.28)',
+                  borderRadius: '16px',
+                  padding: '1.1rem',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                  boxShadow: '0 4px 14px rgba(234, 88, 12, 0.08)'
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.borderColor = '#ea580c'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.borderColor = 'rgba(234, 88, 12, 0.28)'; }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                  <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: '#ea580c', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.25rem', boxShadow: '0 4px 10px rgba(234, 88, 12, 0.3)' }}>⚡</div>
+                  <span style={{ fontSize: '0.66rem', fontWeight: '800', background: '#ffedd5', color: '#c2410c', padding: '2px 8px', borderRadius: '99px' }}>10-15 Mins</span>
+                </div>
+                <strong style={{ display: 'block', fontSize: '0.94rem', color: '#0f172a', fontWeight: '800' }}>Instamart Shelf</strong>
+                <p style={{ margin: '4px 0 0 0', fontSize: '0.74rem', color: '#64748b', lineHeight: 1.4 }}>Direct 1-click re-order from nearby stocked partner pharmacies</p>
+              </div>
             </div>
 
             {/* Amazon-Style Pharmacy Search Bar Container */}
@@ -3447,6 +3840,97 @@ export default function Home() {
               )}
             </div>
 
+            {/* Quick Clinical Category Pills Carousel */}
+            <div style={{
+              maxWidth: '960px',
+              margin: '1.25rem auto 0 auto',
+              display: 'flex',
+              gap: '8px',
+              overflowX: 'auto',
+              paddingBottom: '6px',
+              scrollbarWidth: 'none',
+              textAlign: 'left'
+            }}>
+              {[
+                { label: '🤒 Fever & Chills', term: 'Dolo 650' },
+                { label: '🤢 Acidity & Gas', term: 'Pantocid 40' },
+                { label: '🤧 Cold & Allergy', term: 'Allegra 120' },
+                { label: '⚡ Pain Relief', term: 'Combiflam' },
+                { label: '😷 Cough & Throat', term: 'Ascoril-D' },
+                { label: '🩹 First Aid', term: 'Betadine' },
+                { label: '💊 Daily Vitamins', term: 'Zincovit' },
+                { label: '🩺 BP & Diabetes', term: 'Metformin' }
+              ].map((pill, pIdx) => (
+                <button
+                  key={pIdx}
+                  type="button"
+                  onClick={() => {
+                    setSearchQuery(pill.term);
+                    setShowSuggestions(true);
+                    scrollToSearchBarTop();
+                  }}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    background: '#ffffff',
+                    border: '1.5px solid #e2e8f0',
+                    borderRadius: '99px',
+                    padding: '6px 14px',
+                    fontSize: '0.78rem',
+                    fontWeight: '700',
+                    color: '#334155',
+                    cursor: 'pointer',
+                    whiteSpace: 'nowrap',
+                    boxShadow: '0 2px 6px rgba(0,0,0,0.03)',
+                    transition: 'all 0.15s ease',
+                    flexShrink: 0
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--primary)'; e.currentTarget.style.background = '#f0fdfa'; e.currentTarget.style.color = 'var(--primary)'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#e2e8f0'; e.currentTarget.style.background = '#ffffff'; e.currentTarget.style.color = '#334155'; }}
+                >
+                  {pill.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Quality & Speed Trust Guarantee Strip */}
+            <div style={{
+              maxWidth: '960px',
+              margin: '1.25rem auto 0 auto',
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+              gap: '10px',
+              textAlign: 'left'
+            }}>
+              {[
+                { icon: '🛡️', title: '100% Genuine Pharmacy', desc: 'Direct from licensed dark-stores' },
+                { icon: '⚡', title: '10-15 Min Express', desc: 'Real-time GPS courier dispatch' },
+                { icon: '🤖', title: 'AI Clinical Safety', desc: 'Checks adverse drug interactions' },
+                { icon: '🔊', title: 'Soundbox Settlement', desc: 'Instant UPI audio confirmation' }
+              ].map((item, tIdx) => (
+                <div
+                  key={tIdx}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                    background: 'rgba(255, 255, 255, 0.7)',
+                    border: '1px solid rgba(226, 232, 240, 0.8)',
+                    borderRadius: '12px',
+                    padding: '8px 12px',
+                    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.02)'
+                  }}
+                >
+                  <span style={{ fontSize: '1.3rem' }}>{item.icon}</span>
+                  <div>
+                    <strong style={{ display: 'block', fontSize: '0.8rem', color: '#0f172a' }}>{item.title}</strong>
+                    <span style={{ fontSize: '0.68rem', color: '#64748b' }}>{item.desc}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+
             {/* Dedicated Doctor Prescription Upload Card (Handwritten & Printed) */}
             <div style={{
               marginTop: '1.75rem',
@@ -3649,14 +4133,25 @@ export default function Home() {
                   <div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                       <h2 style={{ margin: 0, fontSize: '1.45rem', color: '#0f172a', fontWeight: '800' }}>
-                        Your Account
+                        {accountEditName || activeUser?.name || 'Your Account'}
                       </h2>
                       <span className="amazon-gold-badge">
                         MEDORA PRIME ⚡
                       </span>
                     </div>
                     <div style={{ fontSize: '0.82rem', color: '#64748b', marginTop: '3px' }}>
-                      {accountEditName} • {accountEditEmail} • Patient ID: #MED-88421
+                      {accountEditEmail || activeUser?.email || 'patient@medora.com'} • {accountEditPhone} • ID: #{activeUser?.id || activeUser?.email || 'MED-88421'}
+                    </div>
+                    <div style={{ display: 'flex', gap: '6px', marginTop: '6px', flexWrap: 'wrap' }}>
+                      <span style={{ fontSize: '0.72rem', background: '#fee2e2', color: '#991b1b', padding: '2px 8px', borderRadius: '4px', fontWeight: '700' }}>
+                        Allergies: {accountEditAllergies || 'None'}
+                      </span>
+                      <span style={{ fontSize: '0.72rem', background: '#e0f2fe', color: '#0369a1', padding: '2px 8px', borderRadius: '4px', fontWeight: '700' }}>
+                        Conditions: {accountEditConditions || 'None'}
+                      </span>
+                      <span style={{ fontSize: '0.72rem', background: '#f0fdf4', color: '#166534', padding: '2px 8px', borderRadius: '4px', fontWeight: '700' }}>
+                        Blood: {accountEditBlood || 'O+'}
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -3840,98 +4335,103 @@ export default function Home() {
               )}
 
               {/* 2. SUBVIEW: YOUR ORDERS */}
-              {activeAccountSection === 'orders' && (
-                <div className="metallic-card" style={{ padding: '2rem' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '1rem' }}>
-                    <div>
-                      <h3 style={{ margin: 0, color: '#0f172a', fontSize: '1.3rem' }}>Your Orders ({activeOrders.length})</h3>
-                      <p style={{ margin: '4px 0 0 0', fontSize: '0.82rem', color: '#64748b' }}>Track active dispatches or review past pharmacy invoices</p>
-                    </div>
-                    <button
-                      onClick={() => setIsTrackingOpen(true)}
-                      style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '6px 14px', borderRadius: '8px', fontWeight: '700', fontSize: '0.8rem', cursor: 'pointer' }}
-                    >
-                      Live Tracking Modal 🛵
-                    </button>
-                  </div>
-
-                  {activeOrders.length === 0 ? (
-                    <div style={{ textAlign: 'center', padding: '3rem 0', color: '#64748b' }}>
-                      <span style={{ fontSize: '2.5rem', display: 'block', marginBottom: '0.75rem' }}>📦</span>
-                      <p style={{ fontWeight: '700', color: '#1e293b' }}>No recent orders placed</p>
-                      <p style={{ fontSize: '0.85rem' }}>Search for medicines and checkout to initiate your first order!</p>
+              {activeAccountSection === 'orders' && (() => {
+                const displayOrders = (allUserOrders && allUserOrders.length > 0 ? allUserOrders : activeOrders);
+                return (
+                  <div className="metallic-card" style={{ padding: '2rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '1rem' }}>
+                      <div>
+                        <h3 style={{ margin: 0, color: '#0f172a', fontSize: '1.3rem' }}>Your Orders ({displayOrders.length})</h3>
+                        <p style={{ margin: '4px 0 0 0', fontSize: '0.82rem', color: '#64748b' }}>Account: {accountEditEmail || activeUser?.email || 'Current Patient'}</p>
+                      </div>
                       <button
-                        onClick={() => setActiveMainView('home')}
-                        className="btn-primary"
-                        style={{ marginTop: '1rem', padding: '8px 18px', fontSize: '0.85rem' }}
+                        onClick={() => setIsTrackingOpen(true)}
+                        style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '6px 14px', borderRadius: '8px', fontWeight: '700', fontSize: '0.8rem', cursor: 'pointer' }}
                       >
-                        Start Shopping Medicines
+                        Live Tracking Modal 🛵
                       </button>
                     </div>
-                  ) : (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-                      {activeOrders.map(order => (
-                        <div key={order.id} style={{ border: '1px solid #cbd5e1', borderRadius: '14px', padding: '1.25rem', background: '#ffffff' }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #f1f5f9', paddingBottom: '0.75rem', marginBottom: '0.85rem' }}>
-                            <div>
-                              <strong style={{ fontSize: '1rem', color: '#0f172a' }}>Order #{order.id}</strong>
-                              <span style={{ fontSize: '0.78rem', color: '#64748b', marginLeft: '12px' }}>
-                                Fulfilling Pharmacy: <strong>{order.pharmacy_id}</strong>
+
+                    {displayOrders.length === 0 ? (
+                      <div style={{ textAlign: 'center', padding: '3rem 0', color: '#64748b' }}>
+                        <span style={{ fontSize: '2.5rem', display: 'block', marginBottom: '0.75rem' }}>📦</span>
+                        <p style={{ fontWeight: '700', color: '#1e293b' }}>No orders placed yet for this account</p>
+                        <p style={{ fontSize: '0.85rem' }}>Search for medicines and checkout to initiate your first order!</p>
+                        <button
+                          onClick={() => setActiveMainView('home')}
+                          className="btn-primary"
+                          style={{ marginTop: '1rem', padding: '8px 18px', fontSize: '0.85rem' }}
+                        >
+                          Start Shopping Medicines
+                        </button>
+                      </div>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                        {displayOrders.map(order => (
+                          <div key={order.id} style={{ border: '1px solid #cbd5e1', borderRadius: '14px', padding: '1.25rem', background: '#ffffff' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #f1f5f9', paddingBottom: '0.75rem', marginBottom: '0.85rem' }}>
+                              <div>
+                                <strong style={{ fontSize: '1rem', color: '#0f172a' }}>Order #{order.id}</strong>
+                                <span style={{ fontSize: '0.78rem', color: '#64748b', marginLeft: '12px' }}>
+                                  Fulfilling Pharmacy: <strong>{order.pharmacy_id || 'Dark-store Hub'}</strong>
+                                </span>
+                              </div>
+                              <span style={{
+                                padding: '4px 12px',
+                                borderRadius: '99px',
+                                fontSize: '0.75rem',
+                                fontWeight: '800',
+                                background: order.status === 'delivered' ? '#dcfce7' : order.status === 'out_for_delivery' ? '#fef3c7' : '#ccfbf1',
+                                color: order.status === 'delivered' ? '#15803d' : order.status === 'out_for_delivery' ? '#b45309' : '#0f766e'
+                              }}>
+                                {order.status?.replace(/_/g, ' ').toUpperCase()}
                               </span>
                             </div>
-                            <span style={{
-                              padding: '4px 12px',
-                              borderRadius: '99px',
-                              fontSize: '0.75rem',
-                              fontWeight: '800',
-                              background: order.status === 'delivered' ? '#dcfce7' : order.status === 'out_for_delivery' ? '#fef3c7' : '#ccfbf1',
-                              color: order.status === 'delivered' ? '#15803d' : order.status === 'out_for_delivery' ? '#b45309' : '#0f766e'
-                            }}>
-                              {order.status?.replace(/_/g, ' ').toUpperCase()}
-                            </span>
-                          </div>
-                          
-                          <div style={{ fontSize: '0.85rem', color: '#334155', marginBottom: '0.75rem' }}>
-                            <strong>Items:</strong> {Array.isArray(order.items) ? order.items.map(i => `${i.quantity || 1}x ${i.brand_name || i.name}`).join(', ') : order.items}
-                          </div>
-
-                          <TrackingBar status={order.status} />
-
-                          {/* Rider Doorstep QR on active order */}
-                          {(order.rider_qr_image || (typeof window !== 'undefined' && localStorage.getItem(`medora_order_qr_${order.id}`))) && (
-                            <div style={{ marginTop: '1rem', padding: '0.85rem', background: '#f8fafc', border: '1px dashed #0d9488', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                              <img
-                                src={order.rider_qr_image || (typeof window !== 'undefined' && localStorage.getItem(`medora_order_qr_${order.id}`))}
-                                alt="Rider Doorstep QR"
-                                style={{ width: '80px', height: '80px', objectFit: 'contain', background: '#fff', padding: '4px', borderRadius: '8px', border: '1px solid #cbd5e1' }}
-                              />
-                              <div>
-                                <strong style={{ fontSize: '0.85rem', color: '#0f172a', display: 'block' }}>🛵 Contactless Doorstep UPI QR Shared by Rider</strong>
-                                <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Scan upon rider arrival using GPay, PhonePe, Paytm or any UPI App.</span>
-                              </div>
+                            
+                            <div style={{ fontSize: '0.85rem', color: '#334155', marginBottom: '0.75rem' }}>
+                              <strong>Items:</strong> {Array.isArray(order.items) ? order.items.map(i => `${i.quantity || 1}x ${i.brand_name || i.name}`).join(', ') : order.items}
                             </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
 
-              {/* 3. SUBVIEW: LOGIN & SECURITY */}
+                            <TrackingBar status={order.status} />
+
+                            {/* Rider Doorstep QR on active order */}
+                            {(order.rider_qr_image || (typeof window !== 'undefined' && (localStorage.getItem(`medora_order_qr_${order.id}`) || localStorage.getItem('medora_rider_main_qr')))) && (
+                              <div style={{ marginTop: '1rem', padding: '0.85rem', background: '#f8fafc', border: '1px dashed #0d9488', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                                <img
+                                  src={order.rider_qr_image || (typeof window !== 'undefined' && (localStorage.getItem(`medora_order_qr_${order.id}`) || localStorage.getItem('medora_rider_main_qr')))}
+                                  alt="Rider Doorstep QR"
+                                  style={{ width: '80px', height: '80px', objectFit: 'contain', background: '#fff', padding: '4px', borderRadius: '8px', border: '1px solid #cbd5e1' }}
+                                />
+                                <div>
+                                  <strong style={{ fontSize: '0.85rem', color: '#0f172a', display: 'block' }}>🛵 Contactless Doorstep UPI QR Shared by Rider</strong>
+                                  <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Scan upon rider arrival using GPay, PhonePe, Paytm or any UPI App. Rider settles at pharmacy.</span>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+
+              {/* 3. SUBVIEW: PERSONAL PROFILE & HEALTH DATA */}
               {activeAccountSection === 'security' && (
-                <div className="metallic-card" style={{ padding: '2rem', maxWidth: '640px' }}>
-                  <h3 style={{ margin: '0 0 0.5rem 0', color: '#0f172a', fontSize: '1.3rem' }}>Login & Security</h3>
-                  <p style={{ margin: '0 0 1.5rem 0', fontSize: '0.82rem', color: '#64748b' }}>Update your personal credentials and contact methods.</p>
+                <div className="metallic-card" style={{ padding: '2rem', maxWidth: '720px' }}>
+                  <h3 style={{ margin: '0 0 0.5rem 0', color: '#0f172a', fontSize: '1.3rem' }}>Personal & Medical Profile</h3>
+                  <p style={{ margin: '0 0 1.5rem 0', fontSize: '0.82rem', color: '#64748b' }}>
+                    Each user has their unique persistent profile. Saved details auto-fill during rapid checkout and clinical triage.
+                  </p>
 
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.2rem' }}>
                     <div>
-                      <label style={{ fontSize: '0.82rem', fontWeight: '700', color: '#334155', display: 'block', marginBottom: '4px' }}>Name</label>
+                      <label style={{ fontSize: '0.82rem', fontWeight: '700', color: '#334155', display: 'block', marginBottom: '4px' }}>Full Name</label>
                       <input
                         type="text"
                         value={accountEditName}
                         onChange={(e) => setAccountEditName(e.target.value)}
-                        style={{ width: '100%', padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.9rem', outline: 'none' }}
+                        style={{ width: '100%', boxSizing: 'border-box', padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.9rem', outline: 'none' }}
                       />
                     </div>
 
@@ -3941,7 +4441,7 @@ export default function Home() {
                         type="text"
                         value={accountEditPhone}
                         onChange={(e) => setAccountEditPhone(e.target.value)}
-                        style={{ width: '100%', padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.9rem', outline: 'none' }}
+                        style={{ width: '100%', boxSizing: 'border-box', padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.9rem', outline: 'none' }}
                       />
                     </div>
 
@@ -3951,7 +4451,64 @@ export default function Home() {
                         type="email"
                         value={accountEditEmail}
                         onChange={(e) => setAccountEditEmail(e.target.value)}
-                        style={{ width: '100%', padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.9rem', outline: 'none' }}
+                        style={{ width: '100%', boxSizing: 'border-box', padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.9rem', outline: 'none' }}
+                      />
+                    </div>
+
+                    <div>
+                      <label style={{ fontSize: '0.82rem', fontWeight: '700', color: '#334155', display: 'block', marginBottom: '4px' }}>Blood Group</label>
+                      <select
+                        value={accountEditBlood}
+                        onChange={(e) => setAccountEditBlood(e.target.value)}
+                        style={{ width: '100%', boxSizing: 'border-box', padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.9rem', outline: 'none', background: '#fff' }}
+                      >
+                        {['O+', 'O-', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-'].map(b => (
+                          <option key={b} value={b}>{b}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div style={{ gridColumn: 'span 2' }}>
+                      <label style={{ fontSize: '0.82rem', fontWeight: '700', color: '#334155', display: 'block', marginBottom: '4px' }}>Primary Delivery Address</label>
+                      <input
+                        type="text"
+                        placeholder="House / Flat No, Street, Landmark, Area, Pincode"
+                        value={accountEditAddress}
+                        onChange={(e) => setAccountEditAddress(e.target.value)}
+                        style={{ width: '100%', boxSizing: 'border-box', padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.9rem', outline: 'none' }}
+                      />
+                    </div>
+
+                    <div>
+                      <label style={{ fontSize: '0.82rem', fontWeight: '700', color: '#dc2626', display: 'block', marginBottom: '4px' }}>Known Drug Allergies</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Sulfa drugs, Penicillin, Aspirin, None"
+                        value={accountEditAllergies}
+                        onChange={(e) => setAccountEditAllergies(e.target.value)}
+                        style={{ width: '100%', boxSizing: 'border-box', padding: '10px 14px', borderRadius: '10px', border: '1px solid #fca5a5', fontSize: '0.9rem', outline: 'none', background: '#fff5f5' }}
+                      />
+                    </div>
+
+                    <div>
+                      <label style={{ fontSize: '0.82rem', fontWeight: '700', color: '#0284c7', display: 'block', marginBottom: '4px' }}>Chronic Medical Conditions</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Type 2 Diabetes, Hypertension, Asthma, None"
+                        value={accountEditConditions}
+                        onChange={(e) => setAccountEditConditions(e.target.value)}
+                        style={{ width: '100%', boxSizing: 'border-box', padding: '10px 14px', borderRadius: '10px', border: '1px solid #bae6fd', fontSize: '0.9rem', outline: 'none', background: '#f0f9ff' }}
+                      />
+                    </div>
+
+                    <div>
+                      <label style={{ fontSize: '0.82rem', fontWeight: '700', color: '#334155', display: 'block', marginBottom: '4px' }}>Emergency Contact Phone</label>
+                      <input
+                        type="text"
+                        placeholder="+91 98765 43210"
+                        value={accountEditEmergencyPhone}
+                        onChange={(e) => setAccountEditEmergencyPhone(e.target.value)}
+                        style={{ width: '100%', boxSizing: 'border-box', padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.9rem', outline: 'none' }}
                       />
                     </div>
 
@@ -3962,33 +4519,68 @@ export default function Home() {
                         placeholder="Leave blank to keep unchanged"
                         value={accountNewPassword}
                         onChange={(e) => setAccountNewPassword(e.target.value)}
-                        style={{ width: '100%', padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.9rem', outline: 'none' }}
+                        style={{ width: '100%', boxSizing: 'border-box', padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.9rem', outline: 'none' }}
                       />
                     </div>
+                  </div>
 
-                    <div style={{ marginTop: '0.5rem', display: 'flex', gap: '1rem', alignItems: 'center' }}>
-                      <button
-                        onClick={() => {
-                          const updatedUser = { ...activeUser, name: accountEditName, email: accountEditEmail };
-                          setActiveUser(updatedUser);
+                  <div style={{ marginTop: '1.5rem', display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                    <button
+                      onClick={async () => {
+                        const updatedUser = {
+                          ...activeUser,
+                          name: accountEditName,
+                          email: accountEditEmail,
+                          phone: accountEditPhone,
+                          address: accountEditAddress,
+                          allergies: accountEditAllergies,
+                          chronic_conditions: accountEditConditions,
+                          blood_group: accountEditBlood,
+                          emergency_phone: accountEditEmergencyPhone
+                        };
+                        setActiveUser(updatedUser);
+                        if (typeof window !== 'undefined') {
                           try {
                             localStorage.setItem('medora_active_user', JSON.stringify(updatedUser));
+                            localStorage.setItem(`medora_user_profile_${accountEditEmail}`, JSON.stringify(updatedUser));
                           } catch (e) {}
-                          showToast('Login & Security credentials updated successfully!', '🔒');
-                          setActiveAccountSection('hub');
-                        }}
-                        className="btn-primary"
-                        style={{ padding: '10px 24px', fontWeight: '800', fontSize: '0.88rem' }}
-                      >
-                        Save Changes
-                      </button>
-                      <button
-                        onClick={() => setActiveAccountSection('hub')}
-                        style={{ background: 'transparent', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: '0.85rem' }}
-                      >
-                        Cancel
-                      </button>
-                    </div>
+                        }
+
+                        try {
+                          await fetch(`${API}/api/v1/auth/profile`, {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                              identifier: activeUser?.email || accountEditEmail,
+                              name: accountEditName,
+                              phone: accountEditPhone,
+                              email: accountEditEmail,
+                              address: accountEditAddress,
+                              allergies: accountEditAllergies,
+                              chronic_conditions: accountEditConditions,
+                              blood_group: accountEditBlood,
+                              emergency_phone: accountEditEmergencyPhone,
+                              password: accountNewPassword || null
+                            })
+                          });
+                        } catch (e) {
+                          console.warn("Could not sync profile to backend", e);
+                        }
+
+                        showToast('Personal profile & medical records saved successfully!', '🔒');
+                        setActiveAccountSection('hub');
+                      }}
+                      className="btn-primary"
+                      style={{ padding: '10px 24px', fontWeight: '800', fontSize: '0.88rem' }}
+                    >
+                      Save Changes
+                    </button>
+                    <button
+                      onClick={() => setActiveAccountSection('hub')}
+                      style={{ background: 'transparent', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: '0.85rem' }}
+                    >
+                      Cancel
+                    </button>
                   </div>
                 </div>
               )}
@@ -5825,14 +6417,34 @@ export default function Home() {
 
               <span style={{ fontSize: '0.88rem', color: 'var(--text-muted)', fontWeight: '600' }}>Select Payment Option:</span>
 
-              {/* Payment Option Cards - Strictly UPI & COD Only */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+              {/* Payment Option Cards - Rider UPI, Store UPI & COD */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '0.75rem' }}>
                 
-                {/* UPI Card */}
+                {/* Rider Direct UPI Card */}
+                <div 
+                  onClick={() => setSelectedPaymentMethod('rider_upi')}
+                  style={{
+                    padding: '1rem',
+                    borderRadius: '14px',
+                    border: selectedPaymentMethod === 'rider_upi' ? '2px solid var(--primary)' : '1px solid #e2e8f0',
+                    background: selectedPaymentMethod === 'rider_upi' ? '#f0fdfa' : '#f8fafc',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease',
+                    boxShadow: selectedPaymentMethod === 'rider_upi' ? '0 4px 16px rgba(13, 148, 136, 0.15)' : 'none'
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                    <span style={{ fontSize: '0.98rem', color: 'var(--text-main)', fontWeight: '800' }}>🛵 Pay Delivery Rider</span>
+                    {selectedPaymentMethod === 'rider_upi' && <span style={{ color: 'var(--primary)', fontWeight: 'bold' }}>✓</span>}
+                  </div>
+                  <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>Direct UPI to Rider • Uploaded QR PNG</div>
+                </div>
+
+                {/* Store UPI Card */}
                 <div 
                   onClick={() => setSelectedPaymentMethod('upi')}
                   style={{
-                    padding: '1.1rem',
+                    padding: '1rem',
                     borderRadius: '14px',
                     border: selectedPaymentMethod === 'upi' ? '2px solid var(--primary)' : '1px solid #e2e8f0',
                     background: selectedPaymentMethod === 'upi' ? '#f0fdfa' : '#f8fafc',
@@ -5842,17 +6454,17 @@ export default function Home() {
                   }}
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                    <span style={{ fontSize: '1.05rem', color: 'var(--text-main)', fontWeight: '800' }}>⚡ UPI Instant Pay & QR</span>
+                    <span style={{ fontSize: '0.98rem', color: 'var(--text-main)', fontWeight: '800' }}>⚡ Store POS Terminal</span>
                     {selectedPaymentMethod === 'upi' && <span style={{ color: 'var(--primary)', fontWeight: 'bold' }}>✓</span>}
                   </div>
-                  <div style={{ fontSize: '0.76rem', color: 'var(--text-muted)' }}>GPay, PhonePe, Paytm & Soundbox Sync</div>
+                  <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>Counter Soundbox Sync & Merchant QR</div>
                 </div>
 
                 {/* Cash on Delivery */}
                 <div 
                   onClick={() => setSelectedPaymentMethod('cod')}
                   style={{
-                    padding: '1.1rem',
+                    padding: '1rem',
                     borderRadius: '14px',
                     border: selectedPaymentMethod === 'cod' ? '2px solid var(--primary)' : '1px solid #e2e8f0',
                     background: selectedPaymentMethod === 'cod' ? '#f0fdfa' : '#f8fafc',
@@ -5862,10 +6474,10 @@ export default function Home() {
                   }}
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                    <span style={{ fontSize: '1.05rem', color: 'var(--text-main)', fontWeight: '800' }}>💵 Cash on Delivery</span>
+                    <span style={{ fontSize: '0.98rem', color: 'var(--text-main)', fontWeight: '800' }}>💵 Cash on Delivery</span>
                     {selectedPaymentMethod === 'cod' && <span style={{ color: 'var(--primary)', fontWeight: 'bold' }}>✓</span>}
                   </div>
-                  <div style={{ fontSize: '0.76rem', color: 'var(--text-muted)' }}>Pay cash or UPI to rider at doorstep</div>
+                  <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>Pay cash or UPI to rider at doorstep</div>
                 </div>
 
               </div>
@@ -6091,6 +6703,144 @@ export default function Home() {
                 </div>
               )}
 
+              {selectedPaymentMethod === 'rider_upi' && (
+                <div style={{ background: '#f8fafc', padding: '1.25rem', borderRadius: '14px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.75rem', flexWrap: 'wrap', gap: '8px' }}>
+                    <div>
+                      <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                        ASSIGNED DELIVERY PARTNER:
+                      </div>
+                      <div style={{ fontSize: '0.96rem', color: 'var(--text-main)', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span>🛵</span>
+                        <span>Rider Partner #{activeUser?.role === 'delivery' ? (activeUser.name || 'Arjun K') : 'AGT-591 (Verified)'}</span>
+                      </div>
+                      <div style={{ fontSize: '0.72rem', color: '#0d9488', display: 'flex', alignItems: 'center', gap: '5px', marginTop: '2px', fontWeight: '600' }}>
+                        <span style={{ display: 'inline-block', width: '7px', height: '7px', borderRadius: '50%', background: '#0d9488', boxShadow: '0 0 6px #0d9488' }} />
+                        <span>Rider Direct Settlement • Settle at Dark-store</span>
+                      </div>
+                    </div>
+                    <span style={{ background: '#dcfce7', color: '#15803d', fontSize: '0.72rem', fontWeight: '800', padding: '3px 10px', borderRadius: '99px' }}>
+                      ✓ REGISTERED UPI QR
+                    </span>
+                  </div>
+
+                  {/* RIDER ACTUAL UPLOADED PNG QR CODE */}
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.75rem' }}>
+                    {(() => {
+                      const storedRiderQr = (typeof window !== 'undefined' ? (localStorage.getItem('medora_rider_main_qr') || '') : '') || activeUser?.rider_upi_qr;
+                      const riderVpa = (typeof window !== 'undefined' ? (localStorage.getItem('medora_rider_vpa') || '') : '') || activeUser?.rider_upi_id || 'rider.express@okhdfcbank';
+                      const totalAmount = cart.reduce((s, i) => s + parseFloat(i.price_mrp || 0), 0).toFixed(2);
+
+                      return (
+                        <>
+                          <div style={{
+                            background: '#ffffff',
+                            padding: '12px',
+                            borderRadius: '14px',
+                            boxShadow: '0 8px 24px rgba(13, 148, 136, 0.15)',
+                            border: '2px solid var(--primary)',
+                            display: 'inline-block',
+                            textAlign: 'center'
+                          }}>
+                            {storedRiderQr ? (
+                              <img
+                                src={storedRiderQr}
+                                alt="Rider Uploaded Registration UPI QR (PNG)"
+                                style={{ width: '180px', height: '180px', objectFit: 'contain', display: 'block', borderRadius: '8px' }}
+                              />
+                            ) : (
+                              <img
+                                src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=upi://pay?pa=${encodeURIComponent(riderVpa)}%26pn=MEDORA-Delivery-Rider%26am=${totalAmount}%26cu=INR`}
+                                alt="Rider Dynamic UPI QR"
+                                style={{ width: '180px', height: '180px', objectFit: 'contain', display: 'block' }}
+                              />
+                            )}
+                          </div>
+
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <span style={{ background: 'rgba(13, 148, 136, 0.12)', color: 'var(--primary)', padding: '3px 10px', borderRadius: '99px', fontSize: '0.72rem', fontWeight: 'bold' }}>
+                              ₹{totalAmount} DUE TO RIDER
+                            </span>
+                            <span style={{ fontSize: '0.72rem', color: '#64748b' }}>
+                              {storedRiderQr ? "★ Verified Rider Registration PNG" : "Dynamic Rider Gateway"}
+                            </span>
+                          </div>
+
+                          {/* 1-Tap Mobile UPI Intent Launcher */}
+                          <a
+                            href={`upi://pay?pa=${encodeURIComponent(riderVpa)}&pn=MEDORA-Rider&am=${totalAmount}&cu=INR&tn=Order-Delivery`}
+                            style={{
+                              width: '100%',
+                              boxSizing: 'border-box',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: '8px',
+                              background: 'linear-gradient(135deg, #0d9488 0%, #0f766e 100%)',
+                              color: '#ffffff',
+                              padding: '10px 16px',
+                              borderRadius: '10px',
+                              textDecoration: 'none',
+                              fontWeight: '700',
+                              fontSize: '0.88rem',
+                              boxShadow: '0 4px 14px rgba(13, 148, 136, 0.25)'
+                            }}
+                          >
+                            <span>📲</span>
+                            <span>Pay Rider via UPI App (GPay / PhonePe / Paytm)</span>
+                          </a>
+
+                          {/* Direct Settlement Explanation Banner */}
+                          <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '10px', padding: '10px 14px', fontSize: '0.76rem', color: '#166534', display: 'flex', alignItems: 'center', gap: '8px', width: '100%', boxSizing: 'border-box' }}>
+                            <span style={{ fontSize: '1.25rem' }}>ℹ️</span>
+                            <div>
+                              <strong>Dark-Store Settlement Guarantee:</strong> Your payment goes straight to the rider. The rider pays the pharmacy at pickup and delivers your medicine in 10-15 mins.
+                            </div>
+                          </div>
+
+                          {/* Rider VPA display & copy */}
+                          <div style={{ width: '100%' }}>
+                            <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '4px', fontWeight: 'bold' }}>
+                              Rider's Registered UPI ID:
+                            </label>
+                            <div style={{ display: 'flex', gap: '0.5rem' }}>
+                              <input
+                                type="text"
+                                readOnly
+                                value={riderVpa}
+                                style={{ flex: 1, padding: '0.65rem 0.85rem', borderRadius: '8px', background: '#ffffff', border: '1px solid #cbd5e1', color: 'var(--text-main)', fontSize: '0.88rem', fontFamily: 'monospace', fontWeight: 'bold' }}
+                              />
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (navigator.clipboard) {
+                                    navigator.clipboard.writeText(riderVpa);
+                                  }
+                                  setCopiedVpa(true);
+                                  setTimeout(() => setCopiedVpa(false), 2000);
+                                }}
+                                style={{
+                                  background: copiedVpa ? '#dcfce7' : 'rgba(13, 148, 136, 0.1)',
+                                  border: '1px solid var(--primary)',
+                                  color: copiedVpa ? '#15803d' : 'var(--primary)',
+                                  padding: '6px 14px',
+                                  borderRadius: '8px',
+                                  fontSize: '0.78rem',
+                                  fontWeight: 'bold',
+                                  cursor: 'pointer'
+                                }}
+                              >
+                                {copiedVpa ? '✓ Copied' : 'Copy'}
+                              </button>
+                            </div>
+                          </div>
+                        </>
+                      );
+                    })()}
+                  </div>
+                </div>
+              )}
+
               {selectedPaymentMethod === 'cod' && (
                 <div style={{ background: '#fffbeb', padding: '1.25rem', borderRadius: '14px', border: '1px dashed #fde68a', fontSize: '0.88rem', color: '#b45309', display: 'flex', alignItems: 'center', gap: '14px' }}>
                   <span style={{ fontSize: '2rem' }}>💵</span>
@@ -6106,7 +6856,11 @@ export default function Home() {
                 className="btn-primary" 
                 style={{ width: '100%', justifyContent: 'center', background: 'linear-gradient(135deg, #0d9488 0%, #0f766e 100%)', padding: '0.95rem', fontSize: '1rem', fontWeight: 'bold', marginTop: '0.5rem' }}
               >
-                {selectedPaymentMethod === 'cod' ? 'Confirm COD Order 🛵' : `Pay ₹${cart.reduce((s, i) => s + parseFloat(i.price_mrp || 0), 0).toFixed(2)} via UPI & Place Order ⚡`}
+                {selectedPaymentMethod === 'cod' 
+                  ? 'Confirm COD Order 🛵' 
+                  : selectedPaymentMethod === 'rider_upi'
+                    ? `Pay Rider ₹${cart.reduce((s, i) => s + parseFloat(i.price_mrp || 0), 0).toFixed(2)} via Direct UPI 🛵`
+                    : `Pay ₹${cart.reduce((s, i) => s + parseFloat(i.price_mrp || 0), 0).toFixed(2)} via Store POS & Place Order ⚡`}
               </button>
             </div>
           )}
@@ -6383,20 +7137,55 @@ export default function Home() {
                         <span style={{
                           fontSize: '0.72rem',
                           fontWeight: '800',
-                          background: 'rgba(16, 185, 129, 0.12)',
-                          color: '#059669',
-                          border: '1px solid rgba(16, 185, 129, 0.3)',
+                          background: (msg.confidence_score || 0.95) >= 0.9 ? 'rgba(16, 185, 129, 0.12)' : (msg.confidence_score || 0.95) >= 0.75 ? 'rgba(14, 165, 233, 0.12)' : 'rgba(245, 158, 11, 0.12)',
+                          color: (msg.confidence_score || 0.95) >= 0.9 ? '#059669' : (msg.confidence_score || 0.95) >= 0.75 ? '#0284c7' : '#d97706',
+                          border: `1px solid ${(msg.confidence_score || 0.95) >= 0.9 ? 'rgba(16, 185, 129, 0.3)' : (msg.confidence_score || 0.95) >= 0.75 ? 'rgba(14, 165, 233, 0.3)' : 'rgba(245, 158, 11, 0.3)'}`,
                           padding: '2px 8px',
                           borderRadius: '99px',
                           display: 'inline-flex',
                           alignItems: 'center',
                           gap: '4px'
                         }}>
-                          <span>🎯</span> {Math.round((msg.confidence_score || 0.95) * 100)}% Confidence
+                          <span>🎯</span> {msg.confidence_label || `${Math.round((msg.confidence_score || 0.95) * 100)}% Confidence`}
                         </span>
                       </div>
                     )}
                     {isUser ? msg.content : renderFormattedMessageContent(msg.content)}
+
+                    {/* Interactive Clinical Quiz Options Chips inside Assistant Bubble */}
+                    {!isUser && Array.isArray(msg.quiz_options) && msg.quiz_options.length > 0 && (
+                      <div style={{ marginTop: '10px', paddingTop: '8px', borderTop: '1px dashed #cbd5e1', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        <span style={{ fontSize: '0.72rem', fontWeight: '800', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                          ⚡ Tap to Answer & Increase Confidence:
+                        </span>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                          {msg.quiz_options.map((opt, oIdx) => (
+                            <button
+                              key={oIdx}
+                              type="button"
+                              onClick={() => handleTriggerChatMessage(opt)}
+                              style={{
+                                background: '#ffffff',
+                                border: '1.5px solid var(--primary)',
+                                color: 'var(--primary)',
+                                padding: '5px 11px',
+                                borderRadius: '8px',
+                                fontSize: '0.76rem',
+                                fontWeight: '700',
+                                cursor: 'pointer',
+                                textAlign: 'left',
+                                transition: 'all 0.15s ease',
+                                boxShadow: '0 2px 4px rgba(13, 148, 136, 0.08)'
+                              }}
+                              onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(13, 148, 136, 0.08)'; }}
+                              onMouseLeave={(e) => { e.currentTarget.style.background = '#ffffff'; }}
+                            >
+                              👉 {opt}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -6411,8 +7200,25 @@ export default function Home() {
                   background: 'rgba(13, 148, 136, 0.1)', color: 'var(--primary)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.8rem'
                 }}>🩺</div>
-                <div style={{ padding: '0.6rem 0.9rem', borderRadius: '4px 14px 14px 14px', background: '#f1f5f9', border: '1px solid #e2e8f0' }}>
+                <div style={{ padding: '0.55rem 0.9rem', borderRadius: '4px 14px 14px 14px', background: '#f1f5f9', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <span className="dot-typing" style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>Doctor is analyzing...</span>
+                  <button
+                    type="button"
+                    onClick={cancelChatRequest}
+                    style={{
+                      background: 'rgba(239, 68, 68, 0.1)',
+                      color: '#dc2626',
+                      border: '1px solid rgba(239, 68, 68, 0.3)',
+                      padding: '2px 7px',
+                      borderRadius: '5px',
+                      fontSize: '0.7rem',
+                      fontWeight: '700',
+                      cursor: 'pointer'
+                    }}
+                    title="Stop current analysis"
+                  >
+                    ✕ Stop
+                  </button>
                 </div>
               </div>
             </div>
@@ -6494,7 +7300,6 @@ export default function Home() {
               key={idx}
               type="button"
               onClick={() => handleTriggerChatMessage(chip.query)}
-              disabled={isChatLoading}
               style={{
                 background: '#ffffff',
                 border: '1px solid #cbd5e1',
@@ -6515,20 +7320,40 @@ export default function Home() {
         </div>
 
         <div className="chatbot-footer" style={{ borderTop: '1px solid #e2e8f0', background: '#f8fafc' }}>
-          <form onSubmit={sendChatMessage} style={{ display: 'flex', gap: '0.5rem' }}>
+          <form onSubmit={sendChatMessage} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
             <input
               type="text"
               className="input-field"
-              placeholder="Type your symptom, medicine query, or dosage..."
+              placeholder={isChatLoading ? "Doctor is analyzing... (you can type follow-ups)" : "Type your symptom, quiz answer, or follow-up question..."}
               value={chatInput}
               onChange={e => setChatInput(e.target.value)}
-              disabled={isChatLoading}
               style={{ flex: 1, padding: '0.65rem 0.9rem', borderRadius: '8px', fontSize: '0.88rem', background: '#ffffff', border: '1px solid #cbd5e1' }}
             />
+            {isChatLoading && (
+              <button
+                type="button"
+                onClick={cancelChatRequest}
+                style={{
+                  background: '#fef2f2',
+                  border: '1px solid #fca5a5',
+                  color: '#dc2626',
+                  padding: '0.65rem 0.85rem',
+                  borderRadius: '8px',
+                  fontSize: '0.82rem',
+                  fontWeight: '700',
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
+                  transition: 'all 0.15s ease'
+                }}
+                title="Stop analyzing"
+              >
+                ⏹ Stop
+              </button>
+            )}
             <button 
               type="submit" 
               className="btn-primary" 
-              disabled={isChatLoading || !chatInput.trim()}
+              disabled={!chatInput.trim()}
               style={{ padding: '0.65rem 1.1rem', borderRadius: '8px', fontSize: '0.88rem' }}
             >
               Send

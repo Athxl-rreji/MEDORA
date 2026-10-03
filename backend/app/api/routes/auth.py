@@ -56,6 +56,22 @@ class ChangeFirstPasswordRequest(BaseModel):
     new_password: str
     confirm_password: Optional[str] = None
 
+class ProfileUpdateRequest(BaseModel):
+    identifier: Optional[str] = None
+    email: Optional[str] = None
+    user_id: Optional[str] = None
+    full_name: Optional[str] = None
+    name: Optional[str] = None
+    phone: Optional[str] = None
+    address: Optional[str] = None
+    allergies: Optional[str] = None
+    chronic_conditions: Optional[str] = None
+    password: Optional[str] = None
+    rider_upi_id: Optional[str] = None
+    rider_upi_qr: Optional[str] = None
+    shop_upi_id: Optional[str] = None
+    shop_upi_qr: Optional[str] = None
+
 class PartnerRequest(BaseModel):
     partner_type: str # "pharmacy" | "delivery"
     full_name: str
@@ -365,10 +381,18 @@ def login(
         "user": {
             "id": user["id"],
             "full_name": user.get("full_name", "MEDORA User"),
+            "name": user.get("full_name", "MEDORA User"),
             "role": user.get("role", "patient"),
             "email": user.get("email", ""),
             "phone": user.get("phone", ""),
             "username": user.get("username", ""),
+            "address": user.get("address", ""),
+            "allergies": user.get("allergies", ""),
+            "chronic_conditions": user.get("chronic_conditions", ""),
+            "rider_upi_id": user.get("rider_upi_id", ""),
+            "rider_upi_qr": user.get("rider_upi_qr", ""),
+            "shop_upi_id": user.get("shop_upi_id", ""),
+            "shop_upi_qr": user.get("shop_upi_qr", ""),
             "must_change_password": must_change
         },
         "token": f"medora_token_{user['id']}"
@@ -472,6 +496,66 @@ def check_user_status(
         "exists": True,
         "status": user.get("status", "active"),
         "role": user.get("role", "patient"),
-        "email": user.get("email")
+        "email": user.get("email"),
+        "rider_upi_id": user.get("rider_upi_id", ""),
+        "rider_upi_qr": user.get("rider_upi_qr", "")
     }
+
+@router.get("/profile/{identifier}")
+def get_user_profile(identifier: str, mock_db: PrototypeDataStore = Depends(get_datastore)):
+    user = mock_db.find_user(identifier)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    return {
+        "status": "success",
+        "user": {
+            "id": user["id"],
+            "full_name": user.get("full_name", "MEDORA User"),
+            "name": user.get("full_name", "MEDORA User"),
+            "role": user.get("role", "patient"),
+            "email": user.get("email", ""),
+            "phone": user.get("phone", ""),
+            "username": user.get("username", ""),
+            "address": user.get("address", ""),
+            "allergies": user.get("allergies", ""),
+            "chronic_conditions": user.get("chronic_conditions", ""),
+            "rider_upi_id": user.get("rider_upi_id", ""),
+            "rider_upi_qr": user.get("rider_upi_qr", ""),
+            "shop_upi_id": user.get("shop_upi_id", ""),
+            "shop_upi_qr": user.get("shop_upi_qr", "")
+        }
+    }
+
+@router.put("/profile")
+def update_profile(payload: ProfileUpdateRequest, mock_db: PrototypeDataStore = Depends(get_datastore)):
+    target = payload.identifier or payload.email or payload.user_id
+    if not target:
+        raise HTTPException(status_code=400, detail="Missing user identifier or email")
+    try:
+        updated = mock_db.update_user_profile(target, payload.dict(exclude_unset=True))
+        return {
+            "status": "success",
+            "message": "User profile updated and saved successfully",
+            "user": {
+                "id": updated["id"],
+                "full_name": updated.get("full_name", "MEDORA User"),
+                "name": updated.get("full_name", "MEDORA User"),
+                "role": updated.get("role", "patient"),
+                "email": updated.get("email", ""),
+                "phone": updated.get("phone", ""),
+                "username": updated.get("username", ""),
+                "address": updated.get("address", ""),
+                "allergies": updated.get("allergies", ""),
+                "chronic_conditions": updated.get("chronic_conditions", ""),
+                "rider_upi_id": updated.get("rider_upi_id", ""),
+                "rider_upi_qr": updated.get("rider_upi_qr", ""),
+                "shop_upi_id": updated.get("shop_upi_id", ""),
+                "shop_upi_qr": updated.get("shop_upi_qr", "")
+            }
+        }
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
+    except Exception as e:
+        logger.error(f"Error updating profile for {target}: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to update profile: {str(e)}")
 

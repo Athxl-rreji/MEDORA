@@ -177,13 +177,31 @@ export default function LoginGateway({ onLoginSuccess }) {
         }
 
         const activeUserData = {
+          id: data.user.id || `usr_${data.user.email.replace(/[^a-zA-Z0-9]/g, '_')}`,
           role: data.user.role || 'patient',
           email: data.user.email || email.trim(),
-          name: data.user.full_name || 'Patient / User'
+          name: data.user.full_name || data.user.name || 'Patient / User',
+          phone: data.user.phone || '',
+          address: data.user.address || '',
+          allergies: data.user.allergies || '',
+          chronic_conditions: data.user.chronic_conditions || '',
+          rider_upi_id: data.user.rider_upi_id || '',
+          rider_upi_qr: data.user.rider_upi_qr || '',
+          shop_upi_id: data.user.shop_upi_id || '',
+          shop_upi_qr: data.user.shop_upi_qr || ''
         };
 
         try {
           localStorage.setItem('medora_active_user', JSON.stringify(activeUserData));
+          if (activeUserData.role === 'delivery') {
+            if (activeUserData.rider_upi_qr) {
+              localStorage.setItem('medora_rider_main_qr', activeUserData.rider_upi_qr);
+              localStorage.setItem(`medora_rider_qr_${activeUserData.email.toLowerCase()}`, activeUserData.rider_upi_qr);
+            }
+            if (activeUserData.rider_upi_id) {
+              localStorage.setItem('medora_rider_upi_id', activeUserData.rider_upi_id);
+            }
+          }
           const userCreds = {
             email: activeUserData.email,
             password: password,
@@ -514,6 +532,14 @@ export default function LoginGateway({ onLoginSuccess }) {
       const existingReqs = JSON.parse(localStorage.getItem('medora_partner_applications') || '[]');
       existingReqs.push({ ...partnerPayload, id: `local_${Date.now()}`, submitted_at: new Date().toISOString() });
       localStorage.setItem('medora_partner_applications', JSON.stringify(existingReqs));
+      if (partnerPayload.rider_upi_qr) {
+        localStorage.setItem('medora_rider_main_qr', partnerPayload.rider_upi_qr);
+        localStorage.setItem(`medora_rider_qr_${partnerPayload.email.toLowerCase()}`, partnerPayload.rider_upi_qr);
+      }
+      if (partnerPayload.rider_upi_id) {
+        localStorage.setItem('medora_rider_upi_id', partnerPayload.rider_upi_id);
+        localStorage.setItem(`medora_rider_upi_${partnerPayload.email.toLowerCase()}`, partnerPayload.rider_upi_id);
+      }
     } catch (e) {}
 
     // 2. Dispatch partner notification email directly via Next.js mailer

@@ -21,13 +21,45 @@ export default function DeliveryDashboard() {
 
   useEffect(() => {
     try {
-      const saved = localStorage.getItem('medora_rider_main_qr');
-      if (saved) setMainQrImage(saved);
-      else {
+      const activeUserStr = localStorage.getItem('medora_active_user');
+      let userQr = null;
+      if (activeUserStr) {
+        try {
+          const u = JSON.parse(activeUserStr);
+          if (u.rider_upi_qr) userQr = u.rider_upi_qr;
+          else if (u.email) {
+            userQr = localStorage.getItem(`medora_rider_qr_${u.email.toLowerCase()}`);
+          }
+        } catch (e) {}
+      }
+      const saved = userQr || localStorage.getItem('medora_rider_main_qr');
+      if (saved && (saved.startsWith('data:image') || saved.startsWith('http'))) {
+        setMainQrImage(saved);
+      } else {
         setMainQrImage(`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=upi://pay?pa=rider.${AGENT_ID.toLowerCase()}@okhdfcbank%26pn=MEDORA_RIDER%26cu=INR`);
       }
     } catch (e) {}
   }, []);
+
+  const handleUploadMainQr = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    compressQrImage(file, async (compressedBase64) => {
+      setMainQrImage(compressedBase64);
+      localStorage.setItem('medora_rider_main_qr', compressedBase64);
+      try {
+        const uStr = localStorage.getItem('medora_active_user');
+        if (uStr) {
+          const u = JSON.parse(uStr);
+          if (u.email) localStorage.setItem(`medora_rider_qr_${u.email.toLowerCase()}`, compressedBase64);
+        }
+      } catch (e) {}
+      setQrStatusMsg('✅ Registered Profile QR updated to your uploaded PNG!');
+      if (activeJob) {
+        handleSelectQrMode('main');
+      }
+    });
+  };
 
   const handleSelectQrMode = async (mode) => {
     setQrMode(mode);
@@ -405,6 +437,28 @@ export default function DeliveryDashboard() {
                 <span>📸</span>
                 <span>Upload Live QR</span>
                 <input type="file" accept="image/*" onChange={handleUploadLiveQr} style={{ display: 'none' }} />
+              </label>
+            </div>
+
+            {/* Quick Upload / Replace Main Registered Profile QR */}
+            <div style={{ marginBottom: '12px' }}>
+              <label style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                background: 'rgba(56, 189, 248, 0.12)',
+                border: '1px dashed #38bdf8',
+                color: '#38bdf8',
+                padding: '6px 14px',
+                borderRadius: '8px',
+                fontSize: '0.74rem',
+                fontWeight: '700',
+                cursor: 'pointer',
+                transition: 'all 0.15s ease'
+              }}>
+                <span>🖼️</span>
+                <span>Upload / Change Registered Main QR (PNG/JPG)</span>
+                <input type="file" accept="image/*" onChange={handleUploadMainQr} style={{ display: 'none' }} />
               </label>
             </div>
 

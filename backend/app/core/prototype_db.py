@@ -221,6 +221,13 @@ class PrototypeDataStore:
             except Exception:
                 pass
 
+            for col in ["allergies", "chronic_conditions", "rider_upi_id", "rider_upi_qr", "shop_upi_id", "shop_upi_qr"]:
+                try:
+                    cur.execute(f"ALTER TABLE users ADD COLUMN {col} TEXT DEFAULT ''")
+                    conn.commit()
+                except Exception:
+                    pass
+
             # 1. Seed deleted_users from JSON if table is empty
             cur.execute("SELECT COUNT(*) FROM deleted_users")
             if cur.fetchone()[0] == 0:
@@ -921,7 +928,12 @@ class PrototypeDataStore:
         return self.get_orders_by_status("pending")
 
     def get_user_orders(self, user_id: str) -> List[dict]:
-        return [o for o in self.orders if o.get("user") == user_id]
+        clean_target = str(user_id).strip().lower()
+        return [
+            o for o in self.orders
+            if str(o.get("user", "")).strip().lower() == clean_target
+            or str(o.get("user_id", "")).strip().lower() == clean_target
+        ]
 
     def update_order_status(self, order_id: str, new_status: str):
         for o in self.orders:
@@ -1165,6 +1177,49 @@ class PrototypeDataStore:
         logger.info(f"Updated password in SQLite for user {user['email']}")
         return True
 
+    def update_user_profile(self, identifier: str, data: dict) -> dict:
+        user = self.find_user(identifier)
+        if not user:
+            raise ValueError(f"User not found for identifier: {identifier}")
+
+        now_iso = datetime.now().isoformat() + "Z"
+        full_name = (data.get("full_name") or data.get("name") or user.get("full_name") or "User").strip()
+        phone = data.get("phone") if data.get("phone") is not None else user.get("phone", "")
+        address = data.get("address") if data.get("address") is not None else user.get("address", "")
+        allergies = data.get("allergies") if data.get("allergies") is not None else user.get("allergies", "")
+        chronic_conditions = data.get("chronic_conditions") if data.get("chronic_conditions") is not None else user.get("chronic_conditions", "")
+        rider_upi_id = data.get("rider_upi_id") if data.get("rider_upi_id") is not None else user.get("rider_upi_id", "")
+        rider_upi_qr = data.get("rider_upi_qr") if data.get("rider_upi_qr") is not None else user.get("rider_upi_qr", "")
+        shop_upi_id = data.get("shop_upi_id") if data.get("shop_upi_id") is not None else user.get("shop_upi_id", "")
+        shop_upi_qr = data.get("shop_upi_qr") if data.get("shop_upi_qr") is not None else user.get("shop_upi_qr", "")
+
+        new_password = data.get("password")
+        if new_password and str(new_password).strip():
+            self.validate_password_strength(str(new_password).strip())
+            pwd_to_save = str(new_password).strip()
+        else:
+            pwd_to_save = user.get("password")
+
+        with self.get_db() as conn:
+            cur = conn.cursor()
+            cur.execute("""
+                UPDATE users
+                SET full_name = ?, phone = ?, address = ?, allergies = ?,
+                    chronic_conditions = ?, rider_upi_id = ?, rider_upi_qr = ?,
+                    shop_upi_id = ?, shop_upi_qr = ?, password = ?, updated_at = ?
+                WHERE id = ?
+            """, (
+                full_name, phone, address, allergies, chronic_conditions,
+                rider_upi_id, rider_upi_qr, shop_upi_id, shop_upi_qr,
+                pwd_to_save, now_iso, user["id"]
+            ))
+            conn.commit()
+
+        self.load_users()
+        updated = self.find_user(user["id"])
+        logger.info(f"Updated profile details in SQLite for user {user['email']}")
+        return updated
+
     def set_first_time_password(self, identifier: str, temp_password: str, new_password: str) -> dict:
         """Sets a permanent password for accounts initialized with a temporary password and clears must_change_password."""
         user = self.find_user(identifier)
@@ -1395,13 +1450,15 @@ class PrototypeDataStore:
                     INSERT OR REPLACE INTO users (
                         id, full_name, role, email, phone, username, password, status,
                         must_change_password, address, pharmacy_license, vehicle_type,
-                        driving_license, created_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, 'active', 1, ?, ?, ?, ?, ?)
+                        driving_license, rider_upi_id, rider_upi_qr, shop_upi_id, shop_upi_qr, created_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, 'active', 1, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, (
                     user_id, req.get("full_name", "").strip() or "Partner", role, raw_email,
                     raw_phone, clean_uname, temp_pass,
                     req.get("store_address", ""), req.get("license_no", ""),
-                    req.get("vehicle_type", ""), req.get("driving_license", ""), created_at
+                    req.get("vehicle_type", ""), req.get("driving_license", ""),
+                    req.get("rider_upi_id", ""), req.get("rider_upi_qr", ""),
+                    req.get("shop_upi_id", ""), req.get("shop_upi_qr", ""), created_at
                 ))
                 conn.commit()
             self.load_users()
@@ -1419,12 +1476,18 @@ class PrototypeDataStore:
                         pharmacy_license = COALESCE(NULLIF(?, ''), pharmacy_license),
                         vehicle_type = COALESCE(NULLIF(?, ''), vehicle_type),
                         driving_license = COALESCE(NULLIF(?, ''), driving_license),
+                        rider_upi_id = COALESCE(NULLIF(?, ''), rider_upi_id),
+                        rider_upi_qr = COALESCE(NULLIF(?, ''), rider_upi_qr),
+                        shop_upi_id = COALESCE(NULLIF(?, ''), shop_upi_id),
+                        shop_upi_qr = COALESCE(NULLIF(?, ''), shop_upi_qr),
                         updated_at = ?
                     WHERE id = ? OR LOWER(email) = ?
                 """, (
                     role, temp_pass,
                     req.get("store_address", ""), req.get("license_no", ""),
                     req.get("vehicle_type", ""), req.get("driving_license", ""),
+                    req.get("rider_upi_id", ""), req.get("rider_upi_qr", ""),
+                    req.get("shop_upi_id", ""), req.get("shop_upi_qr", ""),
                     datetime.now().isoformat() + "Z", user["id"], raw_email.lower()
                 ))
                 conn.commit()

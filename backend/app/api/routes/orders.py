@@ -138,25 +138,29 @@ def get_user_orders(
     db: Client = Depends(get_supabase_client),
     mock_db: PrototypeDataStore = Depends(get_datastore)
 ):
-    logger.info(f"Fetching orders for user {user_id}")
+    clean_uid = str(user_id).strip()
     try:
-        orders = db.table("orders").select("*, order_items(*)").eq("user_id", user_id).order("created_at", desc=True).limit(10).execute()
-        formatted = []
-        for o in orders.data:
-            formatted.append({
-                "id": o["id"],
-                "user": o["user_id"],
-                "status": o["status"],
-                "pharmacy_id": o.get("pharmacy_id", "Vamanjoor Pharmacy, Mangalore"),
-                "type": o.get("delivery_type", "delivery"),
-                "distance": "Vamanjoor Pharmacy, Mangalore",
-                "items": [{"brand_name": item.get("medicine_id") or "Item", "quantity": item["quantity"]} for item in o.get("order_items", [])]
-            })
-        return {"status": "success", "orders": formatted}
-    except Exception as e:
-        logger.warning(f"Supabase user fetch failed: {e}. Falling back.")
-        orders = mock_db.get_user_orders(user_id)
-        return {"status": "success", "orders": orders}
+        # Only query Supabase table if ID is a standard 36-char UUID to avoid 22P02 type errors
+        if len(clean_uid) == 36 and clean_uid.count("-") == 4:
+            orders = db.table("orders").select("*, order_items(*)").eq("user_id", clean_uid).order("created_at", desc=True).limit(10).execute()
+            if orders.data:
+                formatted = []
+                for o in orders.data:
+                    formatted.append({
+                        "id": o["id"],
+                        "user": o["user_id"],
+                        "status": o["status"],
+                        "pharmacy_id": o.get("pharmacy_id", "Vamanjoor Pharmacy, Mangalore"),
+                        "type": o.get("delivery_type", "delivery"),
+                        "distance": "Vamanjoor Pharmacy, Mangalore",
+                        "items": [{"brand_name": item.get("medicine_id") or "Item", "quantity": item["quantity"]} for item in o.get("order_items", [])]
+                    })
+                return {"status": "success", "orders": formatted}
+    except Exception:
+        pass
+
+    orders = mock_db.get_user_orders(clean_uid)
+    return {"status": "success", "orders": orders}
 
 
 @router.put("/{order_id}/status")
