@@ -1,75 +1,9 @@
 "use client";
 import React, { useState, useEffect } from 'react';
+import { detectDeviceLocation, reverseGeocode } from '../utils/gpsManager';
 
-// Free reverse geocoding utility with fallback
-export async function reverseGeocode(lat, lng) {
-  try {
-    const nomRes = await fetch(
-      `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`,
-      { headers: { 'Accept-Language': 'en' }, signal: AbortSignal.timeout(4500) }
-    );
-    if (nomRes.ok) {
-      const data = await nomRes.json();
-      const addr = data.address || {};
-      const road = addr.road || addr.pedestrian || addr.street || '';
-      const suburb = addr.suburb || addr.neighbourhood || addr.residential || addr.subdistrict || '';
-      const city = addr.city || addr.town || addr.county || addr.state_district || 'Mangalore';
-      const state = addr.state || 'Karnataka';
-      const postcode = addr.postcode || '';
-      const displayName = data.display_name || '';
-
-      const area = road ? (suburb ? `${road}, ${suburb}` : road) : (suburb || city);
-
-      return {
-        road,
-        suburb,
-        city,
-        state,
-        pincode: postcode,
-        area: `${area}, ${city}`,
-        displayName,
-        source: 'nominatim'
-      };
-    }
-  } catch (e) {
-    // Fallback to BigDataCloud
-  }
-
-  try {
-    const bdcRes = await fetch(
-      `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lng}&localityLanguage=en`,
-      { signal: AbortSignal.timeout(4500) }
-    );
-    if (bdcRes.ok) {
-      const data = await bdcRes.json();
-      const city = data.city || data.locality || 'Mangalore';
-      const area = data.locality || data.principalSubdivision || city;
-      return {
-        road: '',
-        suburb: data.locality || '',
-        city,
-        state: data.principalSubdivision || '',
-        pincode: data.postcode || '',
-        area: `${area}, ${city}`,
-        displayName: `${area}, ${city}, ${data.countryName || 'India'}`,
-        source: 'bigdatacloud'
-      };
-    }
-  } catch (e) {
-    // Both failed
-  }
-
-  return {
-    road: '',
-    suburb: 'Local Area',
-    city: 'Mangalore',
-    state: 'Karnataka',
-    pincode: '575028',
-    area: 'Airport Road, Vamanjoor',
-    displayName: 'Airport Road, Vamanjoor, Mangalore',
-    source: 'offline_fallback'
-  };
-}
+// Re-export for any dependent components
+export { reverseGeocode };
 
 export default function LivePerimeterRadar({
   userCoords,
@@ -106,56 +40,50 @@ export default function LivePerimeterRadar({
     return () => clearInterval(interval);
   }, []);
 
-  // One-time manual GPS trigger
-  const handleDetectGPS = (autoSetAddress = true) => {
-    if (typeof window === 'undefined' || !navigator.geolocation) {
-      showToast("⚠️ Geolocation is not supported by your browser.");
-      return;
-    }
-
+  // Universal Device GPS & Location Detection (Works on mobile, desktop, HTTP & HTTPS)
+  const handleDetectGPS = async (autoSetAddress = true) => {
     setIsLocating(true);
-    navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        const { latitude, longitude, accuracy } = pos.coords;
-        setGpsAccuracy(Math.round(accuracy));
+    showToast("🛰️ Synchronizing device location...");
 
-        const coords = { lat: latitude, lng: longitude, accuracy: Math.round(accuracy) };
-        if (onUpdateCoords) onUpdateCoords(coords);
+    try {
+      const loc = await detectDeviceLocation({ timeoutMs: 5000, highAccuracy: false });
+      const { lat, lng, accuracy, source } = loc;
+      setGpsAccuracy(accuracy);
 
-        const geo = await reverseGeocode(latitude, longitude);
-        setDetectedLocationName(geo.area);
+      const coords = { lat, lng, accuracy };
+      if (onUpdateCoords) onUpdateCoords(coords);
 
-        if (autoSetAddress && onUpdateAddress) {
-          const liveAddr = {
-            id: `addr_gps_${Date.now()}`,
-            tag: "Live GPS Location",
-            icon: "🎯",
-            houseNo: geo.road ? `Near ${geo.road}` : "Current GPS Location",
-            area: geo.area,
-            city: geo.city,
-            pincode: geo.pincode || "575001",
-            landmark: `GPS Accuracy ±${Math.round(accuracy)}m`,
-            receiverName: selectedAddress?.receiverName || "Customer",
-            receiverPhone: selectedAddress?.receiverPhone || "+91 99999 99999",
-            latitude,
-            longitude,
-            isDefault: true
-          };
-          onUpdateAddress(liveAddr);
-          showToast(`📍 Locked: ${geo.area} (±${Math.round(accuracy)}m)`);
-        }
+      const geo = await reverseGeocode(lat, lng);
+      setDetectedLocationName(geo.area);
 
-        setIsLocating(false);
-      },
-      (err) => {
-        console.warn("GPS error:", err);
-        setIsLocating(false);
-        if (onUpdateCoords) onUpdateCoords({ lat: 12.9141, lng: 74.8560, accuracy: 15 });
-        setDetectedLocationName("Vamanjoor, Mangalore (Default Hub)");
-        showToast("⚠️ GPS signal timeout. Loaded default hub location.");
-      },
-      { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
-    );
+      if (autoSetAddress && onUpdateAddress) {
+        const liveAddr = {
+          id: `addr_gps_${Date.now()}`,
+          tag: source === 'device_gps' ? "Live GPS Location" : "Detected Location",
+          icon: "🎯",
+          houseNo: geo.road ? `Near ${geo.road}` : "Current Location",
+          area: geo.area,
+          city: geo.city || "Mangalore",
+          pincode: geo.pincode || "575028",
+          landmark: `Precision ±${accuracy}m (${source === 'device_gps' ? 'Satellite GPS' : 'Network Geolocation'})`,
+          receiverName: selectedAddress?.receiverName || "Customer",
+          receiverPhone: selectedAddress?.receiverPhone || "+91 99999 99999",
+          latitude: lat,
+          longitude: lng,
+          isDefault: true
+        };
+        onUpdateAddress(liveAddr);
+        const icon = source === 'device_gps' ? '🎯' : '🌐';
+        showToast(`${icon} Locked: ${geo.area} (±${accuracy}m)`);
+      }
+    } catch (err) {
+      console.warn("Location detection fallback:", err);
+      if (onUpdateCoords) onUpdateCoords({ lat: 12.9298, lng: 74.8967, accuracy: 25 });
+      setDetectedLocationName("Vamanjoor, Mangalore (Default Hub)");
+      showToast("📍 Calibrated to Vamanjoor Pharmacy Hub");
+    } finally {
+      setIsLocating(false);
+    }
   };
 
   // Toggle continuous watchPosition for live tracking

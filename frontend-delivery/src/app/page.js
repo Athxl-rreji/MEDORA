@@ -1,6 +1,7 @@
 "use client";
 import React, { useState, useEffect } from 'react';
 import { API } from '../utils/apiConfig';
+import { buildNavigationLinks, resolvePharmacyDetails } from '../utils/gpsManager';
 const AGENT_ID = "AGT-591";
 
 export default function DeliveryDashboard() {
@@ -85,6 +86,9 @@ export default function DeliveryDashboard() {
       { label: 'Arrived',   done: false },
       { label: 'Delivered', done: false },
     ];
+    const navLinks = buildNavigationLinks(activeJob.pharmacy_id, activeJob.delivery_address);
+    const pickupStore = resolvePharmacyDetails(activeJob.pharmacy_id);
+
     return (
       <main className="container">
         <div className="active-header">
@@ -94,38 +98,104 @@ export default function DeliveryDashboard() {
 
         <div className="map-mock" style={{ padding: '1.5rem 1rem', textAlign: 'center' }}>
           <div className="emoji">🗺️</div>
-          <div className="route-text" style={{ fontSize: '1.15rem', fontWeight: 'bold', color: '#fff' }}>GPS Routing & Google Maps Sync</div>
-          <div className="route-sub" style={{ fontSize: '0.82rem', color: '#94a3b8', margin: '4px 0 10px 0' }}>
-            🏪 {activeJob.pharmacy_id || 'Vamanjoor Pharmacy, Mangalore'} ➔ 🏠 Customer {activeJob.user}
+          <div className="route-text" style={{ fontSize: '1.15rem', fontWeight: 'bold', color: '#fff' }}>GPS Voice Navigation & Route</div>
+          
+          <div style={{
+            background: 'rgba(0,0,0,0.3)',
+            borderRadius: '10px',
+            padding: '10px 14px',
+            margin: '12px auto',
+            maxWidth: '440px',
+            textAlign: 'left',
+            fontSize: '0.82rem',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '8px'
+          }}>
+            <div>
+              <span style={{ color: 'var(--primary)', fontWeight: 'bold' }}>🏪 Pickup: </span>
+              <strong style={{ color: '#fff' }}>{pickupStore.name}</strong>
+              <div style={{ color: '#94a3b8', fontSize: '0.74rem' }}>{pickupStore.address}</div>
+              {pickupStore.phone && (
+                <a href={`tel:${pickupStore.phone}`} style={{ color: '#38bdf8', fontSize: '0.72rem', textDecoration: 'none' }}>
+                  📞 {pickupStore.phone}
+                </a>
+              )}
+            </div>
+            <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '6px' }}>
+              <span style={{ color: 'var(--green)', fontWeight: 'bold' }}>🏠 Drop-off: </span>
+              <strong style={{ color: '#fff' }}>Customer {activeJob.user}</strong>
+              <div style={{ color: '#94a3b8', fontSize: '0.74rem' }}>
+                {activeJob.delivery_address 
+                  ? [activeJob.delivery_address.houseNo, activeJob.delivery_address.area, activeJob.delivery_address.city, activeJob.delivery_address.pincode].filter(Boolean).join(', ')
+                  : 'Flat 402, Airport Road, Vamanjoor, Mangalore'}
+              </div>
+              {activeJob.delivery_address?.receiverPhone && (
+                <a href={`tel:${activeJob.delivery_address.receiverPhone}`} style={{ color: '#4ade80', fontSize: '0.72rem', textDecoration: 'none' }}>
+                  📞 {activeJob.delivery_address.receiverPhone}
+                </a>
+              )}
+            </div>
           </div>
+
           <div className="eta-badge" style={{ marginBottom: '12px' }}>ETA: ~8 mins</div>
 
-          <a
-            href={`https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(activeJob.pharmacy_id || 'Vamanjoor Express Pharmacy, Mangalore')}&destination=${encodeURIComponent(
-              activeJob.delivery_address 
-                ? [activeJob.delivery_address.houseNo, activeJob.delivery_address.area, activeJob.delivery_address.city].filter(Boolean).join(', ')
-                : 'Airport Road, Vamanjoor, Mangalore'
-            )}&travelmode=driving`}
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '6px',
-              background: '#2563eb',
-              color: '#fff',
-              padding: '10px 20px',
-              borderRadius: '10px',
-              fontWeight: 'bold',
-              fontSize: '0.88rem',
-              textDecoration: 'none',
-              boxShadow: '0 4px 12px rgba(37, 99, 235, 0.4)'
-            }}
-          >
-            <span>🧭</span>
-            <span>Launch Google Maps GPS App ↗</span>
-          </a>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'center' }}>
+            <a
+              href={navLinks.googleMapsUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
+                color: '#fff',
+                padding: '12px 24px',
+                borderRadius: '12px',
+                fontWeight: 'bold',
+                fontSize: '0.92rem',
+                textDecoration: 'none',
+                boxShadow: '0 4px 16px rgba(37, 99, 235, 0.4)'
+              }}
+            >
+              <span>🧭</span>
+              <span>Open in Google Maps (Turn-by-Turn GPS) ↗</span>
+            </a>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <a
+                href={navLinks.appleMapsUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  padding: '6px 12px',
+                  background: 'rgba(255,255,255,0.06)',
+                  borderRadius: '8px',
+                  color: '#cbd5e1',
+                  fontSize: '0.75rem',
+                  textDecoration: 'none'
+                }}
+              >
+                🍏 Apple Maps
+              </a>
+              <a
+                href={navLinks.wazeUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  padding: '6px 12px',
+                  background: 'rgba(255,255,255,0.06)',
+                  borderRadius: '8px',
+                  color: '#cbd5e1',
+                  fontSize: '0.75rem',
+                  textDecoration: 'none'
+                }}
+              >
+                🚗 Waze GPS
+              </a>
+            </div>
+          </div>
         </div>
 
         <div className="job-details">

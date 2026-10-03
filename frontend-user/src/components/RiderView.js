@@ -1,6 +1,7 @@
 "use client";
 import React, { useState, useEffect } from 'react';
 import { API } from '../utils/apiConfig';
+import { buildNavigationLinks, resolvePharmacyDetails } from '../utils/gpsManager';
 const AGENT_ID = "AGT-591";
 
 export default function RiderView() {
@@ -73,6 +74,9 @@ export default function RiderView() {
     if (Array.isArray(items)) return items.map(i => `${i.quantity}x ${i.brand_name}`).join(', ');
     return String(items || 'Items');
   };
+
+  const navLinks = activeJob ? buildNavigationLinks(activeJob.pharmacy_id, activeJob.delivery_address) : null;
+  const pickupStore = activeJob ? resolvePharmacyDetails(activeJob.pharmacy_id) : null;
 
   return (
     <div style={{ maxWidth: '720px', margin: '0 auto', padding: '1.5rem 1rem' }}>
@@ -163,56 +167,103 @@ export default function RiderView() {
               marginBottom: '1rem',
               display: 'flex',
               flexDirection: 'column',
-              gap: '0.6rem',
+              gap: '0.75rem',
               fontSize: '0.82rem'
             }}>
               <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
                 <span style={{ color: 'var(--primary)', fontWeight: 'bold' }}>🏪 Pickup:</span>
-                <span style={{ color: '#fff' }}>{activeJob.pharmacy_id || 'Vamanjoor Express Pharmacy, Airport Road, Mangalore'}</span>
+                <div>
+                  <div style={{ color: '#fff', fontWeight: '600' }}>{pickupStore?.name || activeJob.pharmacy_id || 'Vamanjoor Express Pharmacy'}</div>
+                  <div style={{ color: '#94a3b8', fontSize: '0.75rem' }}>{pickupStore?.address || 'Airport Road, Vamanjoor, Mangalore'}</div>
+                  {pickupStore?.phone && (
+                    <a href={`tel:${pickupStore.phone}`} style={{ color: '#38bdf8', fontSize: '0.72rem', textDecoration: 'none' }}>
+                      📞 {pickupStore.phone}
+                    </a>
+                  )}
+                </div>
               </div>
-              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '0.5rem' }}>
                 <span style={{ color: 'var(--green)', fontWeight: 'bold' }}>🏠 Drop-off:</span>
-                <span style={{ color: '#fff' }}>
-                  {activeJob.delivery_address 
-                    ? [activeJob.delivery_address.houseNo, activeJob.delivery_address.area, activeJob.delivery_address.city, activeJob.delivery_address.pincode].filter(Boolean).join(', ')
-                    : `Flat 402, Tower 2, Airport Road, Vamanjoor, Mangalore (Customer: ${activeJob.user})`}
-                </span>
+                <div>
+                  <div style={{ color: '#fff', fontWeight: '600' }}>Customer: {activeJob.user || 'Adhwaith'}</div>
+                  <div style={{ color: '#94a3b8', fontSize: '0.75rem' }}>
+                    {activeJob.delivery_address 
+                      ? [activeJob.delivery_address.houseNo, activeJob.delivery_address.area, activeJob.delivery_address.city, activeJob.delivery_address.pincode].filter(Boolean).join(', ')
+                      : `Flat 402, Tower 2, Airport Road, Vamanjoor, Mangalore`}
+                  </div>
+                  {activeJob.delivery_address?.receiverPhone && (
+                    <a href={`tel:${activeJob.delivery_address.receiverPhone}`} style={{ color: '#4ade80', fontSize: '0.72rem', textDecoration: 'none' }}>
+                      📞 {activeJob.delivery_address.receiverPhone}
+                    </a>
+                  )}
+                </div>
               </div>
             </div>
 
-            {/* Direct Google Maps Navigation Launch Button */}
-            <a
-              href={`https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(activeJob.pharmacy_id || 'Vamanjoor Express Pharmacy, Mangalore')}&destination=${encodeURIComponent(
-                activeJob.delivery_address 
-                  ? [activeJob.delivery_address.houseNo, activeJob.delivery_address.area, activeJob.delivery_address.city].filter(Boolean).join(', ')
-                  : 'Airport Road, Vamanjoor, Mangalore'
-              )}&travelmode=driving`}
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '8px',
-                background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
-                color: '#ffffff',
-                border: 'none',
-                padding: '0.85rem 1.5rem',
-                borderRadius: '12px',
-                fontWeight: '800',
-                fontSize: '0.95rem',
-                textDecoration: 'none',
-                boxShadow: '0 4px 16px rgba(37, 99, 235, 0.4)',
-                cursor: 'pointer',
-                marginBottom: '0.5rem',
-                transition: 'all 0.2s ease'
-              }}
-            >
-              <span>🧭</span>
-              <span>Open in Google Maps App (Turn-by-Turn GPS) ↗</span>
-            </a>
+            {/* Direct Multi-App Navigation Launch Buttons */}
+            {navLinks && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '0.8rem' }}>
+                <a
+                  href={navLinks.googleMapsUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                    background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
+                    color: '#ffffff',
+                    border: 'none',
+                    padding: '0.85rem 1.5rem',
+                    borderRadius: '12px',
+                    fontWeight: '800',
+                    fontSize: '0.95rem',
+                    textDecoration: 'none',
+                    boxShadow: '0 4px 16px rgba(37, 99, 235, 0.4)',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease'
+                  }}
+                >
+                  <span>🧭</span>
+                  <span>Open in Google Maps (Turn-by-Turn GPS) ↗</span>
+                </a>
+                <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
+                  <a
+                    href={navLinks.appleMapsUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      padding: '6px 12px',
+                      background: 'rgba(255,255,255,0.06)',
+                      borderRadius: '8px',
+                      color: '#cbd5e1',
+                      fontSize: '0.75rem',
+                      textDecoration: 'none'
+                    }}
+                  >
+                    🍏 Apple Maps
+                  </a>
+                  <a
+                    href={navLinks.wazeUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      padding: '6px 12px',
+                      background: 'rgba(255,255,255,0.06)',
+                      borderRadius: '8px',
+                      color: '#cbd5e1',
+                      fontSize: '0.75rem',
+                      textDecoration: 'none'
+                    }}
+                  >
+                    🚗 Waze GPS
+                  </a>
+                </div>
+              </div>
+            )}
             <div style={{ fontSize: '0.74rem', color: '#94a3b8' }}>
-              Opens live voice-guided driving directions synced between pharmacy & customer
+              Opens live voice-guided driving directions calibrated with exact store & delivery GPS
             </div>
           </div>
 

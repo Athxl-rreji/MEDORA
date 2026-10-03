@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useEffect } from 'react';
-import { reverseGeocode } from './LivePerimeterRadar';
+import { detectDeviceLocation, reverseGeocode } from '../utils/gpsManager';
 
 // Default initial addresses inspired by Swiggy Instamart format
 const DEFAULT_SAVED_ADDRESSES = [
@@ -80,96 +80,81 @@ export default function SwiggyAddressDrawer({
     } catch (e) {}
   };
 
-  const handleUseCurrentLocation = () => {
+  const handleUseCurrentLocation = async () => {
     setIsLocating(true);
-    setGpsStatus('Requesting device GPS coordinates...');
-    if (typeof window !== 'undefined' && navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        async (pos) => {
-          const lat = pos.coords.latitude;
-          const lng = pos.coords.longitude;
-          const accuracy = Math.round(pos.coords.accuracy);
-          setDetectedCoords({ lat, lng, accuracy });
-          setGpsStatus(`GPS Locked: ${lat.toFixed(4)}°, ${lng.toFixed(4)}° (±${accuracy}m)`);
+    setGpsStatus('Acquiring GPS / Network Location...');
+    try {
+      const loc = await detectDeviceLocation({ timeoutMs: 5000, highAccuracy: false });
+      const lat = loc.lat;
+      const lng = loc.lng;
+      const accuracy = loc.accuracy || 25;
+      setDetectedCoords({ lat, lng, accuracy });
+      setGpsStatus(`Location Locked: ${lat.toFixed(4)}°, ${lng.toFixed(4)}° (${loc.source === 'device_gps' ? 'GPS' : 'Network'} ±${accuracy}m)`);
 
-          const geo = await reverseGeocode(lat, lng);
-          const liveAddr = {
-            id: `addr_live_${Date.now()}`,
-            tag: "Live Location",
-            icon: "🎯",
-            houseNo: geo.road ? `Near ${geo.road}` : "Current GPS Location",
-            area: geo.area,
-            city: geo.city || "Mangalore",
-            pincode: geo.pincode || "575001",
-            landmark: `GPS Precision ±${accuracy}m`,
-            receiverName: activeUser?.name || "Customer",
-            receiverPhone: activeUser?.phone || "+91 99999 99999",
-            latitude: lat,
-            longitude: lng,
-            isDefault: true
-          };
+      const geo = await reverseGeocode(lat, lng);
+      const liveAddr = {
+        id: `addr_live_${Date.now()}`,
+        tag: "Live Location",
+        icon: "🎯",
+        houseNo: geo.road ? `Near ${geo.road}` : "Current Location",
+        area: geo.area || "Airport Road, Vamanjoor",
+        city: geo.city || "Mangalore",
+        pincode: geo.pincode || "575028",
+        landmark: `${loc.source === 'device_gps' ? 'GPS' : 'Network'} Precision ±${accuracy}m`,
+        receiverName: activeUser?.name || "Customer",
+        receiverPhone: activeUser?.phone || "+91 99999 99999",
+        latitude: lat,
+        longitude: lng,
+        isDefault: true
+      };
 
-          const updated = [liveAddr, ...savedAddresses.filter(a => !a.id.startsWith('addr_live_'))];
-          saveAddressesToStorage(updated);
-          onSelectAddress(liveAddr);
-          setIsLocating(false);
-          onClose();
-        },
-        async () => {
-          const coords = { lat: 12.9141, lng: 74.8560, accuracy: 15 };
-          setDetectedCoords(coords);
-          const fallback = {
-            id: "addr_vamanjoor_quick",
-            tag: "Vamanjoor Hub",
-            icon: "🎯",
-            houseNo: "Vamanjoor Main Junction",
-            area: "Airport Road, Vamanjoor",
-            city: "Mangalore",
-            pincode: "575028",
-            landmark: "Near St. Joseph College",
-            receiverName: activeUser?.name || "Customer",
-            receiverPhone: activeUser?.phone || "+91 99999 99999",
-            latitude: 12.9141,
-            longitude: 74.8560,
-            isDefault: true
-          };
-          onSelectAddress(fallback);
-          setIsLocating(false);
-          onClose();
-        },
-        { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
-      );
-    } else {
+      const updated = [liveAddr, ...savedAddresses.filter(a => !a.id.startsWith('addr_live_'))];
+      saveAddressesToStorage(updated);
+      onSelectAddress(liveAddr);
       setIsLocating(false);
+      onClose();
+    } catch (e) {
+      console.warn("Location detection fallback:", e);
+      const fallback = {
+        id: "addr_vamanjoor_quick",
+        tag: "Vamanjoor Hub",
+        icon: "🎯",
+        houseNo: "Vamanjoor Main Junction",
+        area: "Airport Road, Vamanjoor",
+        city: "Mangalore",
+        pincode: "575028",
+        landmark: "Near St. Joseph College",
+        receiverName: activeUser?.name || "Customer",
+        receiverPhone: activeUser?.phone || "+91 99999 99999",
+        latitude: 12.9298,
+        longitude: 74.8967,
+        isDefault: true
+      };
+      onSelectAddress(fallback);
+      setIsLocating(false);
+      onClose();
     }
   };
 
-  const handleDetectGpsForForm = () => {
+  const handleDetectGpsForForm = async () => {
     setIsLocating(true);
-    setGpsStatus('Acquiring high-accuracy GPS satellite signal...');
-    if (typeof window !== 'undefined' && navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        async (pos) => {
-          const lat = pos.coords.latitude;
-          const lng = pos.coords.longitude;
-          const accuracy = Math.round(pos.coords.accuracy);
-          setDetectedCoords({ lat, lng, accuracy });
+    setGpsStatus('Detecting device location...');
+    try {
+      const loc = await detectDeviceLocation({ timeoutMs: 5000, highAccuracy: false });
+      const lat = loc.lat;
+      const lng = loc.lng;
+      const accuracy = loc.accuracy || 25;
+      setDetectedCoords({ lat, lng, accuracy });
 
-          const geo = await reverseGeocode(lat, lng);
-          if (geo.road) setHouseNo(prev => prev || `Near ${geo.road}`);
-          if (geo.area) setArea(geo.area);
-          if (geo.city) setCity(geo.city);
-          if (geo.pincode) setPincode(geo.pincode);
-          setGpsStatus(`📍 Calibrated: ${geo.area} (±${accuracy}m)`);
-          setIsLocating(false);
-        },
-        () => {
-          setGpsStatus('⚠️ GPS access denied. Please enter address manually.');
-          setIsLocating(false);
-        },
-        { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
-      );
-    } else {
+      const geo = await reverseGeocode(lat, lng);
+      if (geo.road) setHouseNo(prev => prev || `Near ${geo.road}`);
+      if (geo.area) setArea(geo.area);
+      if (geo.city) setCity(geo.city);
+      if (geo.pincode) setPincode(geo.pincode);
+      setGpsStatus(`📍 Calibrated: ${geo.area} (±${accuracy}m)`);
+    } catch (e) {
+      setGpsStatus('📍 Set to default Mangalore Hub coordinates');
+    } finally {
       setIsLocating(false);
     }
   };

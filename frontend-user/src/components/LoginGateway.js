@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import CartoonBootup from './CartoonBootup';
 import { API } from '../utils/apiConfig';
+import { detectDeviceLocation } from '../utils/gpsManager';
 
 export default function LoginGateway({ onLoginSuccess }) {
   const [showBootupToon, setShowBootupToon] = useState(false);
@@ -423,26 +424,19 @@ export default function LoginGateway({ onLoginSuccess }) {
     }
   };
 
-  const handleDetectShopLocation = () => {
-    if (typeof window !== 'undefined' && !navigator.geolocation) {
-      setErrorMsg("Geolocation is not supported by your browser. Please enter coordinates manually.");
-      return;
-    }
+  const handleDetectShopLocation = async () => {
     setIsLocatingShop(true);
     clearMessages();
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setPartnerLat(pos.coords.latitude.toFixed(6));
-        setPartnerLng(pos.coords.longitude.toFixed(6));
-        setIsLocatingShop(false);
-        setSuccessMsg(`✓ Exact shop GPS location locked: [${pos.coords.latitude.toFixed(4)}, ${pos.coords.longitude.toFixed(4)}]`);
-      },
-      (err) => {
-        setIsLocatingShop(false);
-        setErrorMsg("Unable to retrieve GPS automatically. You may enter latitude & longitude manually.");
-      },
-      { enableHighAccuracy: true, timeout: 8000 }
-    );
+    try {
+      const loc = await detectDeviceLocation({ timeoutMs: 5000, highAccuracy: false });
+      setPartnerLat(loc.lat.toFixed(6));
+      setPartnerLng(loc.lng.toFixed(6));
+      setIsLocatingShop(false);
+      setSuccessMsg(`✓ Exact shop GPS location locked: [${loc.lat.toFixed(4)}, ${loc.lng.toFixed(4)}] (${loc.source === 'device_gps' ? 'GPS' : 'Network'} ±${loc.accuracy || 25}m)`);
+    } catch (err) {
+      setIsLocatingShop(false);
+      setErrorMsg("Unable to retrieve GPS automatically. You may enter latitude & longitude manually.");
+    }
   };
 
   // 6. Partner Request Submission Handler (Forwards request to Admin Panel)
