@@ -49,7 +49,7 @@ def send_email_otp(recipient_email: str, otp_code: str, reason: str = "Registrat
         msg["To"] = recipient_email
         msg.attach(MIMEText(html_content, "html"))
 
-        with smtplib.SMTP(server_host, port) as server:
+        with smtplib.SMTP(server_host, port, timeout=6) as server:
             server.starttls()
             server.login(smtp_user, clean_password)
             server.sendmail(smtp_user, recipient_email, msg.as_string())
@@ -68,7 +68,16 @@ def send_partner_request_email(partner_type: str, full_name: str, email: str, ph
     target_email = "medora2k26@gmail.com"
     subject = f"🚨 New Partner Request: {partner_type.upper()} Application from {full_name}"
     
-    detail_rows = "".join([f"<tr><td style='padding: 6px 12px; font-weight: bold; color: #94a3b8;'>{k.replace('_', ' ').title()}:</td><td style='padding: 6px 12px; color: #ffffff;'>{v}</td></tr>" for k, v in details.items() if v])
+    safe_details = {}
+    for k, v in (details or {}).items():
+        if not v:
+            continue
+        if isinstance(v, str) and (v.startswith("data:image") or len(v) > 300):
+            safe_details[k] = "✓ [Digital QR Image Uploaded & Stored]"
+        else:
+            safe_details[k] = v
+
+    detail_rows = "".join([f"<tr><td style='padding: 6px 12px; font-weight: bold; color: #94a3b8;'>{k.replace('_', ' ').title()}:</td><td style='padding: 6px 12px; color: #ffffff;'>{v}</td></tr>" for k, v in safe_details.items()])
 
     html_content = f"""
     <div style="font-family: Arial, sans-serif; background-color: #0d1117; color: #ffffff; padding: 24px; border-radius: 12px; border: 1px solid #30363d;">
@@ -99,7 +108,7 @@ def send_partner_request_email(partner_type: str, full_name: str, email: str, ph
         msg["To"] = target_email
         msg.attach(MIMEText(html_content, "html"))
 
-        with smtplib.SMTP(server_host, port) as server:
+        with smtplib.SMTP(server_host, port, timeout=6) as server:
             server.starttls()
             server.login(smtp_user, clean_password)
             server.sendmail(smtp_user, target_email, msg.as_string())
@@ -143,7 +152,7 @@ def send_partner_approval_email(recipient_email: str, full_name: str, partner_ty
         msg["To"] = recipient_email
         msg.attach(MIMEText(html_content, "html"))
 
-        with smtplib.SMTP(server_host, port) as server:
+        with smtplib.SMTP(server_host, port, timeout=6) as server:
             server.starttls()
             server.login(smtp_user, clean_password)
             server.sendmail(smtp_user, recipient_email, msg.as_string())

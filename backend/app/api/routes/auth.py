@@ -1,6 +1,6 @@
 import re
 from typing import Optional
-from fastapi import APIRouter, HTTPException, Depends, Query
+from fastapi import APIRouter, HTTPException, Depends, Query, BackgroundTasks
 from pydantic import BaseModel
 from app.core.prototype_db import PrototypeDataStore, get_datastore
 from app.core.email_service import send_email_otp, send_partner_request_email
@@ -213,6 +213,7 @@ def is_valid_email_address(email: str) -> bool:
 @router.post("/partner-request")
 def partner_request(
     payload: PartnerRequest,
+    background_tasks: BackgroundTasks,
     mock_db: PrototypeDataStore = Depends(get_datastore)
 ):
     """
@@ -249,19 +250,28 @@ def partner_request(
         details=details
     )
 
-    email_sent = send_partner_request_email(
+    # Sanitize details so raw base64 data URLs aren't passed to email generator
+    email_details = {}
+    for k, v in details.items():
+        if k in ("rider_upi_qr", "shop_upi_qr") and v:
+            email_details[k] = "[Digital UPI QR Code Uploaded & Stored]"
+        else:
+            email_details[k] = v
+
+    # Asynchronously dispatch email notification in background so HTTP response is instantaneous (<50ms)
+    background_tasks.add_task(
+        send_partner_request_email,
         partner_type=payload.partner_type,
         full_name=payload.full_name,
         email=payload.email,
         phone=payload.phone,
-        details=details
+        details=email_details
     )
     
     return {
         "status": "success",
         "message": f"Your {payload.partner_type.upper()} application (ID: {new_req['id']}) has been submitted successfully for admin review!",
-        "request": new_req,
-        "email_sent": email_sent
+        "request": new_req
     }
 
 @router.post("/login")

@@ -185,6 +185,7 @@ class PrototypeDataStore:
                     delivery_zone TEXT DEFAULT '',
                     shift_preference TEXT DEFAULT '',
                     rider_upi_id TEXT DEFAULT '',
+                    rider_upi_qr TEXT DEFAULT '',
                     shop_upi_id TEXT DEFAULT '',
                     shop_upi_qr TEXT DEFAULT '',
                     approved_at TEXT,
@@ -213,6 +214,12 @@ class PrototypeDataStore:
                 );
             """)
             conn.commit()
+
+            try:
+                cur.execute("ALTER TABLE partner_requests ADD COLUMN rider_upi_qr TEXT DEFAULT ''")
+                conn.commit()
+            except Exception:
+                pass
 
             # 1. Seed deleted_users from JSON if table is empty
             cur.execute("SELECT COUNT(*) FROM deleted_users")
@@ -1264,6 +1271,7 @@ class PrototypeDataStore:
             "delivery_zone": details.get("delivery_zone", ""),
             "shift_preference": details.get("shift_preference", ""),
             "rider_upi_id": details.get("rider_upi_id", ""),
+            "rider_upi_qr": details.get("rider_upi_qr", ""),
             "shop_upi_id": details.get("shop_upi_id", ""),
             "shop_upi_qr": details.get("shop_upi_qr", "")
         }
@@ -1275,15 +1283,15 @@ class PrototypeDataStore:
                     id, partner_type, full_name, email, phone, status, submitted_at,
                     store_name, license_no, store_address, latitude, longitude,
                     vehicle_type, driving_license, vehicle_number, delivery_zone,
-                    shift_preference, rider_upi_id, shop_upi_id, shop_upi_qr
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    shift_preference, rider_upi_id, rider_upi_qr, shop_upi_id, shop_upi_qr
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 new_req["id"], new_req["partner_type"], new_req["full_name"], new_req["email"],
                 new_req["phone"], new_req["status"], new_req["submitted_at"], new_req["store_name"],
                 new_req["license_no"], new_req["store_address"], new_req["latitude"], new_req["longitude"],
                 new_req["vehicle_type"], new_req["driving_license"], new_req["vehicle_number"],
                 new_req["delivery_zone"], new_req["shift_preference"], new_req["rider_upi_id"],
-                new_req["shop_upi_id"], new_req["shop_upi_qr"]
+                new_req["rider_upi_qr"], new_req["shop_upi_id"], new_req["shop_upi_qr"]
             ))
             conn.commit()
 
@@ -1343,8 +1351,8 @@ class PrototypeDataStore:
                         id, partner_type, full_name, email, phone, status, submitted_at,
                         store_name, license_no, store_address, latitude, longitude,
                         vehicle_type, driving_license, vehicle_number, delivery_zone,
-                        shift_preference, rider_upi_id, shop_upi_id, shop_upi_qr
-                    ) VALUES (?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        shift_preference, rider_upi_id, rider_upi_qr, shop_upi_id, shop_upi_qr
+                    ) VALUES (?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, (
                     req_id, req.get("partner_type", "pharmacy"), req.get("full_name", ""),
                     req.get("email", ""), req.get("phone", ""),
@@ -1354,8 +1362,8 @@ class PrototypeDataStore:
                     float(req.get("longitude") or 72.8777), req.get("vehicle_type", ""),
                     req.get("driving_license", ""), req.get("vehicle_number", ""),
                     req.get("delivery_zone", ""), req.get("shift_preference", ""),
-                    req.get("rider_upi_id", ""), req.get("shop_upi_id", ""),
-                    req.get("shop_upi_qr", "")
+                    req.get("rider_upi_id", ""), req.get("rider_upi_qr", ""),
+                    req.get("shop_upi_id", ""), req.get("shop_upi_qr", "")
                 ))
                 conn.commit()
             else:

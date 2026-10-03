@@ -52,23 +52,64 @@ export default function RiderView() {
     }
   };
 
+  const compressQrImage = (file, callback) => {
+    try {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          try {
+            const canvas = document.createElement('canvas');
+            const MAX_SIZE = 380;
+            let width = img.width;
+            let height = img.height;
+            if (width > height) {
+              if (width > MAX_SIZE) {
+                height = Math.round((height * MAX_SIZE) / width);
+                width = MAX_SIZE;
+              }
+            } else {
+              if (height > MAX_SIZE) {
+                width = Math.round((width * MAX_SIZE) / height);
+                height = MAX_SIZE;
+              }
+            }
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, width, height);
+            const compressed = canvas.toDataURL('image/jpeg', 0.82);
+            callback(compressed);
+          } catch (err) {
+            callback(e.target.result);
+          }
+        };
+        img.onerror = () => callback(e.target.result);
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    } catch (err) {
+      const fallbackReader = new FileReader();
+      fallbackReader.onload = (e) => callback(e.target.result);
+      fallbackReader.readAsDataURL(file);
+    }
+  };
+
   const handleUploadLiveQr = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = async (uploadEvent) => {
-      const base64Data = uploadEvent.target.result;
-      setLiveQrImage(base64Data);
+    compressQrImage(file, async (compressedBase64) => {
+      setLiveQrImage(compressedBase64);
       setQrMode('live');
       setQrStatusMsg('Fresh Live QR uploaded! Broadcast to customer payment terminal.');
       if (activeJob) {
         try {
-          localStorage.setItem(`medora_order_qr_${activeJob.id}`, JSON.stringify({ mode: 'live', qr: base64Data }));
+          localStorage.setItem(`medora_order_qr_${activeJob.id}`, JSON.stringify({ mode: 'live', qr: compressedBase64 }));
           await fetch(`${API}/api/v1/orders/${activeJob.id}/rider-qr`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              rider_qr_image: base64Data,
+              rider_qr_image: compressedBase64,
               rider_qr_type: 'live',
               rider_name: `Rider ${AGENT_ID}`,
               rider_upi_id: `rider.${AGENT_ID.toLowerCase()}@okhdfcbank`
@@ -76,8 +117,7 @@ export default function RiderView() {
           });
         } catch (err) {}
       }
-    };
-    reader.readAsDataURL(file);
+    });
   };
 
   // Poll for 'ready' orders packed by pharmacy (pauses if rider already has an active job or tab is hidden)
