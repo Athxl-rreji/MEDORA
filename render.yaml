@@ -2,13 +2,44 @@ services:
   - type: web
     name: medora-backend
     runtime: python
+    plan: free
+    region: singapore
     rootDir: backend
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.9
       - key: PORT
         value: 8000
+      - key: ENVIRONMENT
+        value: production
       - key: ALLOWED_ORIGINS
         value: "*"
+      - key: SUPABASE_URL
+        value: https://pahrhwcigcrdwvpxyxop.supabase.co
+      - key: SUPABASE_KEY
+        value: sb_publishable_uoqbLCd0JokQJGizvo6PcA_4xj9rAQt
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        value: sb_publishable_uoqbLCd0JokQJGizvo6PcA_4xj9rAQt
+      - key: GEMINI_API_KEY
+        value: AQ.Ab8RN6Js_Iap5zHDJQp1PFrwsCfP8gWoEogju4w41SRKg02_TQ
+      - key: OPENAI_API_KEY
+        value: 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
+      - key: OPENROUTER_API_KEY
+        value: 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
+      - key: OPENROUTER_MODEL
+        value: openrouter/free
+      - key: RAZORPAY_KEY_ID
+        value: rzp_test_TGSG2Ef0As1aMa
+      - key: RAZORPAY_KEY_SECRET
+        value: X44IAL2HuzatQ8PmZKli9ZpX
+      - key: SMTP_SERVER
+        value: smtp.gmail.com
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_USER
+        value: medora2k26@gmail.com
+      - key: GMAIL_APP_PASSWORD
+        value: qpgy dkwk nfvx ytfi

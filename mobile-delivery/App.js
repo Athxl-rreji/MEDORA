@@ -18,6 +18,7 @@ export default function App() {
   useEffect(() => {
     if (!isOnline) return;
     const poll = async () => {
+      if (activeJob) return;
       try {
         const res = await fetch(`${API}/api/v1/orders/active?status=ready`);
         if (res.ok) {
@@ -32,9 +33,9 @@ export default function App() {
       }
     };
     poll();
-    const t = setInterval(poll, 3000);
+    const t = setInterval(poll, 5000);
     return () => clearInterval(t);
-  }, [isOnline]);
+  }, [isOnline, activeJob]);
 
   const formatItems = (items) => {
     if (Array.isArray(items)) return items.map(i => `${i.quantity}x ${i.brand_name}`).join(', ');

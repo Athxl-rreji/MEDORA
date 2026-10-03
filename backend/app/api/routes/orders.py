@@ -100,12 +100,20 @@ def get_active_orders(
     logger.info(f"Fetching orders with status filter: {status}")
     try:
         query = db.table("orders").select("*, order_items(*)")
-        if status:
-            query = query.eq("status", status)
+        if status and status.lower() not in ["active", "all"]:
+            statuses = [s.strip().lower() for s in status.split(",") if s.strip()]
+            if len(statuses) == 1:
+                query = query.eq("status", statuses[0])
+            else:
+                query = query.in_("status", statuses)
         else:
-            # Default: pharmacy sees pending + accepted
-            query = query.in_("status", ["pending", "accepted"])
+            # Default: all active stages
+            query = query.in_("status", ["pending", "accepted", "ready"])
         orders = query.execute()
+        if not orders.data:
+            orders_list = mock_db.get_orders_by_status(status)
+            return {"status": "success", "orders": orders_list}
+
         formatted_orders = []
         for o in orders.data:
             formatted_orders.append({

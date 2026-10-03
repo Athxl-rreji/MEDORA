@@ -151,37 +151,42 @@ export default function PharmacyDashboard() {
     fetchMissingFeed();
 
     const fetchOrders = async () => {
+      if (typeof document !== 'undefined' && document.hidden) return;
       try {
-        const [r1, r2, r3] = await Promise.all([
-          fetch(`${API}/api/v1/orders/active?status=pending`),
-          fetch(`${API}/api/v1/orders/active?status=accepted`),
-          fetch(`${API}/api/v1/orders/active?status=ready`),
-        ]);
-        setBackendOnline(true);
-        const [d1, d2, d3] = await Promise.all([
-          r1.ok ? r1.json() : { orders: [] },
-          r2.ok ? r2.json() : { orders: [] },
-          r3.ok ? r3.json() : { orders: [] },
-        ]);
-        const combined = [...(d1.orders || []), ...(d2.orders || []), ...(d3.orders || [])];
-        if (combined.length > orders.length) {
-          try {
-            const audio = new Audio("https://actions.google.com/sounds/v1/alarms/beep_short.ogg");
-            audio.play().catch(() => {});
-          } catch (e) {}
+        const res = await fetch(`${API}/api/v1/orders/active?status=pending,accepted,ready`);
+        if (res.ok) {
+          setBackendOnline(true);
+          const data = await res.json();
+          const combined = data.orders || [];
+          if (combined.length > orders.length) {
+            try {
+              const audio = new Audio("https://actions.google.com/sounds/v1/alarms/beep_short.ogg");
+              audio.play().catch(() => {});
+            } catch (e) {}
+          }
+          setOrders(combined);
+        } else {
+          setBackendOnline(false);
         }
-        setOrders(combined);
       } catch (e) {
         setBackendOnline(false);
       }
     };
 
     fetchOrders();
-    const timer = setInterval(() => {
-      fetchOrders();
-      fetchMissingFeed();
-    }, 3500);
-    return () => clearInterval(timer);
+    // Smart order polling: 5s interval, pauses when tab is hidden
+    const timer = setInterval(fetchOrders, 5000);
+    // Missing feed polling: 30s interval instead of hammering every 3.5s
+    const feedTimer = setInterval(() => {
+      if (typeof document !== 'undefined' && !document.hidden) {
+        fetchMissingFeed();
+      }
+    }, 30000);
+
+    return () => {
+      clearInterval(timer);
+      clearInterval(feedTimer);
+    };
   }, []);
 
   // ─── ORDER MANAGEMENT HANDLERS ───

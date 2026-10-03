@@ -16,6 +16,8 @@ export default function DeliveryDashboard() {
   useEffect(() => {
     if (!isOnline) return;
     const poll = async () => {
+      if (activeJob) return; // Rider already has a delivery in progress
+      if (typeof document !== 'undefined' && document.hidden) return; // Tab in background
       try {
         const res = await fetch(`${API}/api/v1/orders/active?status=ready`);
         if (res.ok) {
@@ -30,9 +32,9 @@ export default function DeliveryDashboard() {
       }
     };
     poll();
-    const t = setInterval(poll, 3000);
+    const t = setInterval(poll, 5000);
     return () => clearInterval(t);
-  }, [isOnline]);
+  }, [isOnline, activeJob]);
 
   // Accept & pick up: status -> out_for_delivery
   const handleAccept = async (order) => {

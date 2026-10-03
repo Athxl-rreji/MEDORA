@@ -532,21 +532,48 @@ export default function Home() {
     };
   }, []);
 
-  // Poll user's orders for live tracking
+  // Poll user's orders for live tracking with adaptive backoff & tab visibility check
   useEffect(() => {
+    let timerId = null;
+    let hasActive = false;
+
     const fetchMyOrders = async () => {
+      if (typeof document !== 'undefined' && document.hidden) {
+        timerId = setTimeout(fetchMyOrders, 12000);
+        return;
+      }
       try {
         const res = await fetch(`${API}/api/v1/orders/user/${USER_ID}`);
         if (res.ok) {
           const data = await res.json();
           const live = (data.orders || []).filter(o => o.status !== 'delivered');
           setActiveOrders(live);
+          hasActive = live.length > 0;
         }
       } catch (e) {}
+
+      // Active orders in progress: 4s tracking; No active orders: relaxed 20s poll
+      const delay = hasActive ? 4000 : 20000;
+      timerId = setTimeout(fetchMyOrders, delay);
     };
+
     fetchMyOrders();
-    const interval = setInterval(fetchMyOrders, 3000);
-    return () => clearInterval(interval);
+    const handleVisibilityChange = () => {
+      if (typeof document !== 'undefined' && !document.hidden) {
+        if (timerId) clearTimeout(timerId);
+        fetchMyOrders();
+      }
+    };
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+    }
+
+    return () => {
+      if (timerId) clearTimeout(timerId);
+      if (typeof document !== 'undefined') {
+        document.removeEventListener('visibilitychange', handleVisibilityChange);
+      }
+    };
   }, []);
 
   // Auto-popup chatbot greeting bubble after 2 seconds of visiting

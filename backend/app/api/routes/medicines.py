@@ -98,12 +98,19 @@ COMPOUND_DICTIONARY = {
     "limcee": {"compound": "Ascorbic Acid", "components": ["Ascorbic Acid"], "note": "Limcee contains active chemical compound Ascorbic Acid (Vitamin C) 500mg for immunity."}
 }
 
+# In-memory cache for ultra-fast clinical compound resolution
+_COMPOUND_CACHE: Dict[str, dict] = {}
+
 def resolve_chemical_compound_ai(query: str) -> dict:
     """
     Uses pharmacology database and Google Gemini AI to resolve brand names into active chemical compounds.
     Supports multi-composition drugs (e.g. Augmentin = Amoxicillin + Clavulanic Acid).
+    Results are cached in memory for sub-millisecond response on repeated queries.
     """
     clean_q = query.strip().lower()
+    if clean_q in _COMPOUND_CACHE:
+        return _COMPOUND_CACHE[clean_q]
+
     first_word = clean_q.split()[0] if clean_q else ""
 
     # 1. Fast local dictionary match (longest key first so "pan-d" matches before "pan")
@@ -115,13 +122,15 @@ def resolve_chemical_compound_ai(query: str) -> dict:
                     comps = [c.strip() for c in v["compound"].split("+")]
                 else:
                     comps = [v["compound"]]
-            return {
+            res = {
                 "compound_name": v["compound"],
                 "is_brand": True,
                 "note": v["note"],
                 "source": "pharmacology_kb",
                 "components": comps
             }
+            _COMPOUND_CACHE[clean_q] = res
+            return res
 
     # 2. Google Gemini AI resolution
     gemini_key = os.environ.get("GEMINI_API_KEY")
@@ -161,6 +170,7 @@ def resolve_chemical_compound_ai(query: str) -> dict:
                                 parsed["components"] = [c.strip() for c in cname.split("+")]
                             else:
                                 parsed["components"] = [cname]
+                        _COMPOUND_CACHE[clean_q] = parsed
                         return parsed
         except Exception as e:
             logger.warning(f"Gemini compound resolution timeout/fallback for '{query}': {e}")
@@ -173,13 +183,15 @@ def resolve_chemical_compound_ai(query: str) -> dict:
     else:
         comps = [query.title()]
 
-    return {
+    fallback_res = {
         "compound_name": query.title(),
         "is_brand": False,
         "note": f"Viewing medicines matching active formulation '{query.title()}'.",
         "source": "direct",
         "components": comps
     }
+    _COMPOUND_CACHE[clean_q] = fallback_res
+    return fallback_res
 
 class InventorySyncRequest(BaseModel):
     pharmacy_id: str = "PHARM_003"
@@ -317,7 +329,9 @@ def search_medicines(
     # 1. Search by brand name
     try:
         results = db.table("medicines").select("*").ilike("brand_name", f"%{q}%").execute()
-        raw_items = results.data
+        raw_items = results.data or []
+        if not raw_items:
+            raw_items = mock_db.search_medicines(q)
     except Exception:
         raw_items = mock_db.search_medicines(q)
 
@@ -326,7 +340,9 @@ def search_medicines(
     if resolved_compound and resolved_compound.lower() != q.lower():
         try:
             c_res = db.table("medicines").select("*").ilike("generic_name", f"%{resolved_compound}%").execute()
-            compound_items = c_res.data
+            compound_items = c_res.data or []
+            if not compound_items:
+                compound_items = mock_db.search_medicines(resolved_compound)
         except Exception:
             compound_items = mock_db.search_medicines(resolved_compound)
 

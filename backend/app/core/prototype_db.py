@@ -905,9 +905,10 @@ class PrototypeDataStore:
         return new_order
 
     def get_orders_by_status(self, status: Optional[str] = None) -> List[dict]:
-        if status:
-            return [o for o in self.orders if o.get("status") == status]
-        return [o for o in self.orders if o.get("status") in ["pending", "accepted"]]
+        if status and status.lower() not in ["active", "all"]:
+            statuses = [s.strip().lower() for s in status.split(",") if s.strip()]
+            return [o for o in self.orders if str(o.get("status", "")).lower() in statuses]
+        return [o for o in self.orders if str(o.get("status", "")).lower() in ["pending", "accepted", "ready"]]
 
     def get_active_orders(self) -> List[dict]:
         return self.get_orders_by_status("pending")

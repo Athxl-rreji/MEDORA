@@ -50,6 +50,7 @@ app.include_router(ai.router, prefix="/api/v1/ai", tags=["AI"])
 app.include_router(ai.router, prefix="/api/v1", tags=["AI"]) # supports /api/v1/chat
 app.include_router(ai.router, prefix="", tags=["AI"])       # supports /chat
 @app.get("/")
+@app.head("/")
 def root():
     return {
         "status": "online",
@@ -60,6 +61,7 @@ def root():
     }
 
 @app.get("/health")
+@app.get("/ping")
 def health_check():
     return {"status": "healthy", "service": "medora-backend"}
 
