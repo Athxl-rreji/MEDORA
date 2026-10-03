@@ -1,5 +1,8 @@
 import os
+import json
 import smtplib
+import urllib.request
+import urllib.error
 import dotenv
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -12,18 +15,123 @@ dotenv.load_dotenv(dotenv_path)
 def get_smtp_config():
     dotenv.load_dotenv(dotenv_path, override=True)
     server = os.getenv("SMTP_SERVER", "smtp.gmail.com")
-    port = int(os.getenv("SMTP_PORT", "587"))
+    port = int(os.getenv("SMTP_PORT", "465"))
     user = os.getenv("SMTP_USER", "medora2k26@gmail.com")
     raw_pass = os.getenv("GMAIL_APP_PASSWORD", "qpgy dkwk nfvx ytfi")
     clean_pass = raw_pass.replace(" ", "").strip()
     return server, port, user, clean_pass
 
+def get_relay_urls():
+    """Returns candidate HTTPS relay endpoints to bypass cloud firewall port blocks (Render/VPS)."""
+    urls = []
+    custom = os.getenv("EMAIL_RELAY_URL")
+    if custom:
+        urls.append(custom.strip())
+    # Production Vercel Next.js endpoint (unrestricted ports 465/587)
+    urls.append("https://frontend-user-athxl-rrejis-projects.vercel.app/api/send-email")
+    # Local development Next.js endpoint
+    urls.append("http://localhost:3000/api/send-email")
+    return urls
+
+def dispatch_email_message(
+    recipient_email: str,
+    subject: str,
+    html_content: str,
+    plain_text: str = "",
+    sender_name: str = "MEDORA Health Ecosystem",
+    extra_recipients: list = None
+) -> bool:
+    """
+    Intelligent Multi-Strategy Email Dispatcher:
+    Strategy 1: HTTPS API Relay over Port 443 (Permitted through all cloud firewalls including Render free tier)
+    Strategy 2: Direct SMTP SSL on Port 465
+    Strategy 3: Direct SMTP TLS on Port 587
+    """
+    server_host, configured_port, smtp_user, clean_password = get_smtp_config()
+    recipients = [recipient_email]
+    if extra_recipients:
+        for er in extra_recipients:
+            if er and er not in recipients:
+                recipients.append(er)
+
+    # -------------------------------------------------------------
+    # STRATEGY 1: HTTPS Web Relay (Port 443)
+    # Essential for cloud platforms like Render that block SMTP ports
+    # -------------------------------------------------------------
+    for relay_url in get_relay_urls():
+        try:
+            payload = {
+                "to": recipient_email,
+                "subject": subject,
+                "html": html_content,
+                "text": plain_text or subject,
+                "from_name": sender_name
+            }
+            req_data = json.dumps(payload).encode("utf-8")
+            req = urllib.request.Request(
+                relay_url,
+                data=req_data,
+                headers={"Content-Type": "application/json", "User-Agent": "MEDORA-Backend-Relay/2.0"},
+                method="POST"
+            )
+            with urllib.request.urlopen(req, timeout=7) as resp:
+                if resp.status in (200, 201):
+                    logger.info(f"SUCCESS: Delivered email to {recipient_email} via HTTPS Gateway ({relay_url})!")
+                    return True
+        except Exception as e:
+            # Continue to next candidate or fallback
+            pass
+
+    # -------------------------------------------------------------
+    # STRATEGY 2: Direct SMTP SSL (Port 465)
+    # Works locally or on VPS/hosts with open SMTP ports
+    # -------------------------------------------------------------
+    if clean_password:
+        try:
+            msg = MIMEMultipart("alternative")
+            msg["Subject"] = subject
+            msg["From"] = f"{sender_name} <{smtp_user}>"
+            msg["To"] = recipient_email
+            if plain_text:
+                msg.attach(MIMEText(plain_text, "plain"))
+            msg.attach(MIMEText(html_content, "html"))
+
+            with smtplib.SMTP_SSL(server_host, 465, timeout=6) as server:
+                server.login(smtp_user, clean_password)
+                server.sendmail(smtp_user, recipients, msg.as_string())
+            logger.info(f"SUCCESS: Delivered email to {recipient_email} via direct SMTP_SSL (Port 465)!")
+            return True
+        except Exception as e_ssl:
+            logger.warning(f"SMTP_SSL (Port 465) connection failed: {e_ssl}. Trying STARTTLS (Port 587)...")
+
+        # -------------------------------------------------------------
+        # STRATEGY 3: Direct SMTP STARTTLS (Port 587)
+        # -------------------------------------------------------------
+        try:
+            msg = MIMEMultipart("alternative")
+            msg["Subject"] = subject
+            msg["From"] = f"{sender_name} <{smtp_user}>"
+            msg["To"] = recipient_email
+            if plain_text:
+                msg.attach(MIMEText(plain_text, "plain"))
+            msg.attach(MIMEText(html_content, "html"))
+
+            with smtplib.SMTP(server_host, 587, timeout=6) as server:
+                server.starttls()
+                server.login(smtp_user, clean_password)
+                server.sendmail(smtp_user, recipients, msg.as_string())
+            logger.info(f"SUCCESS: Delivered email to {recipient_email} via direct SMTP (Port 587)!")
+            return True
+        except Exception as e_tls:
+            logger.error(f"ERROR: Direct SMTP also failed: {e_tls}")
+
+    logger.warning(f"[EMAIL SIMULATION LOG] Subject: '{subject}' -> Recipient: {recipient_email}")
+    return False
+
 def send_email_otp(recipient_email: str, otp_code: str, reason: str = "Registration Verification") -> bool:
     """
-    Sends a 6-digit OTP code to the recipient via Gmail SMTP.
+    Sends a 6-digit OTP code to the recipient via Multi-Strategy Dispatcher.
     """
-    server_host, port, smtp_user, clean_password = get_smtp_config()
-    
     subject = f"MEDORA Security Code: {otp_code} for {reason}"
     html_content = f"""
     <div style="font-family: Arial, sans-serif; background-color: #121316; color: #ffffff; padding: 24px; border-radius: 12px; border: 1px solid #30363d;">
@@ -35,36 +143,21 @@ def send_email_otp(recipient_email: str, otp_code: str, reason: str = "Registrat
       <p style="font-size: 13px; color: #94a3b8;">This code is valid for 5 minutes. If you did not request this, please ignore this message.</p>
     </div>
     """
+    plain_text = f"Your MEDORA security verification code for {reason} is: {otp_code} (Valid for 5 minutes)."
 
-    logger.info(f"Attempting live Gmail SMTP dispatch: User={smtp_user}, Recipient={recipient_email}")
-
-    if not clean_password:
-        logger.warning(f"[SMTP WARNING] GMAIL_APP_PASSWORD is empty. Email simulated for {recipient_email}")
-        return True
-
-    try:
-        msg = MIMEMultipart("alternative")
-        msg["Subject"] = subject
-        msg["From"] = f"MEDORA Security <{smtp_user}>"
-        msg["To"] = recipient_email
-        msg.attach(MIMEText(html_content, "html"))
-
-        with smtplib.SMTP(server_host, port, timeout=6) as server:
-            server.starttls()
-            server.login(smtp_user, clean_password)
-            server.sendmail(smtp_user, recipient_email, msg.as_string())
-        
-        logger.info(f"SUCCESS: Delivered 6-digit OTP email to {recipient_email} via Gmail SMTP!")
-        return True
-    except Exception as e:
-        logger.error(f"ERROR: Failed to send email via Gmail SMTP to {recipient_email}: {str(e)}")
-        return False
+    logger.info(f"Dispatching OTP email for {recipient_email} [Reason: {reason}, Code: {otp_code}]")
+    return dispatch_email_message(
+        recipient_email=recipient_email,
+        subject=subject,
+        html_content=html_content,
+        plain_text=plain_text,
+        sender_name="MEDORA Security"
+    )
 
 def send_partner_request_email(partner_type: str, full_name: str, email: str, phone: str, details: dict) -> bool:
     """
     Sends a Pharmacy / Delivery Rider application notification directly to medora2k26@gmail.com.
     """
-    server_host, port, smtp_user, clean_password = get_smtp_config()
     target_email = "medora2k26@gmail.com"
     subject = f"🚨 New Partner Request: {partner_type.upper()} Application from {full_name}"
     
@@ -94,36 +187,21 @@ def send_partner_request_email(partner_type: str, full_name: str, email: str, ph
       <p style="font-size: 12px; color: #8b949e; margin-top: 20px;">Review and approve this application in the MEDORA Admin Portal.</p>
     </div>
     """
+    plain_text = f"New {partner_type.upper()} application from {full_name} ({email}, {phone}). Please review in Admin Portal."
 
     logger.info(f"[PARTNER REQUEST LOGGED] Role: {partner_type}, Name: {full_name}, Email: {email}, Phone: {phone}")
-
-    if not clean_password:
-        logger.warning(f"[SMTP WARNING] GMAIL_APP_PASSWORD empty. Partner email simulated for {full_name}")
-        return True
-
-    try:
-        msg = MIMEMultipart("alternative")
-        msg["Subject"] = subject
-        msg["From"] = f"MEDORA Portal <{smtp_user}>"
-        msg["To"] = target_email
-        msg.attach(MIMEText(html_content, "html"))
-
-        with smtplib.SMTP(server_host, port, timeout=6) as server:
-            server.starttls()
-            server.login(smtp_user, clean_password)
-            server.sendmail(smtp_user, target_email, msg.as_string())
-        
-        logger.info(f"SUCCESS: Delivered partner application email to {target_email}!")
-        return True
-    except Exception as e:
-        logger.error(f"ERROR: Failed to send partner request email to {target_email}: {str(e)}")
-        return False
+    return dispatch_email_message(
+        recipient_email=target_email,
+        subject=subject,
+        html_content=html_content,
+        plain_text=plain_text,
+        sender_name="MEDORA Portal"
+    )
 
 def send_partner_approval_email(recipient_email: str, full_name: str, partner_type: str, temp_password: str) -> bool:
     """
     Sends an Application Approval notification to the partner with login instructions and temporary password.
     """
-    server_host, port, smtp_user, clean_password = get_smtp_config()
     subject = f"🎉 Application Approved! Welcome to MEDORA as a {partner_type.capitalize()} Partner"
     
     html_content = f"""
@@ -140,27 +218,15 @@ def send_partner_approval_email(recipient_email: str, full_name: str, partner_ty
       <p style="font-size: 13px; color: #8b949e; margin-top: 20px;">You can now sign in directly on the MEDORA Web Portal under <strong>'Pharmacy or Rider Sign In'</strong>.</p>
     </div>
     """
+    plain_text = f"Congratulations {full_name}! Your application to join MEDORA as a {partner_type.capitalize()} Partner is APPROVED. Email: {recipient_email}, Temporary Password: {temp_password}"
 
-    if not clean_password:
-        logger.info(f"[SIMULATION] Sent approval email to {recipient_email}")
-        return True
-
-    try:
-        msg = MIMEMultipart("alternative")
-        msg["Subject"] = subject
-        msg["From"] = f"MEDORA Executive Team <{smtp_user}>"
-        msg["To"] = recipient_email
-        msg.attach(MIMEText(html_content, "html"))
-
-        with smtplib.SMTP(server_host, port, timeout=6) as server:
-            server.starttls()
-            server.login(smtp_user, clean_password)
-            server.sendmail(smtp_user, recipient_email, msg.as_string())
-        logger.info(f"Delivered approval email to {recipient_email}")
-        return True
-    except Exception as e:
-        logger.error(f"Failed to send approval email: {str(e)}")
-        return False
+    return dispatch_email_message(
+        recipient_email=recipient_email,
+        subject=subject,
+        html_content=html_content,
+        plain_text=plain_text,
+        sender_name="MEDORA Executive Team"
+    )
 
 def send_partner_rejection_email(
     recipient_email: str,
@@ -175,7 +241,6 @@ def send_partner_rejection_email(
     the explicit stated reason for rejection, and instructions to the applicant.
     Also sends a copy to the system administrator (medora2k26@gmail.com).
     """
-    server_host, port, smtp_user, clean_password = get_smtp_config()
     p_type_label = partner_type.capitalize()
     subject = f"❌ Application Status: Your MEDORA {p_type_label} Partner Request Was Not Approved"
 
@@ -226,7 +291,6 @@ If you believe this decision was made in error, or if you have updated licensing
 
 Sincerely,
 MEDORA Partner Compliance & Onboarding Team
-Website: http://localhost:3000
     """.strip()
 
     html_content = f"""
@@ -303,28 +367,11 @@ Website: http://localhost:3000
     </html>
     """
 
-    if not clean_password:
-        logger.info(f"[SIMULATION] Rejection email simulated for {recipient_email} with reason: '{clean_reason}'")
-        return True
-
-    try:
-        msg = MIMEMultipart("alternative")
-        msg["Subject"] = subject
-        msg["From"] = f"MEDORA Partner Onboarding <{smtp_user}>"
-        msg["To"] = recipient_email
-        msg.attach(MIMEText(plain_text, "plain"))
-        msg.attach(MIMEText(html_content, "html"))
-
-        with smtplib.SMTP(server_host, port, timeout=20) as server:
-            server.starttls()
-            server.login(smtp_user, clean_password)
-            recipients = [recipient_email]
-            if smtp_user and smtp_user.lower() != recipient_email.lower():
-                recipients.append(smtp_user)  # Admin copy so admin can verify exact mail in their inbox
-            server.sendmail(smtp_user, recipients, msg.as_string())
-        logger.info(f"SUCCESS: Delivered rejection email with reason to {recipient_email} and copy to {smtp_user}")
-        return True
-    except Exception as e:
-        logger.error(f"Failed to send rejection email: {str(e)}")
-        return False
-
+    return dispatch_email_message(
+        recipient_email=recipient_email,
+        subject=subject,
+        html_content=html_content,
+        plain_text=plain_text,
+        sender_name="MEDORA Partner Onboarding",
+        extra_recipients=["medora2k26@gmail.com"]
+    )

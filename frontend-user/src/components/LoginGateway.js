@@ -516,7 +516,47 @@ export default function LoginGateway({ onLoginSuccess }) {
       localStorage.setItem('medora_partner_applications', JSON.stringify(existingReqs));
     } catch (e) {}
 
-    // 2. Abort controller with 6-second timeout ensures UI never freezes
+    // 2. Dispatch partner notification email directly via Next.js mailer
+    try {
+      const emailDetailRows = [
+        `<tr><td style="padding: 6px 12px; font-weight: bold; color: #94a3b8;">Partner Role:</td><td style="padding: 6px 12px; color: #38bdf8; font-weight: bold;">${partnerType.toUpperCase()}</td></tr>`,
+        `<tr><td style="padding: 6px 12px; font-weight: bold; color: #94a3b8;">Applicant Name:</td><td style="padding: 6px 12px; color: #ffffff;">${partnerPayload.full_name}</td></tr>`,
+        `<tr><td style="padding: 6px 12px; font-weight: bold; color: #94a3b8;">Email Address:</td><td style="padding: 6px 12px; color: #ffffff;">${partnerPayload.email}</td></tr>`,
+        `<tr><td style="padding: 6px 12px; font-weight: bold; color: #94a3b8;">Phone Number:</td><td style="padding: 6px 12px; color: #ffffff;">${partnerPayload.phone}</td></tr>`,
+        partnerPayload.store_name ? `<tr><td style="padding: 6px 12px; font-weight: bold; color: #94a3b8;">Store Name:</td><td style="padding: 6px 12px; color: #ffffff;">${partnerPayload.store_name}</td></tr>` : '',
+        partnerPayload.license_no ? `<tr><td style="padding: 6px 12px; font-weight: bold; color: #94a3b8;">License No:</td><td style="padding: 6px 12px; color: #ffffff;">${partnerPayload.license_no}</td></tr>` : '',
+        partnerPayload.store_address ? `<tr><td style="padding: 6px 12px; font-weight: bold; color: #94a3b8;">Store Address:</td><td style="padding: 6px 12px; color: #ffffff;">${partnerPayload.store_address}</td></tr>` : '',
+        partnerPayload.vehicle_type ? `<tr><td style="padding: 6px 12px; font-weight: bold; color: #94a3b8;">Vehicle Type:</td><td style="padding: 6px 12px; color: #ffffff;">${partnerPayload.vehicle_type}</td></tr>` : '',
+        partnerPayload.driving_license ? `<tr><td style="padding: 6px 12px; font-weight: bold; color: #94a3b8;">Driving License:</td><td style="padding: 6px 12px; color: #ffffff;">${partnerPayload.driving_license}</td></tr>` : '',
+        partnerPayload.vehicle_number ? `<tr><td style="padding: 6px 12px; font-weight: bold; color: #94a3b8;">Vehicle Number:</td><td style="padding: 6px 12px; color: #ffffff;">${partnerPayload.vehicle_number}</td></tr>` : '',
+        partnerPayload.rider_upi_id ? `<tr><td style="padding: 6px 12px; font-weight: bold; color: #94a3b8;">Rider UPI ID:</td><td style="padding: 6px 12px; color: #ffffff;">${partnerPayload.rider_upi_id}</td></tr>` : '',
+        partnerPayload.rider_upi_qr ? `<tr><td style="padding: 6px 12px; font-weight: bold; color: #94a3b8;">Rider UPI QR:</td><td style="padding: 6px 12px; color: #4ade80;">✓ [Digital UPI QR Code Uploaded & Stored]</td></tr>` : '',
+        partnerPayload.shop_upi_id ? `<tr><td style="padding: 6px 12px; font-weight: bold; color: #94a3b8;">Shop UPI ID:</td><td style="padding: 6px 12px; color: #ffffff;">${partnerPayload.shop_upi_id}</td></tr>` : '',
+        partnerPayload.shop_upi_qr ? `<tr><td style="padding: 6px 12px; font-weight: bold; color: #94a3b8;">Shop UPI QR:</td><td style="padding: 6px 12px; color: #4ade80;">✓ [Digital Shop QR Stored]</td></tr>` : ''
+      ].filter(Boolean).join('');
+
+      fetch('/api/send-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          to: 'medora2k26@gmail.com',
+          from_name: 'MEDORA Partner Onboarding',
+          subject: `🚨 New Partner Request: ${partnerType.toUpperCase()} Application from ${partnerPayload.full_name}`,
+          html: `
+            <div style="font-family: Arial, sans-serif; background-color: #0d1117; color: #ffffff; padding: 24px; border-radius: 12px; border: 1px solid #30363d;">
+              <h2 style="color: #38bdf8; margin-bottom: 8px;">MEDORA Partner Onboarding Request</h2>
+              <p style="font-size: 14px; color: #8b949e; margin-bottom: 20px;">A new partner application has been submitted on the MEDORA Web Portal:</p>
+              <table style="width: 100%; border-collapse: collapse; background-color: #161b22; border-radius: 8px; overflow: hidden;">
+                ${emailDetailRows}
+              </table>
+              <p style="font-size: 12px; color: #8b949e; margin-top: 20px;">Review and approve this application in the MEDORA Admin Portal.</p>
+            </div>
+          `
+        })
+      }).catch(err => console.warn('Next.js direct email relay:', err));
+    } catch (e) {}
+
+    // 3. Abort controller with 6-second timeout ensures UI never freezes
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 6000);
 
