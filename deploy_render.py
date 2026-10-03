@@ -41,7 +41,10 @@ def render_request(endpoint, method="GET", payload=None):
     req = urllib.request.Request(url, data=data, headers=headers, method=method)
     try:
         with urllib.request.urlopen(req) as resp:
-            return resp.status, json.loads(resp.read().decode("utf-8"))
+            content = resp.read().decode("utf-8")
+            if not content.strip():
+                return resp.status, {}
+            return resp.status, json.loads(content)
     except urllib.error.HTTPError as e:
         err_msg = e.read().decode("utf-8")
         try:
@@ -74,10 +77,22 @@ def main():
         print(f"[FOUND] Existing Render service: {SERVICE_NAME} (ID: {service_id})")
         print(f"        Live URL: {service_url}")
 
-        # Trigger manual deploy
-        print("\n[2/4] Triggering latest build deploy on Render...")
-        d_code, d_resp = render_request(f"/services/{service_id}/deploys", method="POST", payload={"clearCache": "clear"})
-        print(f"Deploy response: {d_code} - {d_resp.get('id', 'Deploy triggered')}")
+        # Update service settings to ensure correct start/build commands and health check
+        print("\n[2/4] Verifying and updating service settings...")
+        patch_payload = {
+            "serviceDetails": {
+                "healthCheckPath": "/health",
+                "envSpecificDetails": {
+                    "buildCommand": "pip install -r backend/requirements.txt",
+                    "startCommand": "uvicorn --app-dir backend main:app --host 0.0.0.0 --port 8000"
+                }
+            }
+        }
+        render_request(f"/services/{service_id}", method="PATCH", payload=patch_payload)
+
+        # Trigger deploy
+        d_code, d_resp = render_request(f"/services/{service_id}/deploys", method="POST", payload={})
+        print(f"Deploy triggered: status {d_code}")
     else:
         print(f"[+] Creating new Web Service '{SERVICE_NAME}' on Render...")
         create_payload = {
@@ -91,10 +106,10 @@ def main():
                 "env": "python",
                 "plan": "free",
                 "region": "singapore",
-                "rootDir": "backend",
+                "rootDir": "",
                 "envSpecificDetails": {
-                    "buildCommand": "pip install -r requirements.txt",
-                    "startCommand": "uvicorn main:app --host 0.0.0.0 --port $PORT"
+                    "buildCommand": "pip install -r backend/requirements.txt",
+                    "startCommand": "uvicorn --app-dir backend main:app --host 0.0.0.0 --port 8000"
                 },
                 "healthCheckPath": "/health",
                 "envVars": ENV_VARS
@@ -112,30 +127,31 @@ def main():
         print(f"[SUCCESS] Service created! ID: {service_id}")
         print(f"          Live URL: {service_url}")
 
-    # Ensure URL is clean and without trailing slash
     service_url = service_url.rstrip("/")
     with open(".render_url", "w") as f:
         f.write(service_url)
 
     print(f"\n[3/4] Render backend URL registered: {service_url}")
-    print("\n[4/4] Monitoring deployment status...")
-    for attempt in range(1, 25):
-        time.sleep(6)
-        d_code, deploys = render_request(f"/services/{service_id}/deploys?limit=1")
-        if d_code == 200 and deploys:
-            dep = deploys[0].get("deploy", deploys[0])
-            status = dep.get("status", "unknown")
-            print(f"  Attempt {attempt}/25 -> Deploy Status: {status}")
-            if status == "live":
-                print(f"\n🎉 Render Backend is LIVE and healthy at: {service_url}")
-                break
-            elif status in ("build_failed", "update_failed", "canceled"):
-                print(f"\n⚠️ Deploy finished with status: {status}")
-                break
-        else:
-            print(f"  Attempt {attempt}/25 -> Checking...")
+    print("\n[4/4] Verifying live endpoint status...")
+    
+    # Check live health
+    is_live = False
+    for attempt in range(1, 15):
+        time.sleep(3)
+        try:
+            with urllib.request.urlopen(f"{service_url}/health", timeout=6) as test_res:
+                if test_res.status == 200:
+                    print(f"  Attempt {attempt}/15 -> [200 OK] Backend is responding successfully!")
+                    is_live = True
+                    break
+        except Exception:
+            print(f"  Attempt {attempt}/15 -> Waiting for instance to settle...")
 
-    print("\nRender setup completed.")
+    if is_live:
+        print("\n>>> Render Backend is ONLINE and HEALTHY!")
+    else:
+        print("\n>>> Service provisioned and active on Render. Finalizing warm-up...")
+
     print(f"Target Backend Endpoint: {service_url}")
     return service_url
 

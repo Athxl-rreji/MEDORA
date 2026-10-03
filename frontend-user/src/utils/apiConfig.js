@@ -1,10 +1,10 @@
 // MEDORA Unified API Resolver
 // Handles 3 environments seamlessly:
-// 1. Cloud Production (Vercel / custom domains) -> connects to https://backend-three-kappa-38.vercel.app
+// 1. Cloud Production (Render Backend) -> connects to https://medora-backend-4q9x.onrender.com
 // 2. Local Wi-Fi / Hotspot LAN (Mac/Phone connecting to host PC IP) -> connects to http://<PC-IP>:8000
 // 3. Localhost Development (PC browser) -> connects to http://localhost:8000
 
-export const CLOUD_BACKEND_URL = 'https://backend-three-kappa-38.vercel.app';
+export const CLOUD_BACKEND_URL = 'https://medora-backend-4q9x.onrender.com';
 
 export const getApiUrl = () => {
   const envApi = process.env.NEXT_PUBLIC_API_URL;

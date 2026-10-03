@@ -2,7 +2,7 @@
 setlocal enabledelayedexpansion
 
 echo ============================================================
-echo          MEDORA Automated Cloud Deployment (Vercel)
+echo      MEDORA Full-Stack Cloud Deployment (Render + Vercel)
 echo ============================================================
 echo.
 
@@ -23,18 +23,20 @@ if %ERRORLEVEL% NEQ 0 (
 )
 
 echo.
-echo [Step 1] Ensuring Git commits are synced...
+echo ============================================================
+echo [Step 1/5] Syncing Git Commits to GitHub...
+echo ============================================================
 git push origin main
 if %ERRORLEVEL% NEQ 0 (
-    echo [NOTE] If Git login is requested, click "Push origin" in GitHub Desktop.
+    echo [NOTE] If Git credentials are required, click "Push origin" in GitHub Desktop.
 )
 
 echo.
 echo ============================================================
-echo [Step 2/5] Deploying Core FastAPI Backend to Vercel...
+echo [Step 2/5] Deploying Core FastAPI Backend to Render...
 echo ============================================================
-cd /d "%~dp0backend"
-cmd /c "npx -y vercel deploy --prod --yes"
+cd /d "%~dp0"
+python deploy_render.py
 
 echo.
 echo ============================================================
@@ -63,7 +65,7 @@ echo ============================================================
 echo      Deployment Complete! All MEDORA services are online!
 echo ============================================================
 echo.
-echo Core Backend API:     https://backend-three-kappa-38.vercel.app
+echo Core Backend API:     https://medora-backend-4q9x.onrender.com
 echo Patient Portal:       https://frontend-user-athxl-rrejis-projects.vercel.app
 echo.
 pause

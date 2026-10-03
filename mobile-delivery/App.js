@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { StyleSheet, Text, View, ScrollView, TouchableOpacity, SafeAreaView, Alert, Platform } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 
-// Connect to live cloud backend (accessible from anywhere, anytime)
-const API = 'https://backend-three-kappa-38.vercel.app';
+// Connect to live cloud backend on Render (accessible from anywhere, anytime)
+const API = 'https://medora-backend-4q9x.onrender.com';
 const AGENT_ID = "AGT-591";
 
 export default function App() {
