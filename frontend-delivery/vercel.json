@@ -5,6 +5,7 @@
   "env": {
     "NEXT_PUBLIC_API_URL": "https://medora-backend-4q9x.onrender.com",
     "NEXT_PUBLIC_SUPABASE_URL": "https://pahrhwcigcrdwvpxyxop.supabase.co",
-    "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY": "sb_publishable_uoqbLCd0JokQJGizvo6PcA_4xj9rAQt"
+    "NEXT_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBhaHJod2NpZ2NyZHd2cHh5eG9wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcwMjQ3MjQsImV4cCI6MjA5MjYwMDcyNH0.0ygjeHbUOsSMyDlX6ShWEFukrZ0FRtllB2h_WqIADJ0",
+    "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBhaHJod2NpZ2NyZHd2cHh5eG9wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcwMjQ3MjQsImV4cCI6MjA5MjYwMDcyNH0.0ygjeHbUOsSMyDlX6ShWEFukrZ0FRtllB2h_WqIADJ0"
   }
 }

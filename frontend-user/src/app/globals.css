@@ -1,49 +1,56 @@
 @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
 
 :root {
-  /* Vibrant Seafoam, Teal & Cyber Emerald Palette */
-  --primary: #0d9488;        /* Deep Teal */
-  --primary-hover: #0f766e;  /* Teal 700 */
-  --primary-light: #ccfbf1;  /* Soft Mint Tint */
-  --primary-glow: rgba(13, 148, 136, 0.28);
+  /* Palette B: Cyber Obsidian & Dark Neumorphic Tokens */
+  --primary: #14b8a6;        /* Luminous Teal */
+  --primary-hover: #2dd4bf;  /* Cyber Seafoam */
+  --primary-light: rgba(20, 184, 166, 0.16); /* Soft glowing mint tint */
+  --primary-glow: rgba(20, 184, 166, 0.35);
   --accent-mint: #2dd4bf;    /* Bright Seafoam */
-  --accent-seafoam: #b8f7e4; /* Signature Medora Mint */
+  --accent-seafoam: #5eead4; /* Signature Medora Mint */
   --accent-emerald: #10b981; /* Emerald Green */
-  --accent-cyan: #06b6d4;    /* Cyber Cyan */
-  --accent-orange: #ff6b00;  /* Instamart Orange */
-  --accent-purple: #8b5cf6;  /* AI Violet */
+  --accent-cyan: #38bdf8;    /* Luminous Cyber Cyan */
+  --accent-orange: #ff7700;  /* Instamart Orange */
+  --accent-purple: #a855f7;  /* AI Violet */
 
-  /* Light Theme Backgrounds with Luminous Frosted Layers */
-  --bg-dark: #ffffff;
-  --bg-body: #f8fafc;        /* Slate 50 */
-  --bg-card: #ffffff;        /* Pure Crisp White */
-  --bg-card-hover: #f1f5f9;  /* Slate 100 */
-  --bg-subtle: #f0fdfa;      /* Mint Mist */
+  /* Cyber Obsidian Dark Surfaces */
+  --bg-dark: #0a0d14;        /* Deepest Obsidian */
+  --bg-body: #0d1117;        /* Clean Cyber Obsidian Body */
+  --bg-card: #151a24;        /* Neumorphic Raised Card Base */
+  --bg-card-hover: #19202c;  /* Slightly Elevated */
+  --bg-subtle: #121620;      /* Inset Well Surface */
   
   /* Borders and Dividers */
-  --border-color: rgba(226, 232, 240, 0.85);
-  --border-focus: #0d9488;
-  --border-mint: rgba(45, 212, 191, 0.45);
-  --border-glow: rgba(13, 148, 136, 0.35);
+  --border-color: rgba(255, 255, 255, 0.08);
+  --border-focus: #14b8a6;
+  --border-mint: rgba(45, 212, 191, 0.38);
+  --border-glow: rgba(56, 189, 248, 0.38);
 
-  /* Typography */
-  --text-main: #0f172a;      /* Deep Obsidian Slate 900 */
-  --text-muted: #64748b;     /* Clean Slate 500 */
-  --text-dark: #1e293b;
+  /* Luminous Crisp Typography */
+  --text-main: #f1f5f9;      /* Slate 100 Crisp White */
+  --text-muted: #94a3b8;     /* Slate 400 Cool Gray */
+  --text-dark: #cbd5e1;      /* Slate 300 */
   
   /* Status Colors */
-  --red: #ef4444;
-  --green: #10b981;
-  --amber: #f59e0b;
-  --orange: #ff6b00;
+  --red: #f87171;
+  --green: #34d399;
+  --amber: #fbbf24;
+  --orange: #ff7700;
+
+  /* Neumorphic Dual Shadows (Palette B) */
+  --neo-shadow-raised: -4px -4px 10px rgba(255, 255, 255, 0.032), 5px 5px 14px rgba(0, 0, 0, 0.72);
+  --neo-shadow-raised-sm: -2px -2px 6px rgba(255, 255, 255, 0.028), 3px 3px 8px rgba(0, 0, 0, 0.65);
+  --neo-shadow-raised-lg: -6px -6px 16px rgba(255, 255, 255, 0.038), 8px 8px 22px rgba(0, 0, 0, 0.82);
+  --neo-shadow-inset: inset 3px 3px 7px rgba(0, 0, 0, 0.75), inset -2px -2px 6px rgba(255, 255, 255, 0.03);
+  --neo-shadow-glow: 0 0 20px rgba(20, 184, 166, 0.35);
 
   /* Elevated Shadows */
-  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.02);
-  --shadow-md: 0 4px 16px -2px rgba(0, 0, 0, 0.06), 0 2px 6px -1px rgba(0, 0, 0, 0.03);
-  --shadow-lg: 0 14px 34px -4px rgba(13, 148, 136, 0.16), 0 4px 12px -2px rgba(0, 0, 0, 0.04);
-  --shadow-xl: 0 24px 50px -10px rgba(15, 23, 42, 0.12);
-  --shadow-glow: 0 0 28px rgba(45, 212, 191, 0.45);
-  --shadow-instamart: 0 8px 25px rgba(255, 107, 0, 0.25);
+  --shadow-sm: var(--neo-shadow-raised-sm);
+  --shadow-md: var(--neo-shadow-raised);
+  --shadow-lg: var(--neo-shadow-raised-lg);
+  --shadow-xl: 0 24px 50px -10px rgba(0, 0, 0, 0.85);
+  --shadow-glow: 0 0 28px rgba(45, 212, 191, 0.4);
+  --shadow-instamart: 0 8px 25px rgba(255, 119, 0, 0.35);
 }
 
 * {
@@ -61,9 +68,9 @@ html {
 body {
   background-color: var(--bg-body);
   background-image: 
-    radial-gradient(circle at 8% 12%, rgba(184, 247, 228, 0.45) 0%, transparent 40%),
-    radial-gradient(circle at 92% 88%, rgba(204, 251, 241, 0.55) 0%, transparent 45%),
-    radial-gradient(circle at 50% 50%, rgba(240, 253, 250, 0.7) 0%, transparent 100%);
+    radial-gradient(circle at 12% 14%, rgba(20, 184, 166, 0.09) 0%, transparent 42%),
+    radial-gradient(circle at 88% 86%, rgba(56, 189, 248, 0.07) 0%, transparent 45%),
+    radial-gradient(circle at 50% 50%, rgba(13, 17, 23, 0.95) 0%, transparent 100%);
   color: var(--text-main);
   font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
   min-height: 100vh;
@@ -79,57 +86,57 @@ h1, h2, h3, h4, h5, h6 {
   color: var(--text-main);
 }
 
-/* Glassmorphism Panel - Ultra Crisp Light Mode */
+/* Glassmorphism Panel - Cyber Obsidian Dark Neumorphism */
 .glass-panel {
-  background: rgba(255, 255, 255, 0.94);
+  background: var(--bg-card);
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
   border: 1px solid var(--border-color);
   border-radius: 24px;
-  box-shadow: var(--shadow-md);
+  box-shadow: var(--neo-shadow-raised);
   transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .glass-panel:hover {
   border-color: var(--border-mint);
-  box-shadow: var(--shadow-lg);
+  box-shadow: var(--neo-shadow-raised-lg), var(--neo-shadow-glow);
   transform: translateY(-2px);
 }
 
 /* Glass Card with Glowing Border */
 .glass-card-interactive {
-  background: #ffffff;
-  border: 1.5px solid rgba(226, 232, 240, 0.85);
+  background: #161c27;
+  border: 1px solid rgba(255, 255, 255, 0.07);
   border-radius: 20px;
   transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-  box-shadow: var(--shadow-sm);
+  box-shadow: var(--neo-shadow-raised-sm);
   position: relative;
   overflow: hidden;
 }
 
 .glass-card-interactive:hover {
   border-color: var(--accent-mint);
-  box-shadow: 0 12px 28px -4px rgba(13, 148, 136, 0.18);
+  box-shadow: var(--neo-shadow-raised), 0 0 16px rgba(45, 212, 191, 0.25);
   transform: translateY(-3px);
 }
 
 /* Gradient Text Styles */
 .gradient-text {
-  background: linear-gradient(135deg, #0f172a 0%, #0d9488 55%, #10b981 100%);
+  background: linear-gradient(135deg, #ffffff 0%, #2dd4bf 55%, #38bdf8 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   display: inline-block;
 }
 
 .gradient-mint-text {
-  background: linear-gradient(135deg, #0d9488 0%, #14b8a6 60%, #10b981 100%);
+  background: linear-gradient(135deg, #14b8a6 0%, #2dd4bf 60%, #5eead4 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   display: inline-block;
 }
 
 .gradient-instamart-text {
-  background: linear-gradient(135deg, #ff6b00 0%, #ffa800 100%);
+  background: linear-gradient(135deg, #ff7700 0%, #ffaa00 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   display: inline-block;
@@ -137,7 +144,7 @@ h1, h2, h3, h4, h5, h6 {
 
 /* Custom Buttons with Micro-Interactions */
 .btn-primary {
-  background: linear-gradient(135deg, #0d9488 0%, #10b981 100%);
+  background: linear-gradient(135deg, #14b8a6 0%, #0d9488 100%);
   color: #ffffff;
   border: none;
   padding: 0.85rem 1.8rem;
@@ -147,7 +154,7 @@ h1, h2, h3, h4, h5, h6 {
   font-size: 0.95rem;
   cursor: pointer;
   transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-  box-shadow: 0 4px 16px rgba(13, 148, 136, 0.35);
+  box-shadow: 0 4px 16px rgba(20, 184, 166, 0.4);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -156,9 +163,9 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .btn-primary:hover {
-  background: linear-gradient(135deg, #0f766e 0%, #059669 100%);
+  background: linear-gradient(135deg, #2dd4bf 0%, #0f766e 100%);
   transform: translateY(-2px);
-  box-shadow: 0 8px 24px rgba(13, 148, 136, 0.45);
+  box-shadow: 0 8px 24px rgba(20, 184, 166, 0.55);
 }
 
 .btn-primary:active {
@@ -166,9 +173,9 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .btn-secondary {
-  background: #ffffff;
+  background: #181e2b;
   color: var(--text-main);
-  border: 1.5px solid var(--border-color);
+  border: 1px solid rgba(255, 255, 255, 0.09);
   padding: 0.8rem 1.6rem;
   border-radius: 99px;
   font-family: 'Outfit', sans-serif;
@@ -180,15 +187,16 @@ h1, h2, h3, h4, h5, h6 {
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
-  box-shadow: var(--shadow-sm);
+  box-shadow: var(--neo-shadow-raised-sm);
   user-select: none;
 }
 
 .btn-secondary:hover {
-  background: var(--bg-subtle);
+  background: #1e2637;
   border-color: var(--primary);
   color: var(--primary);
   transform: translateY(-1px);
+  box-shadow: var(--neo-shadow-raised);
 }
 
 .btn-secondary:active {
@@ -197,7 +205,7 @@ h1, h2, h3, h4, h5, h6 {
 
 /* Instamart Orange Button */
 .btn-instamart {
-  background: linear-gradient(135deg, #ff6b00 0%, #ffa800 100%);
+  background: linear-gradient(135deg, #ff7700 0%, #ffa800 100%);
   color: #ffffff;
   border: none;
   padding: 0.85rem 1.6rem;
@@ -216,32 +224,32 @@ h1, h2, h3, h4, h5, h6 {
 
 .btn-instamart:hover {
   transform: translateY(-2px);
-  box-shadow: 0 10px 30px rgba(255, 107, 0, 0.4);
+  box-shadow: 0 10px 30px rgba(255, 119, 0, 0.45);
 }
 
-/* Modern Input Fields with Glowing Focus */
+/* Modern Input Fields with Glowing Inset Focus */
 .input-field {
   width: 100%;
   padding: 0.95rem 1.35rem;
-  background: #ffffff;
-  border: 1.5px solid #cbd5e1;
+  background: #0f131b;
+  border: 1.5px solid rgba(255, 255, 255, 0.1);
   border-radius: 14px;
-  color: #0f172a;
+  color: #f1f5f9;
   font-size: 0.95rem;
   font-family: inherit;
   outline: none;
   transition: all 0.25s ease;
-  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.03);
+  box-shadow: var(--neo-shadow-inset);
 }
 
 .input-field:focus {
   border-color: var(--primary);
-  box-shadow: 0 0 0 3.5px rgba(13, 148, 136, 0.16);
-  background: #ffffff;
+  box-shadow: var(--neo-shadow-inset), 0 0 0 3px rgba(20, 184, 166, 0.22);
+  background: #111622;
 }
 
 .input-field::placeholder {
-  color: #94a3b8;
+  color: #64748b;
 }
 
 /* Global Container */
@@ -639,11 +647,11 @@ h1, h2, h3, h4, h5, h6 {
   }
 
   .chatbot-window {
-    bottom: 148px;
+    bottom: 74px;
     right: 12px;
     left: 12px;
     width: auto;
-    height: 72vh;
+    height: 75vh;
   }
 
   .modal-content {
@@ -665,6 +673,109 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 @media (max-width: 768px) {
+  /* Prevent content clipping behind bottom navigation bar */
+  body {
+    padding-bottom: 75px !important;
+  }
+
+  /* 1. Header & Location Bar on Mobile */
+  .hide-on-mobile {
+    display: none !important;
+  }
+
+  .medora-role-header {
+    padding: 0.5rem 0.85rem !important;
+  }
+
+  .header-location-chip {
+    max-width: 175px !important;
+    padding: 3px 8px !important;
+  }
+
+  .header-location-chip > div > span:last-child {
+    max-width: 95px !important;
+  }
+
+  /* 2. Hero Command Cards Grid (2x2 Touch Layout) */
+  .hero-command-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 8px !important;
+    margin-bottom: 1.5rem !important;
+  }
+
+  .hero-command-grid > div {
+    padding: 0.75rem 0.65rem !important;
+    border-radius: 14px !important;
+  }
+
+  .hero-command-grid > div p {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    font-size: 0.68rem !important;
+  }
+
+  /* 3. Search Bar on Mobile */
+  .search-container {
+    border-radius: 12px !important;
+  }
+
+  /* 4. Instamart Medicine Shelf (Clean 2-Column Mobile Shelf) */
+  .instamart-products-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 8px !important;
+  }
+
+  .instamart-products-grid .glass-panel {
+    padding: 0.85rem !important;
+    border-radius: 16px !important;
+  }
+
+  /* 5. Admin Console Mobile Layout */
+  .admin-console-root {
+    padding: 1rem 0.65rem !important;
+  }
+
+  .admin-header-banner {
+    padding: 1rem 0.85rem !important;
+    border-radius: 12px !important;
+  }
+
+  .admin-console-nav-tabs {
+    overflow-x: auto !important;
+    flex-wrap: nowrap !important;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 0.4rem !important;
+  }
+
+  .admin-console-nav-tabs button {
+    white-space: nowrap !important;
+    font-size: 0.8rem !important;
+    padding: 0.5rem 0.9rem !important;
+  }
+
+  .admin-kpi-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 0.65rem !important;
+  }
+
+  .admin-filter-bar {
+    padding: 0.75rem !important;
+  }
+
+  .admin-status-tabs {
+    overflow-x: auto !important;
+    flex-wrap: nowrap !important;
+    -webkit-overflow-scrolling: touch;
+    width: 100% !important;
+  }
+
+  .admin-status-tabs button {
+    white-space: nowrap !important;
+  }
+
+  /* 6. Mobile Sticky Bottom Navigation Bar */
   .medora-mobile-nav {
     display: flex;
     position: fixed;
@@ -672,11 +783,11 @@ h1, h2, h3, h4, h5, h6 {
     left: 0;
     right: 0;
     height: 64px;
-    background: rgba(255, 255, 255, 0.94);
+    background: rgba(18, 22, 31, 0.96);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
-    border-top: 1px solid var(--border-color);
-    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.06);
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.7);
     z-index: 1050;
     justify-content: space-around;
     align-items: center;
@@ -690,7 +801,7 @@ h1, h2, h3, h4, h5, h6 {
     justify-content: center;
     flex: 1;
     height: 100%;
-    color: #64748b;
+    color: #94a3b8;
     text-decoration: none;
     font-size: 0.72rem;
     font-weight: 600;
@@ -701,7 +812,7 @@ h1, h2, h3, h4, h5, h6 {
   }
 
   .medora-nav-item.active {
-    color: var(--primary);
+    color: #2dd4bf;
     font-weight: 800;
   }
 
@@ -717,16 +828,16 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 /* ==========================================================================
-   METALLIC SILVER GLASSMORPHIC DESIGN SYSTEM & AMAZON THEMED UI
+   PALETTE B: CYBER OBSIDIAN NEUMORPHIC PANELS & AMAZON THEMED UI
    ========================================================================== */
 
 .metallic-silver-panel {
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.92) 0%, rgba(248, 250, 252, 0.85) 45%, rgba(226, 232, 240, 0.75) 100%);
+  background: linear-gradient(145deg, #161b26 0%, #131720 100%);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(203, 213, 225, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 20px;
-  box-shadow: 0 8px 30px -4px rgba(148, 163, 184, 0.2), inset 0 1px 1px 0 rgba(255, 255, 255, 0.95);
+  box-shadow: var(--neo-shadow-raised);
   transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
   position: relative;
   overflow: hidden;
@@ -739,7 +850,7 @@ h1, h2, h3, h4, h5, h6 {
   left: -150%;
   width: 80%;
   height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.06), transparent);
   transition: 0.65s cubic-bezier(0.16, 1, 0.3, 1);
   pointer-events: none;
   z-index: 1;
@@ -751,23 +862,23 @@ h1, h2, h3, h4, h5, h6 {
 
 .metallic-silver-panel:hover {
   transform: translateY(-4px);
-  border-color: rgba(148, 163, 184, 1);
-  box-shadow: 0 16px 36px -6px rgba(100, 116, 139, 0.28), inset 0 1px 2px rgba(255, 255, 255, 1);
+  border-color: var(--accent-mint);
+  box-shadow: var(--neo-shadow-raised-lg), 0 0 20px rgba(45, 212, 191, 0.2);
 }
 
 .metallic-card {
-  background: linear-gradient(145deg, #ffffff 0%, #f8fafc 55%, #f1f5f9 100%);
-  border: 1px solid #cbd5e1;
+  background: linear-gradient(145deg, #161b26 0%, #141822 100%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 16px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  box-shadow: var(--neo-shadow-raised-sm);
   transition: all 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
   position: relative;
 }
 
 .metallic-card:hover {
   transform: translateY(-3px);
-  border-color: #94a3b8;
-  box-shadow: 0 12px 28px -4px rgba(100, 116, 139, 0.2), inset 0 1px 1px rgba(255, 255, 255, 1);
+  border-color: var(--accent-mint);
+  box-shadow: var(--neo-shadow-raised);
 }
 
 .amazon-gold-badge {
@@ -781,12 +892,13 @@ h1, h2, h3, h4, h5, h6 {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  box-shadow: 0 2px 4px rgba(196, 85, 0, 0.3);
+  box-shadow: 0 2px 4px rgba(196, 85, 0, 0.4);
 }
 
 .amazon-choice-badge {
   background: linear-gradient(135deg, #232f3e 0%, #131921 100%);
-  color: #ffffff !important;
+  color: #38bdf8 !important;
+  border: 1px solid rgba(56, 189, 248, 0.3);
   font-weight: 800;
   font-size: 0.7rem;
   padding: 3px 8px;
@@ -795,12 +907,12 @@ h1, h2, h3, h4, h5, h6 {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  box-shadow: 0 2px 4px rgba(19, 25, 33, 0.4);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
 }
 
 .amazon-account-tile {
-  background: linear-gradient(145deg, #ffffff 0%, #f8fafc 100%);
-  border: 1px solid #e2e8f0;
+  background: linear-gradient(145deg, #161b26 0%, #131720 100%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 14px;
   padding: 1.25rem 1.4rem;
   display: flex;
@@ -808,27 +920,27 @@ h1, h2, h3, h4, h5, h6 {
   gap: 1.1rem;
   cursor: pointer;
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
+  box-shadow: var(--neo-shadow-raised-sm);
 }
 
 .amazon-account-tile:hover {
   transform: translateY(-2px);
-  border-color: #94a3b8;
-  box-shadow: 0 8px 22px rgba(148, 163, 184, 0.2);
-  background: #ffffff;
+  border-color: var(--accent-mint);
+  box-shadow: var(--neo-shadow-raised);
+  background: #19202e;
 }
 
 .amazon-account-tile-icon {
   width: 48px;
   height: 48px;
   border-radius: 12px;
-  background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
-  border: 1px solid #cbd5e1;
+  background: linear-gradient(135deg, #1c2331 0%, #141822 100%);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 1.5rem;
   flex-shrink: 0;
-  box-shadow: inset 0 1px 1px #fff;
+  box-shadow: var(--neo-shadow-inset);
 }
 

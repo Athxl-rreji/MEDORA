@@ -9,6 +9,12 @@ def setup_logging():
     if not logger.handlers:
         logger.setLevel(logging.INFO)
 
+        if sys.platform == "win32" and hasattr(sys.stdout, "reconfigure"):
+            try:
+                sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+            except Exception:
+                pass
+
         # Create console handler with standard level
         ch = logging.StreamHandler(sys.stdout)
         ch.setLevel(logging.INFO)

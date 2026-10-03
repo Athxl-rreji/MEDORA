@@ -10,6 +10,7 @@ export default function AdminView() {
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('pending'); // 'pending' | 'approved' | 'rejected' | 'all'
   const [roleFilter, setRoleFilter] = useState('all'); // 'all' | 'pharmacy' | 'delivery'
+  const [statusCounts, setStatusCounts] = useState({ total: 0, pending: 0, approved: 0, rejected: 0 });
   
   // User Accounts State
   const [users, setUsers] = useState([]);
@@ -37,6 +38,9 @@ export default function AdminView() {
       if (res.ok) {
         const data = await res.json();
         setRequests(data.requests || []);
+        if (data.counts) {
+          setStatusCounts(data.counts);
+        }
       }
     } catch (err) {
       console.error("Failed to fetch admin partner requests:", err);
@@ -236,13 +240,13 @@ export default function AdminView() {
   };
 
   // KPI Calculations
-  const totalCount = requests.length;
-  const pendingCount = requests.filter(r => r.status === 'pending').length;
-  const approvedCount = requests.filter(r => r.status === 'approved').length;
-  const rejectedCount = requests.filter(r => r.status === 'rejected').length;
+  const totalCount = statusCounts.total || requests.length;
+  const pendingCount = statusCounts.pending || requests.filter(r => r.status === 'pending').length;
+  const approvedCount = statusCounts.approved || requests.filter(r => r.status === 'approved').length;
+  const rejectedCount = statusCounts.rejected || requests.filter(r => r.status === 'rejected').length;
 
   return (
-    <div style={{ minHeight: '100vh', background: '#0c0d0e', color: '#e2e8f0', fontFamily: 'Inter, sans-serif', padding: '2rem 1.5rem' }}>
+    <div className="admin-console-root" style={{ minHeight: '100vh', background: '#0c0d0e', color: '#e2e8f0', fontFamily: 'Inter, sans-serif', padding: '2rem 1.5rem' }}>
       
       {/* Toast Notification */}
       {toastMsg && (
@@ -267,7 +271,7 @@ export default function AdminView() {
       <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
         
         {/* Header Banner */}
-        <div style={{
+        <div className="admin-header-banner" style={{
           background: 'linear-gradient(135deg, rgba(30, 41, 59, 0.8) 0%, rgba(15, 23, 42, 0.9) 100%)',
           borderRadius: '16px',
           border: '1px solid rgba(184, 247, 228, 0.2)',
@@ -312,7 +316,7 @@ export default function AdminView() {
         </div>
 
         {/* Console Navigation Tabs */}
-        <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1.75rem', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '0.75rem' }}>
+        <div className="admin-console-nav-tabs" style={{ display: 'flex', gap: '0.75rem', marginBottom: '1.75rem', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '0.75rem' }}>
           <button
             onClick={() => setActiveTab('requests')}
             style={{
@@ -357,7 +361,7 @@ export default function AdminView() {
 
         {/* KPI Stat Cards (Conditional by Tab) */}
         {activeTab === 'requests' ? (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1.25rem', marginBottom: '2rem' }}>
+          <div className="admin-kpi-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1.25rem', marginBottom: '2rem' }}>
             <div style={{ background: '#16181d', padding: '1.25rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.08)' }}>
               <span style={{ fontSize: '0.78rem', color: '#94a3b8', fontWeight: 'bold' }}>PENDING REVIEW</span>
               <div style={{ fontSize: '1.8rem', fontWeight: '800', color: '#f59e0b', marginTop: '4px' }}>
@@ -391,7 +395,7 @@ export default function AdminView() {
             </div>
           </div>
         ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1.25rem', marginBottom: '2rem' }}>
+          <div className="admin-kpi-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1.25rem', marginBottom: '2rem' }}>
             <div style={{ background: '#16181d', padding: '1.25rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.08)' }}>
               <span style={{ fontSize: '0.78rem', color: '#94a3b8', fontWeight: 'bold' }}>TOTAL REGISTERED USERS</span>
               <div style={{ fontSize: '1.8rem', fontWeight: '800', color: 'var(--primary, #B8F7E4)', marginTop: '4px' }}>
@@ -431,7 +435,7 @@ export default function AdminView() {
           <div>
 
         {/* Filter Navigation Bar */}
-        <div style={{
+        <div className="admin-filter-bar" style={{
           background: '#16181d',
           padding: '1rem 1.25rem',
           borderRadius: '12px',
@@ -445,7 +449,7 @@ export default function AdminView() {
         }}>
           
           {/* Status Tabs */}
-          <div style={{ display: 'flex', gap: '0.5rem' }}>
+          <div className="admin-status-tabs" style={{ display: 'flex', gap: '0.5rem' }}>
             {[
               { key: 'pending', label: '⏳ Pending' },
               { key: 'approved', label: '✅ Approved' },

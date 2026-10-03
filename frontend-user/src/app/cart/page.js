@@ -25,8 +25,144 @@ export default function FullPageCart() {
   const [aiInteractionModalOpen, setAiInteractionModalOpen] = useState(false);
   const [aiInteractionReport, setAiInteractionReport] = useState(null);
   const [safetyVerifiedBanner, setSafetyVerifiedBanner] = useState(false);
+  const [toastNotice, setToastNotice] = useState(null);
+
+  const showCartToast = (msg, icon = '✓') => {
+    setToastNotice({ msg, icon });
+    setTimeout(() => setToastNotice(null), 3500);
+  };
+
+
+  // Load cart from localStorage on mount
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem('medora_cart');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed)) {
+          setCart(parsed);
+        }
+      }
+    } catch (e) {
+      console.warn("Failed to load cart from localStorage:", e);
+    }
+  }, []);
+
+  const clearCart = () => {
+    setCart([]);
+    try {
+      localStorage.removeItem('medora_cart');
+    } catch (e) {}
+  };
+
+  const removeFromCart = (index) => {
+    setCart((prev) => {
+      const updated = prev.filter((_, idx) => idx !== index);
+      try {
+        localStorage.setItem('medora_cart', JSON.stringify(updated));
+      } catch (e) {}
+      return updated;
+    });
+  };
+
+  const fetchPharmacyLiveTerminalQr = async () => {
+    setIsRefreshingLiveQr(true);
+    try {
+      const totalAmt = cart.reduce((s, i) => s + (parseFloat(i.price_mrp || i.price || 0) || 0), 0);
+      const res = await fetch(`${API}/api/v1/medicines/pharmacy/live-terminal-qr?pharmacy_id=PHARM_001&amount=${totalAmt}`);
+      if (res.ok) {
+        const data = await res.json();
+        setLiveTerminalData(data);
+        setLastSyncTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+      }
+    } catch (e) {
+      console.warn('Could not fetch pharmacy live terminal QR:', e);
+    } finally {
+      setIsRefreshingLiveQr(false);
+    }
+  };
+
+  // Real-time synchronization heartbeat with fulfilling pharmacy UPI terminal during checkout
+  useEffect(() => {
+    if (paymentStep !== 'payment') return;
+    fetchPharmacyLiveTerminalQr();
+    const syncInterval = setInterval(() => {
+      fetchPharmacyLiveTerminalQr();
+    }, 3500);
+    return () => clearInterval(syncInterval);
+  }, [paymentStep, cart]);
+
+  const finalizeOrderPlacement = async (totalAmt, method, paymentId) => {
+    setPaymentStatusMsg('Confirming Order with Pharmacy & Dispatching Delivery Rider...');
+    await new Promise(r => setTimeout(r, 600));
+
+    let activeUser = null;
+    let selectedAddress = null;
+    try {
+      const uStr = localStorage.getItem('medora_active_user');
+      if (uStr) activeUser = JSON.parse(uStr);
+      const aStr = localStorage.getItem('medora_selected_address');
+      if (aStr) selectedAddress = JSON.parse(aStr);
+    } catch (e) {}
+
+    const currentUserId = activeUser?.id || activeUser?.email || USER_ID;
+    const activeRiderQr = (typeof window !== 'undefined' ? (localStorage.getItem('medora_rider_main_qr') || '') : '') || activeUser?.rider_upi_qr || '';
+
+    const orderRes = await fetch(`${API}/api/v1/orders/create`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        user_id: currentUserId,
+        user: currentUserId,
+        user_email: activeUser?.email || "patient@medora.com",
+        user_name: activeUser?.name || "Patient",
+        items: cart.map(item => ({
+          medicine_id: item.medicine_id || item.id,
+          brand_name: item.brand_name || item.name,
+          price_mrp: parseFloat(item.price_mrp || item.price || 0) || 0,
+          quantity: item.quantity || 1
+        })),
+        prescription_id: uploadedPrescriptionId,
+        delivery_type: "15-Min Quick Commerce",
+        distance: selectedAddress?.area ? `${selectedAddress.area} (Nearby Hub)` : "1.2 km away",
+        payment_method: method,
+        payment_status: method === 'cod' ? 'unpaid' : 'paid',
+        payment_id: paymentId,
+        rider_qr_image: activeRiderQr || undefined,
+        delivery_address: selectedAddress
+      })
+    });
+
+    if (orderRes.ok) {
+      const orderData = await orderRes.json();
+      if (activeRiderQr && orderData.order?.id && typeof window !== 'undefined') {
+        try {
+          localStorage.setItem(`medora_order_qr_${orderData.order.id}`, activeRiderQr);
+        } catch (e) {}
+      }
+      setCompletedOrderInfo({
+        order_id: orderData.order?.id || "ORD-SUCCESS",
+        total: totalAmt,
+        payment_method: method.toUpperCase(),
+        payment_id: paymentId,
+        payment_status: method === 'cod' ? 'Unpaid (COD)' : 'Paid ✅'
+      });
+      setCart([]);
+      try { localStorage.removeItem('medora_cart'); } catch(e){}
+      setUploadedPrescriptionId(null);
+      setPaymentStep('success');
+    } else {
+      let errorMsg = "Failed to confirm order.";
+      try {
+        const err = await orderRes.json();
+        errorMsg = err.detail?.[0]?.msg || err.detail || err.message || errorMsg;
+      } catch (e) {}
+      throw new Error(errorMsg);
+    }
+  };
 
   // Clinical Rule Matrix for Drug Interactions
+
   const checkClientSideInteractions = (items) => {
     if (!items || items.length < 2) return [];
     const alerts = [];
@@ -110,7 +246,10 @@ export default function FullPageCart() {
   };
 
   const runAiDrugInteractionCheck = async () => {
-    if (cart.length === 0) return alert("Your cart is empty!");
+    if (cart.length === 0) {
+      showCartToast("Your cart is empty!", "🛒");
+      return;
+    }
 
     if (cart.length < 2) {
       setSafetyVerifiedBanner(true);
@@ -175,8 +314,11 @@ export default function FullPageCart() {
   };
 
   const handleExecutePayment = async () => {
-    if (cart.length === 0) return alert("Cart is empty!");
-    const totalAmt = cart.reduce((s, i) => s + parseFloat(i.price_mrp || 0), 0);
+    if (cart.length === 0) {
+      showCartToast("Cart is empty!", "🛒");
+      return;
+    }
+    const totalAmt = cart.reduce((s, i) => s + (parseFloat(i.price_mrp || i.price || 0) || 0), 0);
     setIsProcessingPayment(true);
     setPaymentStep('processing');
 
@@ -187,7 +329,7 @@ export default function FullPageCart() {
         await new Promise(r => setTimeout(r, 700));
         await finalizeOrderPlacement(totalAmt, 'cod', `COD_${Math.random().toString(36).substring(2, 10).toUpperCase()}`);
       } catch (err) {
-        alert(`COD Error: ${err.message}`);
+        showCartToast(`COD Error: ${err.message}`, '⚠️');
         setPaymentStep('payment');
       } finally {
         setIsProcessingPayment(false);
@@ -205,7 +347,7 @@ export default function FullPageCart() {
         const upiTxnId = `UPI_${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
         await finalizeOrderPlacement(totalAmt, 'upi', upiTxnId);
       } catch (err) {
-        alert(`UPI Payment Error: ${err.message}`);
+        showCartToast(`UPI Payment Error: ${err.message}`, '⚠️');
         setPaymentStep('payment');
       } finally {
         setIsProcessingPayment(false);
@@ -213,12 +355,13 @@ export default function FullPageCart() {
       return;
     }
 
+
     setSelectedPaymentMethod('upi');
     setIsProcessingPayment(false);
     setPaymentStep('payment');
   };
 
-  const totalAmount = cart.reduce((s, i) => s + parseFloat(i.price_mrp), 0);
+  const totalAmount = cart.reduce((s, i) => s + (parseFloat(i.price_mrp || i.price || 0) || 0), 0);
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg-body)', color: 'var(--text-main)', padding: '2rem 1rem' }}>
@@ -775,11 +918,10 @@ export default function FullPageCart() {
                 <button
                   type="button"
                   onClick={() => {
-                    if (confirm("Proceeding with potentially hazardous drug combination. Do you confirm you have medical approval?")) {
-                      setAiInteractionModalOpen(false);
-                      setPaymentStep('payment');
-                      fetchPharmacyLiveTerminalQr();
-                    }
+                    setAiInteractionModalOpen(false);
+                    setPaymentStep('payment');
+                    fetchPharmacyLiveTerminalQr();
+                    showCartToast("Acknowledged clinical warnings. Proceeding with checkout.", "🛡️");
                   }}
                   style={{
                     background: '#ef4444',
@@ -823,6 +965,31 @@ export default function FullPageCart() {
             <span>AI Clinical Safety Check Passed: No Drug Interactions Detected!</span>
           </div>
         )}
+
+        {/* FLOATING TOAST NOTIFICATION */}
+        {toastNotice && (
+          <div style={{
+            position: 'fixed',
+            bottom: '30px',
+            right: '30px',
+            zIndex: 3000,
+            background: '#1e293b',
+            color: '#ffffff',
+            border: '1px solid var(--primary)',
+            padding: '12px 20px',
+            borderRadius: '12px',
+            boxShadow: '0 8px 30px rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+            fontSize: '0.9rem',
+            fontWeight: '600'
+          }}>
+            <span>{toastNotice.icon || '✓'}</span>
+            <span>{toastNotice.msg}</span>
+          </div>
+        )}
+
 
         </main>
       </div>

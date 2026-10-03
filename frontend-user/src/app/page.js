@@ -364,6 +364,19 @@ export default function Home() {
     { id: 'upi_1', vpa: 'adhwaith@okaxis', bank: 'Axis Bank', isDefault: true },
     { id: 'upi_2', vpa: 'adhwaith@icici', bank: 'ICICI Bank', isDefault: false }
   ]);
+  const [showAddUpiInput, setShowAddUpiInput] = useState(false);
+  const [newUpiVpaInput, setNewUpiVpaInput] = useState('');
+  const [newUpiBankInput, setNewUpiBankInput] = useState('');
+
+  // Add Family Member Modal State
+  const [showAddFamilyModal, setShowAddFamilyModal] = useState(false);
+  const [newFamName, setNewFamName] = useState('');
+  const [newFamRelation, setNewFamRelation] = useState('Parent');
+  const [newFamAge, setNewFamAge] = useState('');
+  const [newFamBlood, setNewFamBlood] = useState('B+');
+  const [newFamAllergies, setNewFamAllergies] = useState('');
+  const [newFamConditions, setNewFamConditions] = useState('');
+
 
   // Elegant Toast Notification System
   const [toastNotification, setToastNotification] = useState(null);
@@ -1453,12 +1466,18 @@ export default function Home() {
   }, [paymentStep, cart]);
 
   const handleInitiatePayment = () => {
-    if (cart.length === 0) return alert("Cart is empty!");
+    if (cart.length === 0) {
+      showToast("Your cart is empty!", "🛒");
+      return;
+    }
     runAiDrugInteractionCheck();
   };
 
   const handleExecutePayment = async () => {
-    if (cart.length === 0) return alert("Cart is empty!");
+    if (cart.length === 0) {
+      showToast("Your cart is empty!", "🛒");
+      return;
+    }
     
     const totalAmt = cart.reduce((s, i) => s + parseFloat(i.price_mrp || 0), 0);
     setIsProcessingPayment(true);
@@ -1471,7 +1490,7 @@ export default function Home() {
         await new Promise(r => setTimeout(r, 700));
         await finalizeOrderPlacement(totalAmt, 'cod', `COD_${Math.random().toString(36).substring(2, 10).toUpperCase()}`);
       } catch (err) {
-        alert(`COD Error: ${err.message}`);
+        showToast(`COD Error: ${err.message}`, '⚠️');
         setPaymentStep('payment');
       } finally {
         setIsProcessingPayment(false);
@@ -1489,7 +1508,7 @@ export default function Home() {
         const upiTxnId = `UPI_${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
         await finalizeOrderPlacement(totalAmt, 'upi', upiTxnId);
       } catch (err) {
-        alert(`UPI Payment Error: ${err.message}`);
+        showToast(`UPI Payment Error: ${err.message}`, '⚠️');
         setPaymentStep('payment');
       } finally {
         setIsProcessingPayment(false);
@@ -1507,13 +1526,14 @@ export default function Home() {
         const riderTxnId = `RIDER_${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
         await finalizeOrderPlacement(totalAmt, 'rider_upi', riderTxnId);
       } catch (err) {
-        alert(`Rider Payment Error: ${err.message}`);
+        showToast(`Rider Payment Error: ${err.message}`, '⚠️');
         setPaymentStep('payment');
       } finally {
         setIsProcessingPayment(false);
       }
       return;
     }
+
 
     // Fallback if unexpected method
     setSelectedPaymentMethod('upi');
@@ -2081,9 +2101,11 @@ export default function Home() {
       }
     }
     
-    alert(`Added ${chatSuggestedMedicines.join(', ')} to cart! Check your cart below.`);
+    showToast(`Added ${chatSuggestedMedicines.join(', ')} to cart! Opening checkout...`, '🛒');
+    setIsCartOpen(true);
     resetChat();
     setIsChatOpen(false);
+
   };
 
   const handleFileUpload = async (e) => {
@@ -2232,8 +2254,10 @@ export default function Home() {
       });
       addedCount++;
     });
-    alert(`🛒 Added all ${addedCount} deciphered medicines to your cart! Open Cart to complete instant 10-min delivery.`);
+    showToast(`🛒 Added all ${addedCount} deciphered medicines to cart!`, '💊');
+    setIsCartOpen(true);
   };
+
 
   const handleConsultAiWithPrescription = (prescData, textSummary) => {
     setIsOcrOpen(false);
@@ -2247,10 +2271,10 @@ export default function Home() {
   };
 
   const renderRoleHeader = () => (
-    <header style={{
-      background: 'rgba(255, 255, 255, 0.92)',
-      backdropFilter: 'blur(16px)',
-      borderBottom: '1px solid rgba(226, 232, 240, 0.9)',
+    <header className="medora-role-header" style={{
+      background: 'rgba(15, 19, 27, 0.96)',
+      backdropFilter: 'blur(20px)',
+      borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
       padding: '0.65rem 1.5rem',
       display: 'flex',
       justifyContent: 'space-between',
@@ -2259,17 +2283,29 @@ export default function Home() {
       top: 0,
       zIndex: 1200,
       fontSize: '0.85rem',
-      boxShadow: '0 2px 10px rgba(0,0,0,0.02)'
+      boxShadow: '0 4px 20px rgba(0, 0, 0, 0.7)'
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
         <span 
           onClick={goHome}
-          style={{ fontWeight: '800', color: 'var(--primary)', fontFamily: 'Outfit, sans-serif', cursor: 'pointer', fontSize: '1.05rem' }}
+          className="gradient-mint-text"
+          style={{ fontWeight: '900', fontFamily: 'Outfit, sans-serif', cursor: 'pointer', fontSize: '1.25rem', letterSpacing: '-0.02em', display: 'flex', alignItems: 'center', gap: '6px' }}
         >
           🧬 MEDORA
         </span>
-        <span style={{ color: 'rgba(15, 23, 42, 0.15)' }}>|</span>
-        <span style={{ color: 'var(--text-main)', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+        <span style={{ color: 'rgba(255, 255, 255, 0.15)' }}>|</span>
+        <span style={{
+          background: 'rgba(255, 255, 255, 0.04)',
+          border: '1px solid rgba(255, 255, 255, 0.08)',
+          padding: '4px 10px',
+          borderRadius: '12px',
+          color: '#f1f5f9',
+          fontWeight: '700',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.4rem',
+          fontSize: '0.78rem'
+        }}>
           {activeUser.role === 'admin' && '🔑 Executive Admin Portal'}
           {activeUser.role === 'patient' && '👤 Patient Portal'}
           {activeUser.role === 'pharmacy' && '🏥 Pharmacy Operations'}
@@ -2282,38 +2318,40 @@ export default function Home() {
       {activeUser.role === 'patient' && (
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
           <div 
+            className="header-location-chip"
             onClick={() => setIsAddressDrawerOpen(true)}
             style={{
               display: 'flex',
               alignItems: 'center',
               gap: '0.65rem',
-              background: '#ffffff',
-              border: '1px solid rgba(226, 232, 240, 0.9)',
+              background: '#131722',
+              border: '1px solid rgba(255, 255, 255, 0.09)',
               padding: '4px 12px',
               borderRadius: '24px',
               cursor: 'pointer',
               maxWidth: '380px',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
+              boxShadow: 'inset 2px 2px 5px rgba(0, 0, 0, 0.6), -1px -1px 3px rgba(255, 255, 255, 0.025)',
               transition: 'all 0.2s ease'
             }}
             title="Click to change delivery location"
           >
             <span style={{
-              background: 'linear-gradient(135deg, #FF6B00 0%, #FFA800 100%)',
+              background: 'linear-gradient(135deg, #FF7700 0%, #FFAA00 100%)',
               color: '#fff',
               fontSize: '0.68rem',
               fontWeight: '800',
               padding: '2px 8px',
-              borderRadius: '12px'
+              borderRadius: '12px',
+              boxShadow: '0 2px 6px rgba(255, 119, 0, 0.4)'
             }}>
               ⚡ 10-15 MINS
             </span>
             <span style={{ fontSize: '0.95rem' }}>{selectedAddress?.icon || '🏠'}</span>
             <div style={{ display: 'flex', flexDirection: 'column', textAlign: 'left', overflow: 'hidden' }}>
-              <span style={{ fontWeight: '800', color: 'var(--text-main)', fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                {selectedAddress?.tag || 'Home'} <span style={{ color: 'var(--primary)', fontSize: '0.65rem' }}>▼</span>
+              <span style={{ fontWeight: '800', color: '#f1f5f9', fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                {selectedAddress?.tag || 'Home'} <span style={{ color: '#2dd4bf', fontSize: '0.65rem' }}>▼</span>
               </span>
-              <span style={{ color: 'var(--text-muted)', fontSize: '0.68rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              <span style={{ color: '#94a3b8', fontSize: '0.68rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {selectedAddress ? `${selectedAddress.houseNo}, ${selectedAddress.area}` : 'Set Location'}
               </span>
             </div>
@@ -2321,20 +2359,21 @@ export default function Home() {
 
           {/* Direct Switch to Dedicated Radar Page / View */}
           <button
+            className="hide-on-mobile"
             onClick={() => setActiveMainView(prev => prev === 'radar' ? 'home' : 'radar')}
             style={{
               display: 'flex',
               alignItems: 'center',
               gap: '6px',
-              background: activeMainView === 'radar' ? 'var(--primary)' : 'rgba(13, 148, 136, 0.1)',
-              color: activeMainView === 'radar' ? '#ffffff' : 'var(--primary)',
-              border: '1px solid rgba(13, 148, 136, 0.3)',
+              background: activeMainView === 'radar' ? 'linear-gradient(135deg, #14b8a6, #0d9488)' : '#161b26',
+              color: activeMainView === 'radar' ? '#ffffff' : '#5eead4',
+              border: activeMainView === 'radar' ? '1px solid #14b8a6' : '1px solid rgba(255, 255, 255, 0.08)',
               padding: '6px 14px',
               borderRadius: '20px',
               fontWeight: '700',
               fontSize: '0.78rem',
               cursor: 'pointer',
-              boxShadow: activeMainView === 'radar' ? '0 2px 10px rgba(13, 148, 136, 0.3)' : 'none',
+              boxShadow: activeMainView === 'radar' ? '0 0 16px rgba(20, 184, 166, 0.45)' : 'var(--neo-shadow-raised-sm)',
               transition: 'all 0.2s ease'
             }}
             title="Calibrate GPS & Radar Settings"
@@ -2343,22 +2382,51 @@ export default function Home() {
             <span>{activeMainView === 'radar' ? 'Home Shelf' : `Radar (${perimeterKm}km)`}</span>
           </button>
 
-          {/* Live Cartoon Bootup Presentation Replay */}
+          {/* Upload Rx button */}
           <button
-            onClick={() => setShowBootup(true)}
+            className="hide-on-mobile"
+            onClick={() => {
+              setIsOcrOpen(true);
+              setTimeout(() => fileInputRef.current?.click(), 100);
+            }}
             style={{
               display: 'flex',
               alignItems: 'center',
               gap: '6px',
-              background: 'linear-gradient(135deg, rgba(13, 148, 136, 0.12), rgba(184, 247, 228, 0.25))',
-              color: '#0d9488',
-              border: '1px solid rgba(13, 148, 136, 0.3)',
+              background: '#161b26',
+              color: '#38bdf8',
+              border: '1px solid rgba(56, 189, 248, 0.3)',
               padding: '6px 14px',
               borderRadius: '20px',
               fontWeight: '700',
               fontSize: '0.78rem',
               cursor: 'pointer',
-              boxShadow: '0 2px 6px rgba(13, 148, 136, 0.08)',
+              boxShadow: 'var(--neo-shadow-raised-sm)',
+              transition: 'all 0.2s ease'
+            }}
+            title="Upload Doctor's Handwritten or Printed Prescription"
+          >
+            <span>📄</span>
+            <span>Upload Rx</span>
+          </button>
+
+          {/* Live Cartoon Bootup Presentation Replay */}
+          <button
+            className="hide-on-mobile"
+            onClick={() => setShowBootup(true)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              background: '#161b26',
+              color: '#2dd4bf',
+              border: '1px solid rgba(45, 212, 191, 0.25)',
+              padding: '6px 14px',
+              borderRadius: '20px',
+              fontWeight: '700',
+              fontSize: '0.78rem',
+              cursor: 'pointer',
+              boxShadow: 'var(--neo-shadow-raised-sm)',
               transition: 'all 0.2s ease'
             }}
             title="Watch Live Cartoon Bootup Animation"
@@ -2374,6 +2442,7 @@ export default function Home() {
           <>
             <button
               id="header-account-btn"
+              className="hide-on-mobile"
               onClick={() => {
                 setActiveMainView(prev => prev === 'account' ? 'home' : 'account');
                 setActiveAccountSection('hub');
@@ -2382,15 +2451,15 @@ export default function Home() {
                 display: 'flex',
                 alignItems: 'center',
                 gap: '6px',
-                background: activeMainView === 'account' ? 'linear-gradient(135deg, #1e293b 0%, #334155 100%)' : '#ffffff',
-                color: activeMainView === 'account' ? '#ffffff' : 'var(--text-main)',
-                border: '1px solid rgba(203, 213, 225, 0.85)',
+                background: activeMainView === 'account' ? 'linear-gradient(135deg, #1e293b 0%, #334155 100%)' : '#161b26',
+                color: activeMainView === 'account' ? '#38bdf8' : '#e2e8f0',
+                border: activeMainView === 'account' ? '1px solid #38bdf8' : '1px solid rgba(255, 255, 255, 0.08)',
                 padding: '6px 14px',
                 borderRadius: '20px',
                 cursor: 'pointer',
                 fontWeight: '700',
                 fontSize: '0.78rem',
-                boxShadow: activeMainView === 'account' ? '0 4px 12px rgba(15, 23, 42, 0.25)' : 'none',
+                boxShadow: activeMainView === 'account' ? '0 0 14px rgba(56, 189, 248, 0.35)' : 'var(--neo-shadow-raised-sm)',
                 transition: 'all 0.2s ease'
               }}
               title="Open Amazon Style Account Management"
@@ -2408,15 +2477,15 @@ export default function Home() {
                 display: 'flex',
                 alignItems: 'center',
                 gap: '6px',
-                background: cart.length > 0 ? 'linear-gradient(135deg, #0d9488 0%, #059669 100%)' : '#ffffff',
-                color: cart.length > 0 ? '#ffffff' : 'var(--primary)',
-                border: cart.length > 0 ? 'none' : '1px solid var(--primary)',
+                background: cart.length > 0 ? 'linear-gradient(135deg, #14b8a6 0%, #059669 100%)' : '#161b26',
+                color: cart.length > 0 ? '#ffffff' : '#94a3b8',
+                border: cart.length > 0 ? '1px solid #14b8a6' : '1px solid rgba(255, 255, 255, 0.08)',
                 padding: '6px 14px',
                 borderRadius: '20px',
                 cursor: 'pointer',
                 fontWeight: '800',
                 fontSize: '0.78rem',
-                boxShadow: cart.length > 0 ? '0 4px 14px rgba(13, 148, 136, 0.35)' : 'none',
+                boxShadow: cart.length > 0 ? '0 0 18px rgba(20, 184, 166, 0.5)' : 'var(--neo-shadow-raised-sm)',
                 transition: 'all 0.2s ease'
               }}
               title="Open Shopping Cart & Checkout Drawer"
@@ -2431,14 +2500,15 @@ export default function Home() {
         <button
           onClick={handleLogout}
           style={{
-            background: '#fff1f2',
-            color: '#e11d48',
-            border: '1px solid #fecdd3',
-            padding: '5px 14px',
-            borderRadius: '8px',
+            background: 'rgba(239, 68, 68, 0.12)',
+            color: '#f87171',
+            border: '1px solid rgba(239, 68, 68, 0.25)',
+            padding: '6px 14px',
+            borderRadius: '20px',
             cursor: 'pointer',
             fontWeight: 'bold',
             fontSize: '0.78rem',
+            boxShadow: 'var(--neo-shadow-raised-sm)',
             transition: 'all 0.2s ease'
           }}
         >
@@ -2513,521 +2583,407 @@ export default function Home() {
   return (
     <>
       {renderRoleHeader()}
-      {/* Navigation Header */}
-      <nav className={`nav-bar ${isNavVisible ? 'visible' : 'hidden'}`}>
-        <div 
-          className="nav-bar-logo gradient-text" 
-          onClick={goHome}
-          title="Home"
-          style={{ 
-            opacity: scrollProgress > 0.8 ? Math.min((scrollProgress - 0.8) / 0.2, 1) : 0,
-            transition: 'opacity 0.15s ease',
-            pointerEvents: scrollProgress > 0.8 ? 'auto' : 'none',
-            cursor: 'pointer'
-          }}
-        >
-          🧬 MEDORA.
-        </div>
-        <div className="nav-links" style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
-          <div 
-            onClick={() => setIsAddressDrawerOpen(true)}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.4rem',
-              cursor: 'pointer',
-              background: '#f8fafc',
-              border: '1px solid rgba(226, 232, 240, 0.9)',
-              padding: '4px 10px',
-              borderRadius: '16px',
-              fontSize: '0.78rem'
-            }}
-            title="Change Delivery Address"
-          >
-            <span style={{ color: '#FF9E00', fontWeight: 'bold' }}>⚡ 10m</span>
-            <span style={{ color: 'var(--text-main)', fontWeight: 'bold' }}>{selectedAddress?.tag || 'Home'} ▼</span>
-          </div>
 
-          <a 
-            href="#" 
-            className="nav-link" 
-            onClick={(e) => { 
-              e.preventDefault(); 
-              setActiveMainView(prev => prev === 'radar' ? 'home' : 'radar'); 
-            }} 
-            style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}
-          >
-            🛰️ Radar
-          </a>
-
-
-          <a 
-            href="#" 
-            className="nav-link" 
-            onClick={(e) => { 
-              e.preventDefault(); 
-              setIsOcrOpen(true); 
-            }} 
-            style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#0d9488', fontWeight: '700' }}
-            title="Upload Doctor's Handwritten or Printed Prescription"
-          >
-            <span>📄 Upload Rx</span>
-            <span style={{ fontSize: '0.66rem', background: 'rgba(13, 148, 136, 0.12)', padding: '1px 6px', borderRadius: '4px', color: '#0d9488', fontWeight: '800' }}>
-              Handwritten OK
-            </span>
-          </a>
-
-          <a 
-            href="#" 
-            className="nav-link" 
-            onClick={(e) => { 
-              e.preventDefault(); 
-              setActiveMainView(prev => prev === 'account' ? 'home' : 'account'); 
-              setActiveAccountSection('hub');
-            }} 
-            style={{ 
-              display: 'flex', 
-              alignItems: 'center', 
-              gap: '0.35rem',
-              fontWeight: activeMainView === 'account' ? '800' : '600',
-              color: activeMainView === 'account' ? 'var(--primary)' : 'inherit'
-            }}
-          >
-            👤 Account
-          </a>
-          <a href="#" className="nav-link" onClick={(e) => { e.preventDefault(); setIsTrackingOpen(true); }} style={{ display: 'flex', alignItems: 'center' }}>
-            Track Orders
-            {activeOrders.length > 0 && <span className="badge">{activeOrders.length}</span>}
-          </a>
-          <a href="#" className="nav-link" onClick={(e) => { e.preventDefault(); setIsCartOpen(true); }} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-            🛒 Cart
-            {cart.length > 0 && <span className="badge">{cart.length}</span>}
-          </a>
-        </div>
-      </nav>
-
-      {/* Cinematic Splash Screen (100vh) */}
-      <section className="splash-container">
-        <canvas 
-          ref={canvasRef} 
-          style={{ 
-            position: 'absolute', 
-            top: 0, 
-            left: 0, 
-            width: '100%', 
-            height: '100%', 
-            zIndex: 8, 
-            opacity: 0.25, 
-            pointerEvents: 'none' 
-          }} 
-        />
-        {/* Animated Flying Logo Wrapper */}
-        <div 
-          style={{
-            position: 'fixed',
-            top: `calc(50vh - ${scrollProgress} * (50vh - 34px))`,
-            left: `calc(50vw - ${scrollProgress} * (50vw - 130px))`,
-            transform: `translate(-50%, -50%) scale(${1 - scrollProgress * 0.55})`,
-            opacity: 1 - Math.max((scrollProgress - 0.8) / 0.2, 0),
-            pointerEvents: scrollProgress > 0.8 ? 'none' : 'auto',
-            zIndex: 1050,
-            display: 'flex',
-            justifyContent: 'center',
+      <main className="container" style={{ paddingTop: '1.25rem' }}>
+        {/* Details Fold / Redesigned Dashboard Hero */}
+        <div className="hero-section" style={{ marginTop: '0.5rem', marginBottom: '2.5rem', textAlign: 'center' }}>
+          
+          {/* Live Hyperlocal Delivery Guarantee Badge */}
+          <div style={{
+            display: 'inline-flex',
             alignItems: 'center',
-            transition: 'opacity 0.15s ease'
-          }}
-        >
-          <div className="boot-logo-container" onClick={goHome} style={{ cursor: 'pointer' }} title="Home">
-            <div className="boot-logo-symbol">🧬</div>
-            <div className="boot-logo-name">MEDORA</div>
+            gap: '8px',
+            background: 'rgba(20, 184, 166, 0.12)',
+            border: '1px solid rgba(20, 184, 166, 0.32)',
+            padding: '6px 16px',
+            borderRadius: '99px',
+            fontSize: '0.78rem',
+            fontWeight: '800',
+            color: '#2dd4bf',
+            marginBottom: '1.1rem',
+            boxShadow: 'var(--neo-shadow-raised-sm)'
+          }}>
+            <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', background: '#34d399', boxShadow: '0 0 10px #34d399' }} />
+            <span>⚡ 10-MIN EXPRESS DELIVERY ACTIVE IN <strong style={{ color: '#5eead4', textTransform: 'uppercase' }}>{selectedAddress?.area || 'VAMANJOOR'}</strong></span>
           </div>
-        </div>
-        <div className="scroll-indicator-container">
-          <span className="scroll-indicator-text">Scroll to explore</span>
-          <div className="scroll-indicator-wheel">
-            <div className="scroll-indicator-wheel" />
-          </div>
-        </div>
-      </section>
 
-      {/* App Details & Search Section */}
-      <section className="morph-section-details">
-        <main className="container">
-          {/* Details Fold / Redesigned Dashboard Hero */}
-          <div className="hero-section" style={{ marginTop: '1.5rem', marginBottom: '2.5rem', textAlign: 'center' }}>
-            
-            {/* Live Hyperlocal Delivery Guarantee Badge */}
-            <div style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '8px',
-              background: 'rgba(13, 148, 136, 0.08)',
-              border: '1px solid rgba(13, 148, 136, 0.25)',
-              padding: '6px 16px',
-              borderRadius: '99px',
-              fontSize: '0.78rem',
-              fontWeight: '800',
-              color: '#0d9488',
-              marginBottom: '1.1rem',
-              boxShadow: '0 2px 10px rgba(13, 148, 136, 0.06)'
+          <h1 className="hero-title" style={{ fontSize: 'clamp(2.1rem, 4.5vw, 3.2rem)', fontWeight: '900', lineHeight: 1.15, letterSpacing: '-0.03em', marginBottom: '0.9rem', color: '#f1f5f9' }}>
+            Smart Healthcare, <br />
+            <span style={{
+              background: 'linear-gradient(135deg, #14b8a6 0%, #2dd4bf 45%, #38bdf8 100%)',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+              display: 'inline-block'
             }}>
-              <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', background: '#10b981', boxShadow: '0 0 10px #10b981' }} />
-              <span>⚡ 10-MIN EXPRESS DELIVERY ACTIVE IN <strong style={{ color: '#0f766e', textTransform: 'uppercase' }}>{selectedAddress?.area || 'VAMANJOOR'}</strong></span>
-            </div>
+              Delivered in 10 Minutes.
+            </span>
+          </h1>
 
-            <h1 className="hero-title" style={{ fontSize: 'clamp(2.1rem, 4.5vw, 3.2rem)', fontWeight: '900', lineHeight: 1.15, letterSpacing: '-0.03em', marginBottom: '0.9rem' }}>
-              Smart Healthcare, <br />
-              <span style={{
-                background: 'linear-gradient(135deg, #0d9488 0%, #10b981 45%, #0284c7 100%)',
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent',
-                display: 'inline-block'
-              }}>
-                Delivered in 10 Minutes.
-              </span>
-            </h1>
+          <p className="hero-subtitle" style={{ maxWidth: '680px', margin: '0 auto 1.8rem auto', fontSize: '0.96rem', color: '#94a3b8', lineHeight: 1.6 }}>
+            Instant clinical consultation with MEDORA AI Doctor, handwritten prescription digitization with Gemini Vision, and verified generic medicines from licensed neighborhood dark-stores.
+          </p>
 
-            <p className="hero-subtitle" style={{ maxWidth: '680px', margin: '0 auto 1.8rem auto', fontSize: '0.96rem', color: '#64748b', lineHeight: 1.6 }}>
-              Instant clinical consultation with MEDORA AI Doctor, handwritten prescription digitization with Gemini Vision, and verified generic medicines from licensed neighborhood dark-stores.
-            </p>
-
-            {/* 4 Premium Glassmorphic Quick-Action Command Cards Grid */}
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(215px, 1fr))',
-              gap: '12px',
-              maxWidth: '960px',
-              margin: '0 auto 2rem auto',
-              textAlign: 'left'
-            }}>
-              {/* Card 1: AI Clinical Doctor */}
-              <div 
-                onClick={() => setIsChatOpen(true)}
-                style={{
-                  background: 'linear-gradient(135deg, rgba(13, 148, 136, 0.08) 0%, rgba(204, 251, 241, 0.4) 100%)',
-                  border: '1.5px solid rgba(13, 148, 136, 0.28)',
-                  borderRadius: '16px',
-                  padding: '1.1rem',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s ease',
-                  boxShadow: '0 4px 14px rgba(13, 148, 136, 0.08)',
-                  position: 'relative'
-                }}
-                onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.borderColor = '#0d9488'; }}
-                onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.borderColor = 'rgba(13, 148, 136, 0.28)'; }}
-              >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                  <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: '#0d9488', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.25rem', boxShadow: '0 4px 10px rgba(13, 148, 136, 0.3)' }}>🩺</div>
-                  <span style={{ fontSize: '0.66rem', fontWeight: '800', background: '#ccfbf1', color: '#0f766e', padding: '2px 8px', borderRadius: '99px' }}>● ONLINE</span>
-                </div>
-                <strong style={{ display: 'block', fontSize: '0.94rem', color: '#0f172a', fontWeight: '800' }}>AI Clinical Doctor</strong>
-                <p style={{ margin: '4px 0 0 0', fontSize: '0.74rem', color: '#64748b', lineHeight: 1.4 }}>Instant symptom diagnosis, safety checks & OTC recommendations</p>
-              </div>
-
-              {/* Card 2: Scan Prescription */}
-              <div 
-                onClick={() => {
-                  setIsOcrOpen(true);
-                  setTimeout(() => fileInputRef.current?.click(), 100);
-                }}
-                style={{
-                  background: 'linear-gradient(135deg, rgba(2, 132, 199, 0.08) 0%, rgba(224, 242, 254, 0.4) 100%)',
-                  border: '1.5px solid rgba(2, 132, 199, 0.28)',
-                  borderRadius: '16px',
-                  padding: '1.1rem',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s ease',
-                  boxShadow: '0 4px 14px rgba(2, 132, 199, 0.08)'
-                }}
-                onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.borderColor = '#0284c7'; }}
-                onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.borderColor = 'rgba(2, 132, 199, 0.28)'; }}
-              >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                  <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: '#0284c7', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.25rem', boxShadow: '0 4px 10px rgba(2, 132, 199, 0.3)' }}>📄</div>
-                  <span style={{ fontSize: '0.66rem', fontWeight: '800', background: '#e0f2fe', color: '#0369a1', padding: '2px 8px', borderRadius: '99px' }}>Gemini Vision</span>
-                </div>
-                <strong style={{ display: 'block', fontSize: '0.94rem', color: '#0f172a', fontWeight: '800' }}>Upload Doctor Rx</strong>
-                <p style={{ margin: '4px 0 0 0', fontSize: '0.74rem', color: '#64748b', lineHeight: 1.4 }}>Digitizes handwritten & printed prescriptions in seconds</p>
-              </div>
-
-              {/* Card 3: Hyperlocal Radar */}
-              <div 
-                onClick={() => setActiveMainView('radar')}
-                style={{
-                  background: 'linear-gradient(135deg, rgba(124, 58, 237, 0.08) 0%, rgba(243, 232, 255, 0.4) 100%)',
-                  border: '1.5px solid rgba(124, 58, 237, 0.28)',
-                  borderRadius: '16px',
-                  padding: '1.1rem',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s ease',
-                  boxShadow: '0 4px 14px rgba(124, 58, 237, 0.08)'
-                }}
-                onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.borderColor = '#7c3aed'; }}
-                onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.borderColor = 'rgba(124, 58, 237, 0.28)'; }}
-              >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                  <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: '#7c3aed', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.25rem', boxShadow: '0 4px 10px rgba(124, 58, 237, 0.3)' }}>🛰️</div>
-                  <span style={{ fontSize: '0.66rem', fontWeight: '800', background: '#f3e8ff', color: '#6d28d9', padding: '2px 8px', borderRadius: '99px' }}>{perimeterKm} km GPS</span>
-                </div>
-                <strong style={{ display: 'block', fontSize: '0.94rem', color: '#0f172a', fontWeight: '800' }}>Dark-Store Radar</strong>
-                <p style={{ margin: '4px 0 0 0', fontSize: '0.74rem', color: '#64748b', lineHeight: 1.4 }}>Live network map with guaranteed 10-15 min delivery perimeter</p>
-              </div>
-
-              {/* Card 4: Instamart Quick Shelf */}
-              <div 
-                onClick={() => {
-                  const el = document.getElementById('instamart-shelf-section');
-                  if (el) el.scrollIntoView({ behavior: 'smooth' });
-                }}
-                style={{
-                  background: 'linear-gradient(135deg, rgba(234, 88, 12, 0.08) 0%, rgba(255, 237, 213, 0.4) 100%)',
-                  border: '1.5px solid rgba(234, 88, 12, 0.28)',
-                  borderRadius: '16px',
-                  padding: '1.1rem',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s ease',
-                  boxShadow: '0 4px 14px rgba(234, 88, 12, 0.08)'
-                }}
-                onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.borderColor = '#ea580c'; }}
-                onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.borderColor = 'rgba(234, 88, 12, 0.28)'; }}
-              >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                  <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: '#ea580c', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.25rem', boxShadow: '0 4px 10px rgba(234, 88, 12, 0.3)' }}>⚡</div>
-                  <span style={{ fontSize: '0.66rem', fontWeight: '800', background: '#ffedd5', color: '#c2410c', padding: '2px 8px', borderRadius: '99px' }}>10-15 Mins</span>
-                </div>
-                <strong style={{ display: 'block', fontSize: '0.94rem', color: '#0f172a', fontWeight: '800' }}>Instamart Shelf</strong>
-                <p style={{ margin: '4px 0 0 0', fontSize: '0.74rem', color: '#64748b', lineHeight: 1.4 }}>Direct 1-click re-order from nearby stocked partner pharmacies</p>
-              </div>
-            </div>
-
-            {/* Amazon-Style Pharmacy Search Bar Container */}
+          {/* 4 Premium Glassmorphic Quick-Action Command Cards Grid */}
+          <div className="hero-command-grid" style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(215px, 1fr))',
+            gap: '14px',
+            maxWidth: '960px',
+            margin: '0 auto 2rem auto',
+            textAlign: 'left'
+          }}>
+            {/* Card 1: AI Clinical Doctor */}
             <div 
-              ref={searchContainerRef}
-              className="search-container" 
+              onClick={() => setIsChatOpen(true)}
+              style={{
+                background: '#151a24',
+                border: '1px solid rgba(20, 184, 166, 0.3)',
+                borderRadius: '16px',
+                padding: '1.2rem',
+                cursor: 'pointer',
+                transition: 'all 0.25s ease',
+                boxShadow: 'var(--neo-shadow-raised)',
+                minHeight: '142px',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'space-between',
+                position: 'relative'
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.borderColor = '#14b8a6'; e.currentTarget.style.boxShadow = 'var(--neo-shadow-raised-lg), 0 0 16px rgba(20, 184, 166, 0.25)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.borderColor = 'rgba(20, 184, 166, 0.3)'; e.currentTarget.style.boxShadow = 'var(--neo-shadow-raised)'; }}
+            >
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                  <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'linear-gradient(135deg, #14b8a6 0%, #0d9488 100%)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.25rem', boxShadow: '0 4px 10px rgba(20, 184, 166, 0.35)' }}>🩺</div>
+                  <span style={{ fontSize: '0.66rem', fontWeight: '800', background: 'rgba(20, 184, 166, 0.16)', color: '#2dd4bf', border: '1px solid rgba(20, 184, 166, 0.3)', padding: '2px 8px', borderRadius: '99px' }}>● ONLINE</span>
+                </div>
+                <strong style={{ display: 'block', fontSize: '0.94rem', color: '#f1f5f9', fontWeight: '800' }}>AI Clinical Doctor</strong>
+              </div>
+              <p style={{ margin: '4px 0 0 0', fontSize: '0.74rem', color: '#94a3b8', lineHeight: 1.4 }}>Instant symptom diagnosis, safety checks & OTC recommendations</p>
+            </div>
+
+            {/* Card 2: Scan Prescription */}
+            <div 
+              onClick={() => {
+                setIsOcrOpen(true);
+                setTimeout(() => fileInputRef.current?.click(), 100);
+              }}
+              style={{
+                background: '#151a24',
+                border: '1px solid rgba(56, 189, 248, 0.3)',
+                borderRadius: '16px',
+                padding: '1.2rem',
+                cursor: 'pointer',
+                transition: 'all 0.25s ease',
+                boxShadow: 'var(--neo-shadow-raised)',
+                minHeight: '142px',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'space-between'
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.borderColor = '#38bdf8'; e.currentTarget.style.boxShadow = 'var(--neo-shadow-raised-lg), 0 0 16px rgba(56, 189, 248, 0.25)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.borderColor = 'rgba(56, 189, 248, 0.3)'; e.currentTarget.style.boxShadow = 'var(--neo-shadow-raised)'; }}
+            >
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                  <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.25rem', boxShadow: '0 4px 10px rgba(2, 132, 199, 0.35)' }}>📄</div>
+                  <span style={{ fontSize: '0.66rem', fontWeight: '800', background: 'rgba(56, 189, 248, 0.16)', color: '#38bdf8', border: '1px solid rgba(56, 189, 248, 0.3)', padding: '2px 8px', borderRadius: '99px' }}>Gemini Vision</span>
+                </div>
+                <strong style={{ display: 'block', fontSize: '0.94rem', color: '#f1f5f9', fontWeight: '800' }}>Upload Doctor Rx</strong>
+              </div>
+              <p style={{ margin: '4px 0 0 0', fontSize: '0.74rem', color: '#94a3b8', lineHeight: 1.4 }}>Digitizes handwritten & printed prescriptions in seconds</p>
+            </div>
+
+            {/* Card 3: Hyperlocal Radar */}
+            <div 
+              onClick={() => setActiveMainView('radar')}
+              style={{
+                background: '#151a24',
+                border: '1px solid rgba(168, 85, 247, 0.3)',
+                borderRadius: '16px',
+                padding: '1.2rem',
+                cursor: 'pointer',
+                transition: 'all 0.25s ease',
+                boxShadow: 'var(--neo-shadow-raised)',
+                minHeight: '142px',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'space-between'
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.borderColor = '#a855f7'; e.currentTarget.style.boxShadow = 'var(--neo-shadow-raised-lg), 0 0 16px rgba(168, 85, 247, 0.25)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.borderColor = 'rgba(168, 85, 247, 0.3)'; e.currentTarget.style.boxShadow = 'var(--neo-shadow-raised)'; }}
+            >
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                  <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.25rem', boxShadow: '0 4px 10px rgba(124, 58, 237, 0.35)' }}>🛰️</div>
+                  <span style={{ fontSize: '0.66rem', fontWeight: '800', background: 'rgba(168, 85, 247, 0.16)', color: '#c084fc', border: '1px solid rgba(168, 85, 247, 0.3)', padding: '2px 8px', borderRadius: '99px' }}>{perimeterKm} km GPS</span>
+                </div>
+                <strong style={{ display: 'block', fontSize: '0.94rem', color: '#f1f5f9', fontWeight: '800' }}>Dark-Store Radar</strong>
+              </div>
+              <p style={{ margin: '4px 0 0 0', fontSize: '0.74rem', color: '#94a3b8', lineHeight: 1.4 }}>Live network map with guaranteed 10-15 min delivery perimeter</p>
+            </div>
+
+            {/* Card 4: Instamart Quick Shelf */}
+            <div 
+              onClick={() => {
+                const el = document.getElementById('instamart-shelf-section');
+                if (el) el.scrollIntoView({ behavior: 'smooth' });
+              }}
+              style={{
+                background: '#151a24',
+                border: '1px solid rgba(255, 119, 0, 0.3)',
+                borderRadius: '16px',
+                padding: '1.2rem',
+                cursor: 'pointer',
+                transition: 'all 0.25s ease',
+                boxShadow: 'var(--neo-shadow-raised)',
+                minHeight: '142px',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'space-between'
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.borderColor = '#ff7700'; e.currentTarget.style.boxShadow = 'var(--neo-shadow-raised-lg), 0 0 16px rgba(255, 119, 0, 0.25)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.borderColor = 'rgba(255, 119, 0, 0.3)'; e.currentTarget.style.boxShadow = 'var(--neo-shadow-raised)'; }}
+            >
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                  <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'linear-gradient(135deg, #ea580c 0%, #c2410c 100%)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.25rem', boxShadow: '0 4px 10px rgba(234, 88, 12, 0.35)' }}>⚡</div>
+                  <span style={{ fontSize: '0.66rem', fontWeight: '800', background: 'rgba(255, 119, 0, 0.16)', color: '#fb923c', border: '1px solid rgba(255, 119, 0, 0.3)', padding: '2px 8px', borderRadius: '99px' }}>10-15 Mins</span>
+                </div>
+                <strong style={{ display: 'block', fontSize: '0.94rem', color: '#f1f5f9', fontWeight: '800' }}>Instamart Shelf</strong>
+              </div>
+              <p style={{ margin: '4px 0 0 0', fontSize: '0.74rem', color: '#94a3b8', lineHeight: 1.4 }}>Direct 1-click re-order from nearby stocked partner pharmacies</p>
+            </div>
+          </div>
+
+          {/* Amazon-Style Pharmacy Search Bar Container */}
+          <div 
+            ref={searchContainerRef}
+            className="search-container" 
+            style={{ 
+              position: 'relative',
+              width: '100%',
+              maxWidth: '960px',
+              margin: '0 auto',
+              background: '#121620',
+              borderRadius: '14px',
+              border: isSearchFocused ? '2px solid #38bdf8' : '1.5px solid rgba(255, 255, 255, 0.1)',
+              boxShadow: isSearchFocused 
+                ? '0 0 20px rgba(56, 189, 248, 0.35), inset 2px 2px 6px rgba(0, 0, 0, 0.6)' 
+                : 'inset 2px 2px 6px rgba(0, 0, 0, 0.6), -2px -2px 6px rgba(255, 255, 255, 0.02)',
+              transition: 'all 0.2s ease',
+              zIndex: 100
+            }}
+          >
+            <form 
+              onSubmit={handleAmazonSearchSubmit}
               style={{ 
-                position: 'relative',
-                width: '100%',
-                maxWidth: '960px',
-                margin: '0 auto',
-                background: '#ffffff',
-                borderRadius: '14px',
-                border: isSearchFocused ? '2px solid #febd69' : '2px solid rgba(13, 148, 136, 0.45)',
-                boxShadow: isSearchFocused 
-                  ? '0 0 0 4px rgba(254, 189, 105, 0.35), 0 12px 35px rgba(0, 0, 0, 0.12)' 
-                  : '0 8px 30px rgba(13, 148, 136, 0.12)',
-                transition: 'all 0.2s ease',
-                zIndex: 100
+                display: 'flex', 
+                width: '100%', 
+                alignItems: 'stretch',
+                borderRadius: '12px',
+                overflow: 'hidden'
               }}
             >
-              <form 
-                onSubmit={handleAmazonSearchSubmit}
-                style={{ 
-                  display: 'flex', 
-                  width: '100%', 
-                  alignItems: 'stretch',
-                  borderRadius: '12px',
-                  overflow: 'hidden'
-                }}
-              >
-                {/* 1. Amazon Department / Category Dropdown */}
-                <div style={{
-                  position: 'relative',
-                  display: 'flex',
-                  alignItems: 'center',
-                  background: '#f3f4f6',
-                  borderRight: '1px solid #d1d5db',
-                  padding: '0 8px 0 12px',
-                  cursor: 'pointer',
-                  flexShrink: 0
-                }}>
-                  <select
-                    value={selectedDepartment}
-                    onChange={(e) => {
-                      setSelectedDepartment(e.target.value);
-                      showToast(`Department: ${e.target.options[e.target.selectedIndex].text}`, '🏷️');
-                    }}
-                    style={{
-                      appearance: 'none',
-                      background: 'transparent',
-                      border: 'none',
-                      outline: 'none',
-                      fontSize: '0.82rem',
-                      fontWeight: '700',
-                      color: '#374151',
-                      cursor: 'pointer',
-                      paddingRight: '16px',
-                      paddingTop: '0.85rem',
-                      paddingBottom: '0.85rem',
-                      height: '100%'
-                    }}
-                  >
-                    {AMAZON_DEPARTMENTS.map(d => (
-                      <option key={d.id} value={d.id}>{d.label}</option>
-                    ))}
-                  </select>
-                  <span style={{ position: 'absolute', right: '6px', fontSize: '0.62rem', color: '#6b7280', pointerEvents: 'none' }}>
-                    ▼
-                  </span>
-                </div>
-
-                {/* 2. Search Input */}
-                <div style={{ flex: 1, display: 'flex', alignItems: 'center', padding: '0 10px', background: '#ffffff', minWidth: 0 }}>
-                  <input
-                    type="text"
-                    placeholder="Search Amazon Pharmacy - medicines, generic salt, symptoms (e.g. Dolo 650, Augmentin, Crocin)..."
-                    value={searchQuery}
-                    onChange={e => {
-                      setSearchQuery(e.target.value);
-                      setShowSuggestions(true);
-                    }}
-                    onFocus={() => {
-                      setIsSearchFocused(true);
-                      setShowSuggestions(true);
-                    }}
-                    onKeyDown={handleKeyDown}
-                    style={{ 
-                      flex: 1,
-                      background: 'transparent', 
-                      border: 'none', 
-                      padding: '0.85rem 0.5rem',
-                      fontSize: '0.98rem',
-                      color: '#111827',
-                      fontWeight: '500',
-                      outline: 'none',
-                      minWidth: 0
-                    }}
-                  />
-
-                  {/* Clear Button */}
-                  {searchQuery && (
-                    <button 
-                      type="button" 
-                      onClick={() => { setSearchQuery(''); setShowSuggestions(true); }} 
-                      style={{ 
-                        background: 'transparent', 
-                        border: 'none', 
-                        color: '#9ca3af', 
-                        cursor: 'pointer', 
-                        fontSize: '1.25rem',
-                        fontWeight: 'bold',
-                        padding: '0 6px',
-                        lineHeight: 1
-                      }}
-                      title="Clear search"
-                    >
-                      &times;
-                    </button>
-                  )}
-
-                  {/* Amazon Voice Search Microphone Button */}
-                  <button
-                    type="button"
-                    onClick={handleVoiceSearch}
-                    style={{
-                      background: isListeningVoice ? 'rgba(239, 68, 68, 0.15)' : 'transparent',
-                      border: 'none',
-                      color: isListeningVoice ? '#dc2626' : '#6b7280',
-                      cursor: 'pointer',
-                      fontSize: '1.15rem',
-                      padding: '6px 8px',
-                      borderRadius: '8px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      transition: 'all 0.15s ease'
-                    }}
-                    title={isListeningVoice ? "Listening to voice..." : "Voice Search (Speak medicine name)"}
-                  >
-                    {isListeningVoice ? '🔴' : '🎙️'}
-                  </button>
-
-                  {/* Rx / Camera Scan Button */}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsOcrOpen(true);
-                      setTimeout(() => fileInputRef.current?.click(), 100);
-                    }}
-                    style={{
-                      background: 'transparent',
-                      border: 'none',
-                      color: '#0d9488',
-                      cursor: 'pointer',
-                      fontSize: '1.15rem',
-                      padding: '6px 8px',
-                      borderRadius: '8px',
-                      display: 'flex',
-                      alignItems: 'center'
-                    }}
-                    title="Scan Prescription (Handwritten / Printed)"
-                  >
-                    📷
-                  </button>
-                </div>
-
-                {/* 3. Amazon Signature Amber/Gold Search Button */}
-                <button
-                  type="submit"
-                  style={{
-                    background: 'linear-gradient(180deg, #febd69 0%, #f3a847 100%)',
-                    border: 'none',
-                    borderLeft: '1px solid #e5e7eb',
-                    color: '#111827',
-                    padding: '0 1.6rem',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: '1.25rem',
-                    fontWeight: 'bold',
-                    transition: 'all 0.15s ease',
-                    boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.4)',
-                    flexShrink: 0
-                  }}
-                  onMouseEnter={(e) => { e.currentTarget.style.background = '#f2a740'; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.background = 'linear-gradient(180deg, #febd69 0%, #f3a847 100%)'; }}
-                  title="Search Medicines"
-                >
-                  <span>🔍</span>
-                </button>
-              </form>
-
-              {/* Amazon Secondary Delivery Guarantee Strip */}
+              {/* 1. Amazon Department / Category Dropdown */}
               <div style={{
+                position: 'relative',
                 display: 'flex',
                 alignItems: 'center',
-                justifyContent: 'space-between',
-                padding: '0.45rem 1rem',
-                background: '#fafafa',
-                borderTop: '1px solid #f1f5f9',
-                borderRadius: '0 0 12px 12px',
-                fontSize: '0.74rem',
-                color: '#64748b',
-                flexWrap: 'wrap',
-                gap: '8px'
+                background: '#181e2b',
+                borderRight: '1px solid rgba(255, 255, 255, 0.08)',
+                padding: '0 8px 0 12px',
+                cursor: 'pointer',
+                flexShrink: 0
               }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span style={{
-                    background: '#0284c7',
-                    color: '#ffffff',
-                    fontWeight: '800',
-                    fontSize: '0.68rem',
-                    padding: '2px 7px',
-                    borderRadius: '4px',
-                    letterSpacing: '0.03em'
-                  }}>
-                    ⚡ PRIME
-                  </span>
-                  <span style={{ fontWeight: '600', color: '#0f172a' }}>
-                    FREE 10-15 Min Express Delivery in {selectedAddress?.area || 'Mangalore'}
-                  </span>
-                </div>
-
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <span style={{ color: '#059669', fontWeight: '700' }}>✓ 100% Genuine Pharmacy Stock</span>
-                  <span>•</span>
-                  <span style={{ color: '#0369a1', fontWeight: '700' }}>Cash on Delivery & UPI</span>
-                </div>
+                <select
+                  value={selectedDepartment}
+                  onChange={(e) => {
+                    setSelectedDepartment(e.target.value);
+                    showToast(`Department: ${e.target.options[e.target.selectedIndex].text}`, '🏷️');
+                  }}
+                  style={{
+                    appearance: 'none',
+                    background: 'transparent',
+                    border: 'none',
+                    outline: 'none',
+                    fontSize: '0.82rem',
+                    fontWeight: '700',
+                    color: '#cbd5e1',
+                    cursor: 'pointer',
+                    paddingRight: '16px',
+                    paddingTop: '0.85rem',
+                    paddingBottom: '0.85rem',
+                    height: '100%'
+                  }}
+                >
+                  {AMAZON_DEPARTMENTS.map(d => (
+                    <option key={d.id} value={d.id} style={{ background: '#181e2b', color: '#f1f5f9' }}>{d.label}</option>
+                  ))}
+                </select>
+                <span style={{ position: 'absolute', right: '6px', fontSize: '0.62rem', color: '#94a3b8', pointerEvents: 'none' }}>
+                  ▼
+                </span>
               </div>
+
+              {/* 2. Search Input */}
+              <div style={{ flex: 1, display: 'flex', alignItems: 'center', padding: '0 10px', background: '#121620', minWidth: 0 }}>
+                <input
+                  type="text"
+                  placeholder="Search Amazon Pharmacy - medicines, generic salt, symptoms (e.g. Dolo 650, Augmentin, Crocin)..."
+                  value={searchQuery}
+                  onChange={e => {
+                    setSearchQuery(e.target.value);
+                    setShowSuggestions(true);
+                  }}
+                  onFocus={() => {
+                    setIsSearchFocused(true);
+                    setShowSuggestions(true);
+                  }}
+                  onKeyDown={handleKeyDown}
+                  style={{ 
+                    flex: 1,
+                    background: 'transparent', 
+                    border: 'none', 
+                    padding: '0.85rem 0.5rem',
+                    fontSize: '0.98rem',
+                    color: '#f1f5f9',
+                    fontWeight: '500',
+                    outline: 'none',
+                    minWidth: 0
+                  }}
+                />
+
+                {/* Clear Button */}
+                {searchQuery && (
+                  <button 
+                    type="button" 
+                    onClick={() => { setSearchQuery(''); setShowSuggestions(true); }} 
+                    style={{ 
+                      background: 'transparent', 
+                      border: 'none', 
+                      color: '#94a3b8', 
+                      cursor: 'pointer', 
+                      fontSize: '1.25rem',
+                      fontWeight: 'bold',
+                      padding: '0 6px',
+                      lineHeight: 1
+                    }}
+                    title="Clear search"
+                  >
+                    &times;
+                  </button>
+                )}
+
+                {/* Amazon Voice Search Microphone Button */}
+                <button
+                  type="button"
+                  onClick={handleVoiceSearch}
+                  style={{
+                    background: isListeningVoice ? 'rgba(239, 68, 68, 0.2)' : 'transparent',
+                    border: 'none',
+                    color: isListeningVoice ? '#f87171' : '#94a3b8',
+                    cursor: 'pointer',
+                    fontSize: '1.15rem',
+                    padding: '6px 8px',
+                    borderRadius: '8px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    transition: 'all 0.15s ease'
+                  }}
+                  title={isListeningVoice ? "Listening to voice..." : "Voice Search (Speak medicine name)"}
+                >
+                  {isListeningVoice ? '🔴' : '🎙️'}
+                </button>
+
+                {/* Rx / Camera Scan Button */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsOcrOpen(true);
+                    setTimeout(() => fileInputRef.current?.click(), 100);
+                  }}
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    color: '#38bdf8',
+                    cursor: 'pointer',
+                    fontSize: '1.15rem',
+                    padding: '6px 8px',
+                    borderRadius: '8px',
+                    display: 'flex',
+                    alignItems: 'center'
+                  }}
+                  title="Scan Prescription (Handwritten / Printed)"
+                >
+                  📷
+                </button>
+              </div>
+
+              {/* 3. Amazon Signature Amber/Gold Search Button */}
+              <button
+                type="submit"
+                style={{
+                  background: 'linear-gradient(180deg, #febd69 0%, #f3a847 100%)',
+                  border: 'none',
+                  borderLeft: '1px solid rgba(255, 255, 255, 0.1)',
+                  color: '#111827',
+                  padding: '0 1.6rem',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '1.25rem',
+                  fontWeight: 'bold',
+                  transition: 'all 0.15s ease',
+                  boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.4)',
+                  flexShrink: 0
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = '#f2a740'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = 'linear-gradient(180deg, #febd69 0%, #f3a847 100%)'; }}
+                title="Search Medicines"
+              >
+                <span>🔍</span>
+              </button>
+            </form>
+
+            {/* Amazon Secondary Delivery Guarantee Strip */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '0.45rem 1rem',
+              background: '#0f131a',
+              borderTop: '1px solid rgba(255, 255, 255, 0.06)',
+              borderRadius: '0 0 12px 12px',
+              fontSize: '0.74rem',
+              color: '#94a3b8',
+              flexWrap: 'wrap',
+              gap: '8px'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{
+                  background: '#0284c7',
+                  color: '#ffffff',
+                  fontWeight: '800',
+                  fontSize: '0.68rem',
+                  padding: '2px 7px',
+                  borderRadius: '4px',
+                  letterSpacing: '0.03em'
+                }}>
+                  ⚡ PRIME
+                </span>
+                <span style={{ fontWeight: '600', color: '#f1f5f9' }}>
+                  FREE 10-15 Min Express Delivery in {selectedAddress?.area || 'Mangalore'}
+                </span>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span style={{ color: '#34d399', fontWeight: '700' }}>✓ 100% Genuine Pharmacy Stock</span>
+                <span>•</span>
+                <span style={{ color: '#38bdf8', fontWeight: '700' }}>Cash on Delivery & UPI</span>
+              </div>
+            </div>
 
               {/* Amazon Live Suggestions Dropdown: Dual Mode (Zero-State & Active Search) */}
               {showSuggestions && (isSearchFocused || searchQuery.trim().length > 0) && (
@@ -3039,10 +2995,10 @@ export default function Home() {
                     left: 0,
                     right: 0,
                     marginTop: '8px',
-                    background: '#ffffff',
-                    border: '1.5px solid #d1d5db',
+                    background: '#151a24',
+                    border: '1.5px solid rgba(56, 189, 248, 0.25)',
                     borderRadius: '16px',
-                    boxShadow: '0 20px 50px rgba(0, 0, 0, 0.2), 0 0 0 1px rgba(0,0,0,0.05)',
+                    boxShadow: '0 20px 50px rgba(0, 0, 0, 0.8), -3px -3px 10px rgba(255, 255, 255, 0.03)',
                     zIndex: 9999,
                     maxHeight: '520px',
                     overflowY: 'auto',
@@ -3062,7 +3018,7 @@ export default function Home() {
                             marginBottom: '0.5rem',
                             padding: '0 4px'
                           }}>
-                            <span style={{ fontSize: '0.8rem', fontWeight: '800', color: '#374151', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <span style={{ fontSize: '0.8rem', fontWeight: '800', color: '#94a3b8', display: 'flex', alignItems: 'center', gap: '6px' }}>
                               <span>🕒</span> Recent Searches
                             </span>
                             <button
@@ -3071,7 +3027,7 @@ export default function Home() {
                               style={{
                                 background: 'transparent',
                                 border: 'none',
-                                color: '#6b7280',
+                                color: '#64748b',
                                 fontSize: '0.72rem',
                                 fontWeight: '600',
                                 cursor: 'pointer',
@@ -3095,26 +3051,26 @@ export default function Home() {
                                   display: 'inline-flex',
                                   alignItems: 'center',
                                   gap: '6px',
-                                  background: '#f3f4f6',
-                                  border: '1px solid #e5e7eb',
+                                  background: '#1c2331',
+                                  border: '1px solid rgba(255, 255, 255, 0.08)',
                                   borderRadius: '99px',
                                   padding: '5px 12px',
                                   fontSize: '0.8rem',
                                   fontWeight: '600',
-                                  color: '#1f2937',
+                                  color: '#e2e8f0',
                                   cursor: 'pointer',
                                   transition: 'all 0.15s ease'
                                 }}
-                                onMouseEnter={(e) => { e.currentTarget.style.background = '#e5e7eb'; }}
-                                onMouseLeave={(e) => { e.currentTarget.style.background = '#f3f4f6'; }}
+                                onMouseEnter={(e) => { e.currentTarget.style.background = '#242d3e'; }}
+                                onMouseLeave={(e) => { e.currentTarget.style.background = '#1c2331'; }}
                               >
-                                <span style={{ color: '#9ca3af', fontSize: '0.75rem' }}>🔍</span>
+                                <span style={{ color: '#38bdf8', fontSize: '0.75rem' }}>🔍</span>
                                 <span>{term}</span>
                                 <span
                                   onClick={(e) => removeSingleRecentSearch(term, e)}
                                   style={{
                                     marginLeft: '4px',
-                                    color: '#9ca3af',
+                                    color: '#94a3b8',
                                     fontSize: '0.85rem',
                                     fontWeight: 'bold',
                                     cursor: 'pointer',
@@ -3139,12 +3095,13 @@ export default function Home() {
                           marginBottom: '0.6rem',
                           padding: '0 4px'
                         }}>
-                          <span style={{ fontSize: '0.82rem', fontWeight: '800', color: '#111827', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <span style={{ fontSize: '0.82rem', fontWeight: '800', color: '#f1f5f9', display: 'flex', alignItems: 'center', gap: '6px' }}>
                             <span>🔥</span> Best Sellers in Pharmacy (10-15 Min Prime)
                           </span>
                           <span style={{
-                            background: '#ffecd1',
-                            color: '#b45309',
+                            background: 'rgba(255, 119, 0, 0.16)',
+                            color: '#fb923c',
+                            border: '1px solid rgba(255, 119, 0, 0.3)',
                             fontSize: '0.68rem',
                             fontWeight: '800',
                             padding: '2px 8px',
@@ -3171,20 +3128,20 @@ export default function Home() {
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'space-between',
-                                background: '#fafafa',
-                                border: '1px solid #e5e7eb',
+                                background: '#181e2b',
+                                border: '1px solid rgba(255, 255, 255, 0.08)',
                                 borderRadius: '12px',
                                 padding: '8px 10px',
                                 cursor: 'pointer',
                                 transition: 'all 0.15s ease'
                               }}
                               onMouseEnter={(e) => {
-                                e.currentTarget.style.background = '#f8fafc';
-                                e.currentTarget.style.borderColor = '#febd69';
+                                e.currentTarget.style.background = '#1e2638';
+                                e.currentTarget.style.borderColor = '#38bdf8';
                               }}
                               onMouseLeave={(e) => {
-                                e.currentTarget.style.background = '#fafafa';
-                                e.currentTarget.style.borderColor = '#e5e7eb';
+                                e.currentTarget.style.background = '#181e2b';
+                                e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.08)';
                               }}
                             >
                               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1 }}>
@@ -3195,9 +3152,9 @@ export default function Home() {
                                   display: 'flex',
                                   alignItems: 'center',
                                   justifyContent: 'center',
-                                  background: '#ffffff',
+                                  background: '#121620',
                                   borderRadius: '8px',
-                                  border: '1px solid #f1f5f9',
+                                  border: '1px solid rgba(255, 255, 255, 0.08)',
                                   flexShrink: 0
                                 }}>
                                   {bs.icon}
@@ -3206,28 +3163,28 @@ export default function Home() {
                                   <div style={{
                                     fontSize: '0.82rem',
                                     fontWeight: '800',
-                                    color: '#0f172a',
+                                    color: '#f1f5f9',
                                     whiteSpace: 'nowrap',
                                     overflow: 'hidden',
                                     textOverflow: 'ellipsis'
                                   }}>
                                     {bs.brand_name}
                                   </div>
-                                  <div style={{ fontSize: '0.68rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                  <div style={{ fontSize: '0.68rem', color: '#94a3b8', display: 'flex', alignItems: 'center', gap: '4px' }}>
                                     <span style={{ color: '#f59e0b' }}>⭐ {bs.rating}</span>
                                     <span>({bs.reviews})</span>
                                     <span>•</span>
-                                    <span style={{ color: '#0284c7', fontWeight: '700' }}>⚡ Prime</span>
+                                    <span style={{ color: '#38bdf8', fontWeight: '700' }}>⚡ Prime</span>
                                   </div>
                                 </div>
                               </div>
 
                               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0, marginLeft: '8px' }}>
                                 <div style={{ textAlign: 'right' }}>
-                                  <div style={{ fontSize: '0.84rem', fontWeight: '800', color: '#0f172a' }}>
+                                  <div style={{ fontSize: '0.84rem', fontWeight: '800', color: '#2dd4bf' }}>
                                     ₹{bs.price_mrp}
                                   </div>
-                                  <div style={{ fontSize: '0.65rem', color: '#94a3b8', textDecoration: 'line-through' }}>
+                                  <div style={{ fontSize: '0.65rem', color: '#64748b', textDecoration: 'line-through' }}>
                                     ₹{bs.original_mrp}
                                   </div>
                                 </div>
@@ -3263,7 +3220,7 @@ export default function Home() {
 
                       {/* 3. Shop by Category / Department */}
                       <div>
-                        <div style={{ fontSize: '0.78rem', fontWeight: '800', color: '#4b5563', marginBottom: '0.5rem', padding: '0 4px' }}>
+                        <div style={{ fontSize: '0.78rem', fontWeight: '800', color: '#94a3b8', marginBottom: '0.5rem', padding: '0 4px' }}>
                           🏷️ Shop by Health Concern / Department
                         </div>
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
@@ -3278,9 +3235,9 @@ export default function Home() {
                                 saveRecentSearch(d.label);
                               }}
                               style={{
-                                background: selectedDepartment === d.id ? '#0d9488' : '#ffffff',
-                                color: selectedDepartment === d.id ? '#ffffff' : '#374151',
-                                border: '1px solid #e5e7eb',
+                                background: selectedDepartment === d.id ? 'linear-gradient(135deg, #14b8a6, #0d9488)' : '#181e2b',
+                                color: selectedDepartment === d.id ? '#ffffff' : '#cbd5e1',
+                                border: selectedDepartment === d.id ? '1px solid #2dd4bf' : '1px solid rgba(255, 255, 255, 0.08)',
                                 borderRadius: '8px',
                                 padding: '5px 10px',
                                 fontSize: '0.75rem',
@@ -3307,18 +3264,18 @@ export default function Home() {
                             justifyContent: 'space-between',
                             alignItems: 'center',
                             padding: '0.35rem 0.6rem 0.6rem 0.6rem',
-                            borderBottom: '1px solid #f1f5f9',
+                            borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
                             marginBottom: '0.5rem',
                             flexWrap: 'wrap',
                             gap: '6px'
                           }}>
-                            <span style={{ fontSize: '0.78rem', fontWeight: '800', color: '#0f766e', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <span style={{ fontSize: '0.78rem', fontWeight: '800', color: '#2dd4bf', display: 'flex', alignItems: 'center', gap: '6px' }}>
                               <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#10b981', display: 'inline-block' }}></span>
                               Live Stock Matches ({displayedResults.length})
                               {selectedDepartment !== 'All' && (
                                 <span style={{
-                                  background: '#fef3c7',
-                                  color: '#92400e',
+                                  background: 'rgba(245, 158, 11, 0.15)',
+                                  color: '#fbbf24',
                                   padding: '1px 6px',
                                   borderRadius: '4px',
                                   fontSize: '0.68rem',
@@ -3328,7 +3285,7 @@ export default function Home() {
                                 </span>
                               )}
                             </span>
-                            <span style={{ fontSize: '0.72rem', color: '#0284c7', fontWeight: '700' }}>
+                            <span style={{ fontSize: '0.72rem', color: '#38bdf8', fontWeight: '700' }}>
                               ⚡ PRIME FREE Express Delivery (10-15 Min)
                             </span>
                           </div>
@@ -3336,8 +3293,8 @@ export default function Home() {
                           {/* Multi-Composition Split Banner */}
                           {multiCompositionSplit && multiCompositionSplit.tabs && multiCompositionSplit.tabs.length >= 2 && (
                             <div style={{
-                              background: 'linear-gradient(135deg, #f0fdfa 0%, #e0f2fe 100%)',
-                              border: '1px solid #99f6e4',
+                              background: 'linear-gradient(135deg, rgba(20, 184, 166, 0.12) 0%, rgba(56, 189, 248, 0.1) 100%)',
+                              border: '1px solid rgba(45, 212, 191, 0.3)',
                               borderRadius: '16px',
                               padding: '1rem',
                               marginBottom: '0.85rem'
@@ -3345,7 +3302,7 @@ export default function Home() {
                               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px', flexWrap: 'wrap', gap: '6px' }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                                   <span style={{ fontSize: '1.2rem' }}>💊</span>
-                                  <strong style={{ fontSize: '0.92rem', color: '#0f766e' }}>
+                                  <strong style={{ fontSize: '0.92rem', color: '#2dd4bf' }}>
                                     Multi-Composition Formulation ({multiCompositionSplit.brand_searched})
                                   </strong>
                                 </div>
@@ -3354,24 +3311,24 @@ export default function Home() {
                                   padding: '3px 10px',
                                   borderRadius: '99px',
                                   background: multiCompositionSplit.is_combined_in_stock ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)',
-                                  color: multiCompositionSplit.is_combined_in_stock ? '#059669' : '#dc2626',
+                                  color: multiCompositionSplit.is_combined_in_stock ? '#34d399' : '#f87171',
                                   fontWeight: '800'
                                 }}>
                                   {multiCompositionSplit.is_combined_in_stock ? 'Combo Tablet Available' : '⚠️ Combo Tablet Out of Stock'}
                                 </span>
                               </div>
 
-                              <p style={{ fontSize: '0.78rem', color: '#334155', margin: '0 0 10px 0', lineHeight: '1.4' }}>
+                              <p style={{ fontSize: '0.78rem', color: '#cbd5e1', margin: '0 0 10px 0', lineHeight: '1.4' }}>
                                 {multiCompositionSplit.note}
                               </p>
 
                               {/* 2-TAB COMPOSITION SWITCHER */}
                               <div style={{
                                 display: 'flex',
-                                background: '#ffffff',
+                                background: '#121620',
                                 borderRadius: '12px',
                                 padding: '3px',
-                                border: '1px solid #cbd5e1',
+                                border: '1px solid rgba(255, 255, 255, 0.08)',
                                 marginBottom: '10px',
                                 gap: '4px'
                               }}>
@@ -3389,20 +3346,21 @@ export default function Home() {
                                       padding: '8px 12px',
                                       borderRadius: '99px',
                                       border: 'none',
-                                      background: activeCompositionTab === tIdx ? 'linear-gradient(135deg, #0d9488, #059669)' : 'transparent',
-                                      color: activeCompositionTab === tIdx ? '#ffffff' : '#475569',
+                                      background: activeCompositionTab === tIdx ? 'linear-gradient(135deg, #14b8a6, #0d9488)' : 'transparent',
+                                      color: activeCompositionTab === tIdx ? '#ffffff' : '#94a3b8',
                                       fontWeight: '700',
                                       fontSize: '0.82rem',
                                       cursor: 'pointer',
                                       transition: 'all 0.2s ease',
-                                      boxShadow: activeCompositionTab === tIdx ? '0 2px 8px rgba(13, 148, 136, 0.25)' : 'none'
+                                      boxShadow: activeCompositionTab === tIdx ? '0 2px 8px rgba(20, 184, 166, 0.35)' : 'none'
                                     }}
                                   >
                                     <span>🧪</span>
                                     <span>{tab.label || tab.name}</span>
                                     <span style={{
                                       fontSize: '0.68rem',
-                                      background: activeCompositionTab === tIdx ? 'rgba(255,255,255,0.25)' : '#f1f5f9',
+                                      background: activeCompositionTab === tIdx ? 'rgba(255,255,255,0.25)' : 'rgba(255, 255, 255, 0.08)',
+                                      color: '#f1f5f9',
                                       padding: '1px 6px',
                                       borderRadius: '99px'
                                     }}>
@@ -3415,12 +3373,12 @@ export default function Home() {
                               {/* Content of Selected Composition Tab */}
                               {multiCompositionSplit.tabs[activeCompositionTab] && (
                                 <div>
-                                  <div style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#0f766e', marginBottom: '6px' }}>
+                                  <div style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#2dd4bf', marginBottom: '6px' }}>
                                     Available standalone medicines containing {multiCompositionSplit.tabs[activeCompositionTab].name}:
                                   </div>
                                   <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                                     {multiCompositionSplit.tabs[activeCompositionTab].medicines.length === 0 ? (
-                                      <div style={{ fontSize: '0.75rem', color: '#64748b', fontStyle: 'italic', padding: '6px' }}>
+                                      <div style={{ fontSize: '0.75rem', color: '#94a3b8', fontStyle: 'italic', padding: '6px' }}>
                                         No individual medicines found in stock for this composition.
                                       </div>
                                     ) : (
@@ -3432,28 +3390,28 @@ export default function Home() {
                                             display: 'flex',
                                             justifyContent: 'space-between',
                                             alignItems: 'center',
-                                            background: '#ffffff',
-                                            border: '1px solid #e2e8f0',
+                                            background: '#181e2b',
+                                            border: '1px solid rgba(255, 255, 255, 0.08)',
                                             borderRadius: '10px',
                                             padding: '8px 12px',
                                             cursor: 'pointer'
                                           }}
                                         >
                                           <div>
-                                            <strong style={{ fontSize: '0.84rem', color: '#0f172a' }}>{cm.brand_name}</strong>
-                                            <span style={{ fontSize: '0.72rem', color: '#64748b', marginLeft: '6px' }}>
+                                            <strong style={{ fontSize: '0.84rem', color: '#f1f5f9' }}>{cm.brand_name}</strong>
+                                            <span style={{ fontSize: '0.72rem', color: '#94a3b8', marginLeft: '6px' }}>
                                               ({cm.dosage || 'Standard'} • {cm.form || 'Tablet'})
                                             </span>
                                           </div>
                                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                            <span style={{ fontSize: '0.84rem', fontWeight: 'bold', color: '#0d9488' }}>
+                                            <span style={{ fontSize: '0.84rem', fontWeight: 'bold', color: '#2dd4bf' }}>
                                               ₹{cm.price_mrp || '45.00'}
                                             </span>
                                             <button
                                               type="button"
                                               onClick={(e) => { e.stopPropagation(); addToCart(cm); }}
                                               style={{
-                                                background: '#0d9488',
+                                                background: 'linear-gradient(135deg, #14b8a6, #0d9488)',
                                                 color: '#ffffff',
                                                 border: 'none',
                                                 padding: '4px 10px',
@@ -3505,9 +3463,9 @@ export default function Home() {
 
                           {/* Empty State */}
                           {displayedResults.length === 0 && !multiCompositionSplit ? (
-                            <div style={{ padding: '1.75rem', textAlign: 'center', color: '#64748b', fontSize: '0.88rem' }}>
+                            <div style={{ padding: '1.75rem', textAlign: 'center', color: '#94a3b8', fontSize: '0.88rem' }}>
                               <span style={{ fontSize: '1.8rem', display: 'block', marginBottom: '6px' }}>🔍</span>
-                              No local stock found for "<strong>{searchQuery}</strong>"
+                              No local stock found for "<strong style={{ color: '#f1f5f9' }}>{searchQuery}</strong>"
                               {selectedDepartment !== 'All' ? ` in department ${selectedDepartment}.` : '.'}<br />
                               {selectedDepartment !== 'All' && (
                                 <button
@@ -3515,7 +3473,7 @@ export default function Home() {
                                   onClick={() => setSelectedDepartment('All')}
                                   style={{
                                     marginTop: '8px',
-                                    background: '#0d9488',
+                                    background: 'linear-gradient(135deg, #14b8a6, #0d9488)',
                                     color: '#ffffff',
                                     border: 'none',
                                     padding: '5px 12px',
@@ -3553,24 +3511,24 @@ export default function Home() {
                                     padding: '0.75rem 0.9rem',
                                     borderRadius: '12px',
                                     cursor: 'pointer',
-                                    background: focusedIndex === idx ? 'rgba(254, 189, 105, 0.12)' : 'transparent',
+                                    background: focusedIndex === idx ? 'rgba(56, 189, 248, 0.12)' : 'transparent',
                                     transition: 'all 0.15s ease',
-                                    borderBottom: idx !== displayedResults.length - 1 ? '1px solid #f1f5f9' : 'none',
+                                    borderBottom: idx !== displayedResults.length - 1 ? '1px solid rgba(255, 255, 255, 0.06)' : 'none',
                                     display: 'flex',
                                     justifyContent: 'space-between',
                                     alignItems: 'center',
                                     gap: '12px'
                                   }}
-                                  onMouseEnter={(e) => { e.currentTarget.style.background = '#f9fafb'; }}
-                                  onMouseLeave={(e) => { e.currentTarget.style.background = focusedIndex === idx ? 'rgba(254, 189, 105, 0.12)' : 'transparent'; }}
+                                  onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(56, 189, 248, 0.08)'; }}
+                                  onMouseLeave={(e) => { e.currentTarget.style.background = focusedIndex === idx ? 'rgba(56, 189, 248, 0.12)' : 'transparent'; }}
                                 >
                                   {/* Amazon Form & Thumbnail Icon */}
                                   <div style={{
                                     width: '42px',
                                     height: '42px',
                                     borderRadius: '10px',
-                                    background: '#f8fafc',
-                                    border: '1px solid #e2e8f0',
+                                    background: '#121620',
+                                    border: '1px solid rgba(255, 255, 255, 0.08)',
                                     display: 'flex',
                                     flexDirection: 'column',
                                     alignItems: 'center',
@@ -3579,7 +3537,7 @@ export default function Home() {
                                     flexShrink: 0
                                   }}>
                                     <span>{formIcon}</span>
-                                    <span style={{ fontSize: '0.52rem', fontWeight: '800', color: '#64748b', textTransform: 'uppercase', lineHeight: 1 }}>
+                                    <span style={{ fontSize: '0.52rem', fontWeight: '800', color: '#94a3b8', textTransform: 'uppercase', lineHeight: 1 }}>
                                       {item.form ? item.form.substring(0, 4) : 'MED'}
                                     </span>
                                   </div>
@@ -3587,18 +3545,18 @@ export default function Home() {
                                   {/* Middle Column: Medicine Details & Amazon Prime Badge */}
                                   <div style={{ flex: 1, minWidth: 0 }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '3px' }}>
-                                      <strong style={{ fontSize: '0.94rem', color: '#0f172a' }}>
+                                      <strong style={{ fontSize: '0.94rem', color: '#f1f5f9' }}>
                                         {highlightMatch(item.brand_name, searchQuery)}
                                       </strong>
                                       {item.dosage && (
-                                        <span style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: '600' }}>
+                                        <span style={{ fontSize: '0.74rem', color: '#94a3b8', fontWeight: '600' }}>
                                           ({item.dosage})
                                         </span>
                                       )}
                                       {item.compound_badge && (
                                         <span style={{
                                           background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.15), rgba(13, 148, 136, 0.2))',
-                                          color: '#0f766e',
+                                          color: '#2dd4bf',
                                           border: '1px solid rgba(13, 148, 136, 0.3)',
                                           padding: '2px 8px',
                                           borderRadius: '99px',
@@ -3613,9 +3571,9 @@ export default function Home() {
                                     {item.compound_note && (
                                       <div style={{
                                         fontSize: '0.7rem',
-                                        color: '#0369a1',
-                                        background: '#f0f9ff',
-                                        border: '1px solid #bae6fd',
+                                        color: '#38bdf8',
+                                        background: 'rgba(56, 189, 248, 0.1)',
+                                        border: '1px solid rgba(56, 189, 248, 0.25)',
                                         padding: '2px 7px',
                                         borderRadius: '6px',
                                         marginBottom: '4px',
@@ -3625,16 +3583,16 @@ export default function Home() {
                                       </div>
                                     )}
 
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.74rem', color: '#64748b', flexWrap: 'wrap' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.74rem', color: '#cbd5e1', flexWrap: 'wrap' }}>
                                       <span>🧪 <strong>{highlightMatch(item.generic_name, searchQuery)}</strong></span>
-                                      {item.manufacturer && <span>• {item.manufacturer}</span>}
+                                      {item.manufacturer && <span style={{ color: '#94a3b8' }}>• {item.manufacturer}</span>}
                                     </div>
 
                                     {/* Amazon Star Rating & Prime Delivery line */}
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px', fontSize: '0.7rem', flexWrap: 'wrap' }}>
                                       <span style={{ color: '#f59e0b', fontWeight: '700' }}>⭐⭐⭐⭐½ 4.8</span>
                                       <span style={{ color: '#94a3b8' }}>(1,240+)</span>
-                                      <span style={{ color: '#cbd5e1' }}>•</span>
+                                      <span style={{ color: 'rgba(255, 255, 255, 0.2)' }}>•</span>
                                       <span style={{
                                         background: '#0284c7',
                                         color: '#ffffff',
@@ -3646,7 +3604,7 @@ export default function Home() {
                                       }}>
                                         ⚡ PRIME
                                       </span>
-                                      <span style={{ color: '#059669', fontWeight: '700' }}>
+                                      <span style={{ color: '#34d399', fontWeight: '700' }}>
                                         10-15 Min Express Delivery
                                       </span>
                                     </div>
@@ -3655,13 +3613,13 @@ export default function Home() {
                                   {/* Right Column: Pricing & Amazon 1-Click Buttons */}
                                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
                                     <div style={{ textAlign: 'right', minWidth: '60px' }}>
-                                      <div style={{ fontWeight: '800', color: '#0f172a', fontSize: '1rem' }}>
+                                      <div style={{ fontWeight: '800', color: '#2dd4bf', fontSize: '1rem' }}>
                                         ₹{currentPrice}
                                       </div>
-                                      <div style={{ fontSize: '0.68rem', color: '#94a3b8', textDecoration: 'line-through' }}>
+                                      <div style={{ fontSize: '0.68rem', color: '#64748b', textDecoration: 'line-through' }}>
                                         ₹{originalMrp}
                                       </div>
-                                      <div style={{ fontSize: '0.65rem', color: '#16a34a', fontWeight: '700' }}>
+                                      <div style={{ fontSize: '0.65rem', color: '#4ade80', fontWeight: '700' }}>
                                         {discountPercent}% OFF
                                       </div>
                                     </div>
@@ -3675,8 +3633,8 @@ export default function Home() {
                                             display: 'flex',
                                             alignItems: 'center',
                                             gap: '4px',
-                                            background: '#f0fdf4',
-                                            border: '1.5px solid #16a34a',
+                                            background: 'rgba(16, 185, 129, 0.12)',
+                                            border: '1.5px solid #10b981',
                                             borderRadius: '8px',
                                             padding: '2px 6px'
                                           }}
@@ -3684,17 +3642,17 @@ export default function Home() {
                                           <button
                                             type="button"
                                             onClick={() => handleUpdateItemQuantity(item, -1)}
-                                            style={{ background: 'transparent', border: 'none', color: '#16a34a', fontWeight: '800', cursor: 'pointer', padding: '0 3px' }}
+                                            style={{ background: 'transparent', border: 'none', color: '#34d399', fontWeight: '800', cursor: 'pointer', padding: '0 3px' }}
                                           >
                                             −
                                           </button>
-                                          <span style={{ fontWeight: '800', fontSize: '0.78rem', color: '#16a34a', minWidth: '14px', textAlign: 'center' }}>
+                                          <span style={{ fontWeight: '800', fontSize: '0.78rem', color: '#34d399', minWidth: '14px', textAlign: 'center' }}>
                                             {itemCartQty}
                                           </span>
                                           <button
                                             type="button"
                                             onClick={() => handleUpdateItemQuantity(item, 1)}
-                                            style={{ background: 'transparent', border: 'none', color: '#16a34a', fontWeight: '800', cursor: 'pointer', padding: '0 3px' }}
+                                            style={{ background: 'transparent', border: 'none', color: '#34d399', fontWeight: '800', cursor: 'pointer', padding: '0 3px' }}
                                           >
                                             +
                                           </button>
@@ -3707,9 +3665,9 @@ export default function Home() {
                                             handleUpdateItemQuantity(item, 1);
                                           }}
                                           style={{
-                                            background: '#f3f4f6',
-                                            color: '#1f2937',
-                                            border: '1px solid #d1d5db',
+                                            background: '#1e2638',
+                                            color: '#38bdf8',
+                                            border: '1px solid rgba(56, 189, 248, 0.3)',
                                             padding: '6px 10px',
                                             borderRadius: '8px',
                                             fontWeight: '700',
@@ -3762,9 +3720,9 @@ export default function Home() {
                             <div style={{
                               marginTop: '0.75rem',
                               padding: '0.65rem 0.5rem 0.25rem 0.5rem',
-                              borderTop: '1px solid #f1f5f9'
+                              borderTop: '1px solid rgba(255, 255, 255, 0.08)'
                             }}>
-                              <div style={{ fontSize: '0.72rem', fontWeight: '800', color: '#6b7280', marginBottom: '6px' }}>
+                              <div style={{ fontSize: '0.72rem', fontWeight: '800', color: '#94a3b8', marginBottom: '6px' }}>
                                 🔍 Related Searches on Amazon Pharmacy:
                               </div>
                               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
@@ -3783,12 +3741,12 @@ export default function Home() {
                                       setShowSuggestions(true);
                                     }}
                                     style={{
-                                      background: '#f8fafc',
-                                      border: '1px solid #e2e8f0',
+                                      background: '#181e2b',
+                                      border: '1px solid rgba(255, 255, 255, 0.08)',
                                       borderRadius: '6px',
                                       padding: '3px 8px',
                                       fontSize: '0.7rem',
-                                      color: '#0284c7',
+                                      color: '#38bdf8',
                                       fontWeight: '600',
                                       cursor: 'pointer'
                                     }}
@@ -3805,7 +3763,7 @@ export default function Home() {
                             <div style={{
                               marginTop: '0.5rem',
                               paddingTop: '0.5rem',
-                              borderTop: '1px solid #f1f5f9',
+                              borderTop: '1px solid rgba(255, 255, 255, 0.08)',
                               textAlign: 'center'
                             }}>
                               <button
@@ -3818,7 +3776,7 @@ export default function Home() {
                                 style={{
                                   background: 'transparent',
                                   border: 'none',
-                                  color: 'var(--primary)',
+                                  color: '#2dd4bf',
                                   fontWeight: '700',
                                   fontSize: '0.8rem',
                                   cursor: 'pointer',
@@ -4408,8 +4366,42 @@ export default function Home() {
                                 </div>
                               </div>
                             )}
+
+                            {/* Order Action Bar: Payment status & Reorder button */}
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.85rem', paddingTop: '0.85rem', borderTop: '1px solid #f1f5f9', flexWrap: 'wrap', gap: '8px' }}>
+                              <div style={{ fontSize: '0.82rem', color: '#64748b' }}>
+                                {order.payment_method && <span>Payment: <strong style={{ color: '#0f172a' }}>{String(order.payment_method).toUpperCase()}</strong> • </span>}
+                                <span>Ref: #{order.id}</span>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (Array.isArray(order.items) && order.items.length > 0) {
+                                    order.items.forEach(it => {
+                                      addToCart({
+                                        id: it.medicine_id || it.id || `med_${Math.random().toString(36).substring(2, 7)}`,
+                                        medicine_id: it.medicine_id || it.id,
+                                        brand_name: it.brand_name || it.name,
+                                        generic_name: it.generic_name || it.brand_name,
+                                        price_mrp: it.price_mrp || it.price || 45,
+                                        quantity: it.quantity || 1
+                                      });
+                                    });
+                                    setIsCartOpen(true);
+                                    showToast(`Added ${order.items.length} item(s) from Order #${order.id} to cart!`, '🛒');
+                                  } else {
+                                    showToast(`Order details loaded`, '📦');
+                                  }
+                                }}
+                                className="btn-primary"
+                                style={{ padding: '6px 14px', fontSize: '0.78rem', fontWeight: '800', borderRadius: '8px' }}
+                              >
+                                🔁 Buy Again
+                              </button>
+                            </div>
                           </div>
                         ))}
+
                       </div>
                     )}
                   </div>
@@ -4714,6 +4706,81 @@ export default function Home() {
                         )}
                       </div>
                     ))}
+
+                    {/* Add New UPI VPA Row */}
+                    {showAddUpiInput ? (
+                      <div style={{ padding: '1.1rem', background: '#f8fafc', border: '1.5px dashed var(--primary)', borderRadius: '12px', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                        <strong style={{ fontSize: '0.88rem', color: '#0f172a' }}>Link New UPI VPA</strong>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: '8px' }}>
+                          <input
+                            type="text"
+                            placeholder="e.g. yourname@okaxis"
+                            value={newUpiVpaInput}
+                            onChange={(e) => setNewUpiVpaInput(e.target.value)}
+                            style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.85rem' }}
+                          />
+                          <input
+                            type="text"
+                            placeholder="Bank (e.g. HDFC Bank)"
+                            value={newUpiBankInput}
+                            onChange={(e) => setNewUpiBankInput(e.target.value)}
+                            style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.85rem' }}
+                          />
+                        </div>
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (!newUpiVpaInput || !newUpiVpaInput.includes('@')) {
+                                showToast('Please enter a valid UPI VPA (e.g. name@okaxis)', '⚠️');
+                                return;
+                              }
+                              setSavedUpiIds(prev => [
+                                ...prev,
+                                { id: `upi_${Date.now()}`, vpa: newUpiVpaInput.trim(), bank: newUpiBankInput.trim() || 'UPI Bank', isDefault: false }
+                              ]);
+                              showToast(`Linked UPI ID: ${newUpiVpaInput.trim()}`, '✓');
+                              setNewUpiVpaInput('');
+                              setNewUpiBankInput('');
+                              setShowAddUpiInput(false);
+                            }}
+                            className="btn-primary"
+                            style={{ padding: '6px 14px', fontSize: '0.8rem', fontWeight: '800' }}
+                          >
+                            Save UPI ID
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setShowAddUpiInput(false)}
+                            style={{ background: 'transparent', border: '1px solid #cbd5e1', padding: '6px 12px', borderRadius: '8px', fontSize: '0.8rem', cursor: 'pointer' }}
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setShowAddUpiInput(true)}
+                        style={{
+                          background: 'transparent',
+                          border: '1px dashed #0d9488',
+                          color: '#0d9488',
+                          padding: '10px',
+                          borderRadius: '10px',
+                          fontWeight: '800',
+                          fontSize: '0.82rem',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '6px'
+                        }}
+                      >
+                        <span>+</span>
+                        <span>Link Another UPI ID</span>
+                      </button>
+                    )}
                   </div>
 
                   <div style={{ padding: '1rem', background: '#f0fdfa', border: '1px solid #ccfbf1', borderRadius: '12px' }}>
@@ -4726,6 +4793,7 @@ export default function Home() {
                   </div>
                 </div>
               )}
+
 
               {/* 7. SUBVIEW: PRESCRIPTIONS */}
               {activeAccountSection === 'prescriptions' && (
@@ -4782,22 +4850,139 @@ export default function Home() {
                       <p style={{ margin: '4px 0 0 0', fontSize: '0.82rem', color: '#64748b' }}>Store chronic conditions and drug allergies for safe medicine dispatch</p>
                     </div>
                     <button
-                      onClick={() => {
-                        const newName = prompt("Enter family member name (e.g. Grandma, Sister):");
-                        if (newName) {
-                          setFamilyProfiles(prev => [
-                            ...prev,
-                            { id: `fam_${Date.now()}`, name: newName, age: 30, relation: 'Family', blood: 'B+', allergies: 'None', conditions: 'None' }
-                          ]);
-                          showToast(`Added ${newName} to family profiles`, '👨‍👩‍👧');
-                        }
-                      }}
+                      onClick={() => setShowAddFamilyModal(v => !v)}
                       className="btn-primary"
                       style={{ padding: '8px 16px', fontSize: '0.82rem', fontWeight: '800' }}
                     >
-                      + Add Family Member
+                      {showAddFamilyModal ? '✕ Close Form' : '+ Add Family Member'}
                     </button>
                   </div>
+
+                  {/* Add Family Member Inline Card */}
+                  {showAddFamilyModal && (
+                    <div style={{ padding: '1.25rem', background: '#f8fafc', border: '1.5px dashed var(--primary)', borderRadius: '16px', marginBottom: '1.5rem', display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+                      <strong style={{ fontSize: '0.95rem', color: '#0f172a' }}>Add Family Medical Profile</strong>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '10px' }}>
+                        <div>
+                          <label style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: '700', display: 'block', marginBottom: '3px' }}>Full Name / Nickname</label>
+                          <input
+                            type="text"
+                            placeholder="e.g. Grandma, Rohit (Brother)"
+                            value={newFamName}
+                            onChange={(e) => setNewFamName(e.target.value)}
+                            style={{ width: '100%', boxSizing: 'border-box', padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.85rem' }}
+                          />
+                        </div>
+                        <div>
+                          <label style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: '700', display: 'block', marginBottom: '3px' }}>Relation</label>
+                          <select
+                            value={newFamRelation}
+                            onChange={(e) => setNewFamRelation(e.target.value)}
+                            style={{ width: '100%', boxSizing: 'border-box', padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.85rem' }}
+                          >
+                            <option value="Parent">Parent</option>
+                            <option value="Father">Father</option>
+                            <option value="Mother">Mother</option>
+                            <option value="Spouse">Spouse</option>
+                            <option value="Child">Child</option>
+                            <option value="Sibling">Sibling</option>
+                            <option value="Grandparent">Grandparent</option>
+                            <option value="Other">Other</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: '700', display: 'block', marginBottom: '3px' }}>Age (Years)</label>
+                          <input
+                            type="number"
+                            placeholder="e.g. 62"
+                            value={newFamAge}
+                            onChange={(e) => setNewFamAge(e.target.value)}
+                            style={{ width: '100%', boxSizing: 'border-box', padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.85rem' }}
+                          />
+                        </div>
+                        <div>
+                          <label style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: '700', display: 'block', marginBottom: '3px' }}>Blood Group</label>
+                          <select
+                            value={newFamBlood}
+                            onChange={(e) => setNewFamBlood(e.target.value)}
+                            style={{ width: '100%', boxSizing: 'border-box', padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.85rem' }}
+                          >
+                            <option value="A+">A+</option>
+                            <option value="A-">A-</option>
+                            <option value="B+">B+</option>
+                            <option value="B-">B-</option>
+                            <option value="O+">O+</option>
+                            <option value="O-">O-</option>
+                            <option value="AB+">AB+</option>
+                            <option value="AB-">AB-</option>
+                          </select>
+                        </div>
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                        <div>
+                          <label style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: '700', display: 'block', marginBottom: '3px' }}>Drug Allergies</label>
+                          <input
+                            type="text"
+                            placeholder="e.g. Penicillin, Sulfa, None"
+                            value={newFamAllergies}
+                            onChange={(e) => setNewFamAllergies(e.target.value)}
+                            style={{ width: '100%', boxSizing: 'border-box', padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.85rem' }}
+                          />
+                        </div>
+                        <div>
+                          <label style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: '700', display: 'block', marginBottom: '3px' }}>Chronic Conditions</label>
+                          <input
+                            type="text"
+                            placeholder="e.g. Hypertension, Asthma, None"
+                            value={newFamConditions}
+                            onChange={(e) => setNewFamConditions(e.target.value)}
+                            style={{ width: '100%', boxSizing: 'border-box', padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.85rem' }}
+                          />
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (!newFamName.trim()) {
+                              showToast('Please enter a name for the family member', '⚠️');
+                              return;
+                            }
+                            setFamilyProfiles(prev => [
+                              ...prev,
+                              {
+                                id: `fam_${Date.now()}`,
+                                name: newFamName.trim(),
+                                relation: newFamRelation,
+                                age: parseInt(newFamAge) || 35,
+                                blood: newFamBlood,
+                                allergies: newFamAllergies.trim() || 'None',
+                                conditions: newFamConditions.trim() || 'None'
+                              }
+                            ]);
+                            showToast(`Added ${newFamName.trim()} to family profiles!`, '👨‍👩‍👧');
+                            setNewFamName('');
+                            setNewFamAge('');
+                            setNewFamAllergies('');
+                            setNewFamConditions('');
+                            setShowAddFamilyModal(false);
+                          }}
+                          className="btn-primary"
+                          style={{ padding: '8px 18px', fontSize: '0.82rem', fontWeight: '800' }}
+                        >
+                          Save Profile
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setShowAddFamilyModal(false)}
+                          style={{ background: 'transparent', border: '1px solid #cbd5e1', padding: '8px 14px', borderRadius: '8px', fontSize: '0.82rem', cursor: 'pointer' }}
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
 
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1.25rem' }}>
                     {familyProfiles.map(member => (
@@ -4941,40 +5126,43 @@ export default function Home() {
                 justifyContent: 'space-between',
                 alignItems: 'center',
                 gap: '1rem',
-                boxShadow: '0 4px 16px rgba(0, 0, 0, 0.02)'
+                background: 'linear-gradient(135deg, rgba(255, 119, 0, 0.12) 0%, rgba(20, 184, 166, 0.08) 100%)',
+                border: '1px solid rgba(255, 119, 0, 0.3)',
+                boxShadow: 'var(--neo-shadow-raised)'
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
                   <div style={{
                     width: '52px',
                     height: '52px',
                     borderRadius: '16px',
-                    background: 'linear-gradient(135deg, #FF6B00 0%, #FFA800 100%)',
+                    background: 'linear-gradient(135deg, #FF7700 0%, #FFAA00 100%)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     fontSize: '1.8rem',
-                    boxShadow: '0 8px 20px rgba(255, 107, 0, 0.35)',
+                    boxShadow: '0 8px 20px rgba(255, 119, 0, 0.4)',
                     color: '#fff'
                   }}>
                     ⚡
                   </div>
                   <div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <h3 style={{ margin: 0, fontSize: '1.3rem', fontWeight: '800', color: 'var(--text-main)' }}>
+                      <h3 style={{ margin: 0, fontSize: '1.3rem', fontWeight: '800', color: '#f1f5f9' }}>
                         MEDORA Instamart
                       </h3>
                       <span style={{
-                        background: 'rgba(74, 222, 128, 0.2)',
-                        color: 'var(--green)',
+                        background: 'rgba(52, 211, 153, 0.16)',
+                        color: '#34d399',
                         fontSize: '0.72rem',
                         fontWeight: '800',
                         padding: '2px 8px',
-                        borderRadius: '20px'
+                        borderRadius: '20px',
+                        border: '1px solid rgba(52, 211, 153, 0.3)'
                       }}>
                         ● LIVE NETWORK
                       </span>
                     </div>
-                    <p style={{ margin: '4px 0 0 0', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                    <p style={{ margin: '4px 0 0 0', fontSize: '0.85rem', color: '#94a3b8' }}>
                       Instant medicine delivery in 10-15 mins from connected local pharmacy dark-stores
                     </p>
                   </div>
@@ -4986,21 +5174,21 @@ export default function Home() {
                     <div
                       key={pharm.id}
                       style={{
-                        background: '#ffffff',
-                        border: pharm.is_fastest ? '1.5px solid var(--primary)' : '1px solid rgba(226, 232, 240, 0.9)',
+                        background: '#161b26',
+                        border: pharm.is_fastest ? '1.5px solid #14b8a6' : '1px solid rgba(255, 255, 255, 0.08)',
                         borderRadius: '12px',
                         padding: '6px 12px',
                         display: 'flex',
                         alignItems: 'center',
                         gap: '6px',
                         fontSize: '0.75rem',
-                        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.02)'
+                        boxShadow: 'var(--neo-shadow-raised-sm)'
                       }}
                     >
-                      <span style={{ color: 'var(--green)', fontSize: '0.65rem' }}>●</span>
-                      <span style={{ color: 'var(--text-main)', fontWeight: '700' }}>{pharm.name}</span>
+                      <span style={{ color: '#34d399', fontSize: '0.65rem' }}>●</span>
+                      <span style={{ color: '#f1f5f9', fontWeight: '700' }}>{pharm.name}</span>
                       <span style={{
-                        color: pharm.is_fastest ? 'var(--primary)' : 'var(--text-muted)',
+                        color: pharm.is_fastest ? '#2dd4bf' : '#94a3b8',
                         fontWeight: pharm.is_fastest ? '800' : '500'
                       }}>
                         ({pharm.distance_km} km • {pharm.delivery_time})
@@ -5013,16 +5201,16 @@ export default function Home() {
               {/* Section Title & Subtitle */}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '1.2rem', flexWrap: 'wrap', gap: '0.5rem' }}>
                 <div>
-                  <h3 style={{ margin: 0, fontSize: '1.35rem', fontWeight: '800', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <h3 style={{ margin: 0, fontSize: '1.35rem', fontWeight: '800', color: '#f1f5f9', display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <span>🔥</span> Most Bought & Everyday Essentials
                   </h3>
-                  <p style={{ margin: '4px 0 0 0', fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+                  <p style={{ margin: '4px 0 0 0', fontSize: '0.82rem', color: '#94a3b8' }}>
                     High-demand medicines commonly searched by people — verified in stock at nearby partner pharmacies
                   </p>
                 </div>
                 <div 
                   onClick={() => setIsAddressDrawerOpen(true)}
-                  style={{ fontSize: '0.78rem', color: 'var(--primary)', fontWeight: '700', cursor: 'pointer' }}
+                  style={{ fontSize: '0.78rem', color: '#2dd4bf', fontWeight: '700', cursor: 'pointer' }}
                 >
                   ⚡ Delivering to {selectedAddress?.tag || 'Home'} ({selectedAddress?.area || 'Vamanjoor'}) ➔
                 </div>
@@ -5040,16 +5228,16 @@ export default function Home() {
                         showToast(`Filtered by ${cat}`, '🔍');
                       }}
                       style={{
-                        background: active ? 'linear-gradient(135deg, #0d9488 0%, #0f766e 100%)' : '#ffffff',
-                        color: active ? '#ffffff' : '#334155',
-                        border: active ? '1px solid #0d9488' : '1px solid rgba(226, 232, 240, 0.9)',
+                        background: active ? 'linear-gradient(135deg, #14b8a6 0%, #0d9488 100%)' : '#161b26',
+                        color: active ? '#ffffff' : '#94a3b8',
+                        border: active ? '1px solid #14b8a6' : '1px solid rgba(255, 255, 255, 0.08)',
                         borderRadius: '24px',
                         padding: '7px 16px',
                         fontSize: '0.8rem',
                         fontWeight: '700',
                         cursor: 'pointer',
                         whiteSpace: 'nowrap',
-                        boxShadow: active ? '0 4px 14px rgba(13, 148, 136, 0.25)' : '0 2px 6px rgba(0, 0, 0, 0.02)',
+                        boxShadow: active ? '0 4px 14px rgba(20, 184, 166, 0.45)' : 'var(--neo-shadow-raised-sm)',
                         transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
                       }}
                     >
@@ -5060,7 +5248,7 @@ export default function Home() {
               </div>
 
               {/* Fast Moving Medicine Cards Grid */}
-              <div style={{
+              <div className="instamart-products-grid" style={{
                 display: 'grid',
                 gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
                 gap: '1.25rem'
@@ -5076,16 +5264,16 @@ export default function Home() {
                         gridColumn: '1 / -1',
                         padding: '3rem 2rem',
                         textAlign: 'center',
-                        background: '#ffffff',
+                        background: '#151a24',
                         borderRadius: '20px',
-                        border: '1px dashed rgba(226, 232, 240, 0.9)',
-                        boxShadow: '0 4px 16px rgba(0, 0, 0, 0.02)'
+                        border: '1px dashed rgba(255, 255, 255, 0.12)',
+                        boxShadow: 'var(--neo-shadow-raised)'
                       }}>
                         <div style={{ fontSize: '2.5rem', marginBottom: '0.6rem' }}>📡</div>
-                        <h4 style={{ color: 'var(--text-main)', margin: '0 0 6px 0', fontSize: '1.1rem', fontWeight: '800' }}>
+                        <h4 style={{ color: '#f1f5f9', margin: '0 0 6px 0', fontSize: '1.1rem', fontWeight: '800' }}>
                           No medicines found under "{activeInstamartCategory}" within {perimeterKm} km
                         </h4>
-                        <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', margin: 0 }}>
+                        <p style={{ color: '#94a3b8', fontSize: '0.85rem', margin: 0 }}>
                           Try switching categories above or visit the Radar page to increase your search perimeter.
                         </p>
                         <button
@@ -5112,25 +5300,25 @@ export default function Home() {
                         style={{
                           padding: '1.25rem',
                           borderRadius: '20px',
-                          background: '#ffffff',
-                          border: inRange ? '1px solid rgba(226, 232, 240, 0.9)' : '1px solid rgba(226, 232, 240, 0.6)',
+                          background: '#151a24',
+                          border: inRange ? '1px solid rgba(255, 255, 255, 0.08)' : '1px solid rgba(255, 255, 255, 0.04)',
                           opacity: inRange ? 1 : 0.88,
                           display: 'flex',
                           flexDirection: 'column',
                           justifyContent: 'space-between',
                           transition: 'all 0.25s cubic-bezier(0.25, 0.8, 0.25, 1)',
                           cursor: 'pointer',
-                          boxShadow: '0 4px 16px rgba(0, 0, 0, 0.03)'
+                          boxShadow: 'var(--neo-shadow-raised)'
                         }}
                         onMouseEnter={(e) => {
                           e.currentTarget.style.transform = 'translateY(-4px)';
-                          e.currentTarget.style.boxShadow = '0 12px 28px rgba(13, 148, 136, 0.12)';
+                          e.currentTarget.style.boxShadow = 'var(--neo-shadow-raised-lg), 0 0 16px rgba(20, 184, 166, 0.25)';
                           e.currentTarget.style.borderColor = 'var(--primary)';
                         }}
                         onMouseLeave={(e) => {
                           e.currentTarget.style.transform = 'none';
-                          e.currentTarget.style.boxShadow = '0 4px 16px rgba(0, 0, 0, 0.03)';
-                          e.currentTarget.style.borderColor = inRange ? 'rgba(226, 232, 240, 0.9)' : 'rgba(226, 232, 240, 0.6)';
+                          e.currentTarget.style.boxShadow = 'var(--neo-shadow-raised)';
+                          e.currentTarget.style.borderColor = inRange ? 'rgba(255, 255, 255, 0.08)' : 'rgba(255, 255, 255, 0.04)';
                         }}
                       >
                         <div>
@@ -5139,8 +5327,9 @@ export default function Home() {
                             <span style={{
                               fontSize: '0.65rem',
                               fontWeight: '800',
-                              color: 'var(--primary)',
-                              background: 'rgba(13, 148, 136, 0.1)',
+                              color: '#2dd4bf',
+                              background: 'rgba(20, 184, 166, 0.15)',
+                              border: '1px solid rgba(20, 184, 166, 0.25)',
                               padding: '2px 8px',
                               borderRadius: '6px',
                               textTransform: 'uppercase'
@@ -5149,7 +5338,7 @@ export default function Home() {
                             </span>
                             <span style={{
                               fontSize: '0.68rem',
-                              color: inRange ? 'var(--green)' : '#f59e0b',
+                              color: inRange ? '#34d399' : '#fbbf24',
                               fontWeight: '700'
                             }}>
                               ● {inRange ? 'In Perimeter' : 'Extended Range'} ({med.instamart?.total_available || 40})
@@ -5157,10 +5346,10 @@ export default function Home() {
                           </div>
 
                           {/* Medicine Title & Generic */}
-                          <h4 style={{ margin: '0 0 4px 0', fontSize: '1.1rem', fontWeight: '800', color: 'var(--text-main)' }}>
+                          <h4 style={{ margin: '0 0 4px 0', fontSize: '1.1rem', fontWeight: '800', color: '#f1f5f9' }}>
                             {med.brand_name}
                           </h4>
-                          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                          <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
                             {med.generic_name} • {med.dosage}
                           </div>
                           {med.compound_badge && (
@@ -5168,8 +5357,8 @@ export default function Home() {
                               display: 'inline-flex',
                               alignItems: 'center',
                               gap: '4px',
-                              background: 'rgba(13, 148, 136, 0.12)',
-                              color: 'var(--primary)',
+                              background: 'rgba(20, 184, 166, 0.15)',
+                              color: '#2dd4bf',
                               fontSize: '0.7rem',
                               fontWeight: '700',
                               padding: '2px 8px',
@@ -5183,8 +5372,8 @@ export default function Home() {
                           {/* Instamart Speed & Store Banner */}
                           {nearest && (
                             <div style={{
-                              background: inRange ? '#fff7ed' : '#f8fafc',
-                              border: inRange ? '1px solid rgba(255, 107, 0, 0.25)' : '1px solid #e2e8f0',
+                              background: inRange ? 'rgba(255, 119, 0, 0.12)' : 'rgba(255, 255, 255, 0.04)',
+                              border: inRange ? '1px solid rgba(255, 119, 0, 0.28)' : '1px solid rgba(255, 255, 255, 0.06)',
                               borderRadius: '10px',
                               padding: '6px 10px',
                               marginTop: '0.75rem',
@@ -5193,7 +5382,7 @@ export default function Home() {
                               gap: '6px'
                             }}>
                               <span style={{ fontSize: '0.9rem' }}>{inRange ? '⚡' : '📍'}</span>
-                              <div style={{ fontSize: '0.72rem', color: inRange ? '#c2410c' : 'var(--text-muted)', fontWeight: '700' }}>
+                              <div style={{ fontSize: '0.72rem', color: inRange ? '#fb923c' : '#94a3b8', fontWeight: '700' }}>
                                 {inRange
                                   ? `${nearest.delivery_time} from ${nearest.pharmacy_name} (${nearest.distance_km} km)`
                                   : `Beyond ${perimeterKm} km (${nearest.distance_km} km • ${nearest.pharmacy_name})`}
@@ -5206,16 +5395,16 @@ export default function Home() {
                         <div style={{
                           marginTop: '1.1rem',
                           paddingTop: '0.8rem',
-                          borderTop: '1px solid rgba(226, 232, 240, 0.8)',
+                          borderTop: '1px solid rgba(255, 255, 255, 0.08)',
                           display: 'flex',
                           justifyContent: 'space-between',
                           alignItems: 'center'
                         }}>
                           <div>
-                            <span style={{ fontSize: '1.25rem', fontWeight: '800', color: 'var(--primary)' }}>
+                            <span style={{ fontSize: '1.25rem', fontWeight: '800', color: '#2dd4bf' }}>
                               ₹{med.price_mrp}
                             </span>
-                            <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'block' }}>
+                            <span style={{ fontSize: '0.7rem', color: '#94a3b8', display: 'block' }}>
                               MRP incl. taxes
                             </span>
                           </div>
@@ -5227,7 +5416,7 @@ export default function Home() {
                                 display: 'flex',
                                 alignItems: 'center',
                                 gap: '6px',
-                                background: '#f0fdf4',
+                                background: 'rgba(22, 163, 74, 0.16)',
                                 border: '1.5px solid #16a34a',
                                 borderRadius: '10px',
                                 padding: '3px 8px'
@@ -5239,7 +5428,7 @@ export default function Home() {
                                 style={{
                                   background: 'transparent',
                                   border: 'none',
-                                  color: '#16a34a',
+                                  color: '#4ade80',
                                   fontSize: '1rem',
                                   fontWeight: '800',
                                   cursor: 'pointer',
@@ -5249,7 +5438,7 @@ export default function Home() {
                               >
                                 −
                               </button>
-                              <span style={{ fontWeight: '800', fontSize: '0.85rem', color: '#16a34a', minWidth: '18px', textAlign: 'center' }}>
+                              <span style={{ fontWeight: '800', fontSize: '0.85rem', color: '#4ade80', minWidth: '18px', textAlign: 'center' }}>
                                 {cartQty}
                               </span>
                               <button
@@ -5258,7 +5447,7 @@ export default function Home() {
                                 style={{
                                   background: 'transparent',
                                   border: 'none',
-                                  color: '#16a34a',
+                                  color: '#4ade80',
                                   fontSize: '1rem',
                                   fontWeight: '800',
                                   cursor: 'pointer',
@@ -5277,7 +5466,7 @@ export default function Home() {
                                 handleUpdateItemQuantity(med, 1);
                               }}
                               style={{
-                                background: 'linear-gradient(135deg, #0d9488 0%, #0f766e 100%)',
+                                background: 'linear-gradient(135deg, #14b8a6 0%, #0d9488 100%)',
                                 color: '#ffffff',
                                 border: 'none',
                                 borderRadius: '10px',
@@ -5288,7 +5477,7 @@ export default function Home() {
                                 display: 'flex',
                                 alignItems: 'center',
                                 gap: '4px',
-                                boxShadow: '0 4px 12px rgba(13, 148, 136, 0.2)',
+                                boxShadow: '0 4px 12px rgba(20, 184, 166, 0.35)',
                                 transition: 'all 0.15s ease'
                               }}
                             >
@@ -5316,39 +5505,39 @@ export default function Home() {
                 flexWrap: 'wrap',
                 gap: '1rem',
                 marginBottom: '1.25rem',
-                background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
+                background: '#151a24',
                 padding: '0.9rem 1.4rem',
                 borderRadius: '16px',
-                border: '1px solid rgba(203, 213, 225, 0.85)',
-                boxShadow: '0 2px 10px rgba(0, 0, 0, 0.03)'
+                border: '1px solid rgba(255, 255, 255, 0.08)',
+                boxShadow: 'var(--neo-shadow-raised)'
               }}>
                 <div>
-                  <div style={{ fontSize: '0.92rem', color: '#0f172a', fontWeight: '700' }}>
-                    Results for <span style={{ color: '#c45500', fontWeight: '800' }}>"{searchQuery}"</span>
+                  <div style={{ fontSize: '0.92rem', color: '#f1f5f9', fontWeight: '700' }}>
+                    Results for <span style={{ color: '#ff7700', fontWeight: '800' }}>"{searchQuery}"</span>
                   </div>
-                  <span style={{ fontSize: '0.76rem', color: '#64748b' }}>
+                  <span style={{ fontSize: '0.76rem', color: '#94a3b8' }}>
                     Check each product page for other buying options and fulfilling partner pharmacies.
                   </span>
                 </div>
 
                 {/* Right: Amazon Sort Dropdown & Clear */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', color: '#334155' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', color: '#cbd5e1' }}>
                     <span style={{ fontWeight: '600' }}>Sort by:</span>
                     <select
                       value={amazonSortBy}
                       onChange={(e) => setAmazonSortBy(e.target.value)}
                       style={{
-                        background: '#ffffff',
-                        border: '1px solid #cbd5e1',
+                        background: '#121620',
+                        border: '1px solid rgba(255, 255, 255, 0.12)',
                         borderRadius: '8px',
                         padding: '6px 10px',
                         fontSize: '0.78rem',
                         fontWeight: '700',
-                        color: '#0f172a',
+                        color: '#f1f5f9',
                         cursor: 'pointer',
                         outline: 'none',
-                        boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
+                        boxShadow: 'inset 1px 1px 3px rgba(0,0,0,0.5)'
                       }}
                     >
                       <option value="featured">Featured</option>
@@ -5374,9 +5563,9 @@ export default function Home() {
                     style={{
                       padding: '5px 12px',
                       borderRadius: '8px',
-                      border: '1px solid #fecaca',
-                      background: '#fff5f5',
-                      color: '#dc2626',
+                      border: '1px solid rgba(239, 68, 68, 0.35)',
+                      background: 'rgba(239, 68, 68, 0.1)',
+                      color: '#f87171',
                       fontWeight: '700',
                       fontSize: '0.76rem',
                       cursor: 'pointer'
@@ -5394,36 +5583,36 @@ export default function Home() {
                 <aside style={{
                   width: '240px',
                   flexShrink: 0,
-                  background: 'linear-gradient(145deg, #ffffff 0%, #f8fafc 100%)',
-                  border: '1px solid rgba(203, 213, 225, 0.85)',
+                  background: '#151a24',
+                  border: '1px solid rgba(255, 255, 255, 0.08)',
                   borderRadius: '16px',
                   padding: '1.25rem',
-                  boxShadow: '0 2px 8px rgba(0, 0, 0, 0.03)'
+                  boxShadow: 'var(--neo-shadow-raised)'
                 }}>
                   {/* Delivery Filter */}
-                  <div style={{ marginBottom: '1.25rem', paddingBottom: '1rem', borderBottom: '1px solid #e2e8f0' }}>
-                    <div style={{ fontWeight: '800', fontSize: '0.85rem', color: '#0f172a', marginBottom: '8px' }}>
+                  <div style={{ marginBottom: '1.25rem', paddingBottom: '1rem', borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }}>
+                    <div style={{ fontWeight: '800', fontSize: '0.85rem', color: '#f1f5f9', marginBottom: '8px' }}>
                       Delivery Day
                     </div>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.8rem', color: '#334155', cursor: 'pointer' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.8rem', color: '#cbd5e1', cursor: 'pointer' }}>
                       <input
                         type="checkbox"
                         checked={filterPrimeOnly}
                         onChange={(e) => setFilterPrimeOnly(e.target.checked)}
-                        style={{ accentColor: '#0d9488', cursor: 'pointer' }}
+                        style={{ accentColor: '#14b8a6', cursor: 'pointer' }}
                       />
                       <span className="amazon-gold-badge" style={{ fontSize: '0.66rem', padding: '2px 6px' }}>
                         ⚡ Prime Express
                       </span>
                     </label>
-                    <span style={{ fontSize: '0.72rem', color: '#64748b', display: 'block', marginTop: '4px', marginLeft: '22px' }}>
+                    <span style={{ fontSize: '0.72rem', color: '#94a3b8', display: 'block', marginTop: '4px', marginLeft: '22px' }}>
                       Free 10-15 min dispatch
                     </span>
                   </div>
 
                   {/* Department / Category Filter */}
-                  <div style={{ marginBottom: '1.25rem', paddingBottom: '1rem', borderBottom: '1px solid #e2e8f0' }}>
-                    <div style={{ fontWeight: '800', fontSize: '0.85rem', color: '#0f172a', marginBottom: '8px' }}>
+                  <div style={{ marginBottom: '1.25rem', paddingBottom: '1rem', borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }}>
+                    <div style={{ fontWeight: '800', fontSize: '0.85rem', color: '#f1f5f9', marginBottom: '8px' }}>
                       Department
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '0.8rem' }}>
@@ -5433,11 +5622,11 @@ export default function Home() {
                           onClick={() => setSearchCategoryFilter(cat)}
                           style={{
                             cursor: 'pointer',
-                            color: searchCategoryFilter === cat ? '#0d9488' : '#475569',
+                            color: searchCategoryFilter === cat ? '#2dd4bf' : '#94a3b8',
                             fontWeight: searchCategoryFilter === cat ? '800' : '500',
                             padding: '3px 6px',
                             borderRadius: '6px',
-                            background: searchCategoryFilter === cat ? 'rgba(13, 148, 136, 0.08)' : 'transparent',
+                            background: searchCategoryFilter === cat ? 'rgba(45, 212, 191, 0.1)' : 'transparent',
                             transition: 'all 0.15s ease'
                           }}
                         >
@@ -5448,27 +5637,27 @@ export default function Home() {
                   </div>
 
                   {/* Customer Review Filter */}
-                  <div style={{ marginBottom: '1.25rem', paddingBottom: '1rem', borderBottom: '1px solid #e2e8f0' }}>
-                    <div style={{ fontWeight: '800', fontSize: '0.85rem', color: '#0f172a', marginBottom: '8px' }}>
+                  <div style={{ marginBottom: '1.25rem', paddingBottom: '1rem', borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }}>
+                    <div style={{ fontWeight: '800', fontSize: '0.85rem', color: '#f1f5f9', marginBottom: '8px' }}>
                       Customer Reviews
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '0.78rem' }}>
                       <div
                         onClick={() => setFilterMinRating(prev => prev === 4 ? 0 : 4)}
-                        style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', color: filterMinRating === 4 ? '#c45500' : '#475569', fontWeight: filterMinRating === 4 ? '800' : 'normal' }}
+                        style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', color: filterMinRating === 4 ? '#38bdf8' : '#cbd5e1', fontWeight: filterMinRating === 4 ? '800' : 'normal' }}
                       >
                         <span style={{ color: '#e47911' }}>★★★★☆</span> & Up
                       </div>
                       <div
                         onClick={() => setFilterMinRating(prev => prev === 3 ? 0 : 3)}
-                        style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', color: filterMinRating === 3 ? '#c45500' : '#475569', fontWeight: filterMinRating === 3 ? '800' : 'normal' }}
+                        style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', color: filterMinRating === 3 ? '#38bdf8' : '#cbd5e1', fontWeight: filterMinRating === 3 ? '800' : 'normal' }}
                       >
                         <span style={{ color: '#e47911' }}>★★★☆☆</span> & Up
                       </div>
                       {filterMinRating > 0 && (
                         <span
                           onClick={() => setFilterMinRating(0)}
-                          style={{ fontSize: '0.72rem', color: '#0284c7', cursor: 'pointer', textDecoration: 'underline', marginTop: '2px' }}
+                          style={{ fontSize: '0.72rem', color: '#38bdf8', cursor: 'pointer', textDecoration: 'underline', marginTop: '2px' }}
                         >
                           Clear rating filter
                         </span>
@@ -5477,11 +5666,11 @@ export default function Home() {
                   </div>
 
                   {/* Price Bracket Filter */}
-                  <div style={{ marginBottom: '1.25rem', paddingBottom: '1rem', borderBottom: '1px solid #e2e8f0' }}>
-                    <div style={{ fontWeight: '800', fontSize: '0.85rem', color: '#0f172a', marginBottom: '8px' }}>
+                  <div style={{ marginBottom: '1.25rem', paddingBottom: '1rem', borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }}>
+                    <div style={{ fontWeight: '800', fontSize: '0.85rem', color: '#f1f5f9', marginBottom: '8px' }}>
                       Price
                     </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '0.8rem', color: '#475569' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '0.8rem', color: '#cbd5e1' }}>
                       {[
                         { key: 'all', label: 'All Prices' },
                         { key: 'under50', label: 'Under ₹50' },
@@ -5494,7 +5683,7 @@ export default function Home() {
                           onClick={() => setFilterPriceBracket(p.key)}
                           style={{
                             cursor: 'pointer',
-                            color: filterPriceBracket === p.key ? '#0d9488' : 'inherit',
+                            color: filterPriceBracket === p.key ? '#2dd4bf' : '#94a3b8',
                             fontWeight: filterPriceBracket === p.key ? '800' : '500'
                           }}
                         >
@@ -5506,15 +5695,15 @@ export default function Home() {
 
                   {/* Discount Filter */}
                   <div>
-                    <div style={{ fontWeight: '800', fontSize: '0.85rem', color: '#0f172a', marginBottom: '8px' }}>
+                    <div style={{ fontWeight: '800', fontSize: '0.85rem', color: '#f1f5f9', marginBottom: '8px' }}>
                       Discount
                     </div>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.8rem', color: '#334155', cursor: 'pointer' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.8rem', color: '#cbd5e1', cursor: 'pointer' }}>
                       <input
                         type="checkbox"
                         checked={filterDiscountOnly}
                         onChange={(e) => setFilterDiscountOnly(e.target.checked)}
-                        style={{ accentColor: '#0d9488', cursor: 'pointer' }}
+                        style={{ accentColor: '#14b8a6', cursor: 'pointer' }}
                       />
                       <span>10% Off or more</span>
                     </label>
@@ -5579,13 +5768,14 @@ export default function Home() {
                         <div style={{
                           padding: '3rem',
                           textAlign: 'center',
-                          background: '#ffffff',
+                          background: '#151a24',
                           borderRadius: '16px',
-                          border: '1px solid #e2e8f0',
-                          color: '#64748b'
+                          border: '1px solid rgba(255, 255, 255, 0.08)',
+                          boxShadow: 'var(--neo-shadow-raised)',
+                          color: '#94a3b8'
                         }}>
                           <span style={{ fontSize: '2.5rem', display: 'block', marginBottom: '8px' }}>🔍</span>
-                          <strong style={{ color: '#0f172a', fontSize: '1rem', display: 'block' }}>No matching medicines found for selected filters</strong>
+                          <strong style={{ color: '#f1f5f9', fontSize: '1rem', display: 'block' }}>No matching medicines found for selected filters</strong>
                           <span style={{ fontSize: '0.85rem' }}>Try clearing your active filters to see all available inventory.</span>
                           <div style={{ marginTop: '12px' }}>
                             <button
@@ -5650,28 +5840,28 @@ export default function Home() {
                                   ) : (
                                     <span style={{
                                       fontSize: '0.68rem',
-                                      background: 'rgba(13, 148, 136, 0.1)',
-                                      border: '1px solid rgba(13, 148, 136, 0.25)',
+                                      background: 'rgba(20, 184, 166, 0.12)',
+                                      border: '1px solid rgba(20, 184, 166, 0.3)',
                                       padding: '2px 8px',
                                       borderRadius: '6px',
-                                      color: 'var(--primary)',
+                                      color: '#2dd4bf',
                                       fontWeight: '800'
                                     }}>
                                       {formIcon} {med.category || 'Prescription'}
                                     </span>
                                   )}
-                                  <span style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: '700' }}>
+                                  <span style={{ fontSize: '0.74rem', color: '#94a3b8', fontWeight: '700' }}>
                                     {med.dosage}
                                   </span>
                                 </div>
 
                                 {/* Product Name */}
-                                <h4 style={{ margin: '0 0 4px 0', fontSize: '1.12rem', color: '#0f172a', fontWeight: '800', lineHeight: '1.3' }}>
+                                <h4 style={{ margin: '0 0 4px 0', fontSize: '1.12rem', color: '#f1f5f9', fontWeight: '800', lineHeight: '1.3' }}>
                                   {highlightMatch(med.brand_name, searchQuery)}
                                 </h4>
 
                                 {/* Salt & Mfg */}
-                                <div style={{ fontSize: '0.78rem', color: '#64748b', lineHeight: '1.45', marginBottom: '8px' }}>
+                                <div style={{ fontSize: '0.78rem', color: '#94a3b8', lineHeight: '1.45', marginBottom: '8px' }}>
                                   <span style={{ display: 'block' }}><strong>Salt:</strong> {highlightMatch(med.generic_name, searchQuery)}</span>
                                   {med.manufacturer && <span style={{ display: 'block', fontSize: '0.72rem' }}><strong>Mfg:</strong> {med.manufacturer}</span>}
                                 </div>
@@ -5679,37 +5869,37 @@ export default function Home() {
                                 {/* Star Reviews */}
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '0.75rem' }}>
                                   <span style={{ color: '#e47911', fontSize: '0.85rem', letterSpacing: '1px' }}>★★★★★</span>
-                                  <span style={{ fontSize: '0.78rem', fontWeight: '800', color: '#007185' }}>4.8</span>
-                                  <span style={{ fontSize: '0.72rem', color: '#64748b' }}>({med.reviews_count || (540 + idx * 80)})</span>
+                                  <span style={{ fontSize: '0.78rem', fontWeight: '800', color: '#38bdf8' }}>4.8</span>
+                                  <span style={{ fontSize: '0.72rem', color: '#94a3b8' }}>({med.reviews_count || (540 + idx * 80)})</span>
                                 </div>
 
                                 {/* Pricing Section with Amazon Style MRP Strikethrough */}
                                 <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginBottom: '6px' }}>
-                                  <span style={{ fontSize: '1.35rem', fontWeight: '900', color: '#0f172a' }}>
+                                  <span style={{ fontSize: '1.35rem', fontWeight: '900', color: '#2dd4bf' }}>
                                     ₹{med.price_mrp}
                                   </span>
                                   <span style={{ fontSize: '0.78rem', color: '#64748b', textDecoration: 'line-through' }}>
                                     M.R.P.: ₹{(parseFloat(med.price_mrp || 40) * 1.15).toFixed(0)}
                                   </span>
-                                  <span style={{ fontSize: '0.74rem', color: '#cc0c39', fontWeight: '800' }}>
+                                  <span style={{ fontSize: '0.74rem', color: '#4ade80', fontWeight: '800' }}>
                                     (15% off)
                                   </span>
                                 </div>
 
                                 {/* Prime Delivery Badge */}
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.76rem', color: '#007185', fontWeight: '700', marginBottom: '8px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.76rem', color: '#38bdf8', fontWeight: '700', marginBottom: '8px' }}>
                                   <span className="amazon-gold-badge" style={{ fontSize: '0.62rem', padding: '1px 5px' }}>⚡ Prime</span>
-                                  <span>FREE delivery <strong>Today in 10-15 mins</strong></span>
+                                  <span>FREE delivery <strong style={{ color: '#34d399' }}>Today in 10-15 mins</strong></span>
                                 </div>
 
                                 {/* Local Pharmacy Availability */}
-                                <div style={{ fontSize: '0.72rem', color: '#15803d', fontWeight: '700', background: '#f0fdf4', padding: '4px 8px', borderRadius: '6px', border: '1px solid #bbf7d0', display: 'inline-block' }}>
+                                <div style={{ fontSize: '0.72rem', color: '#34d399', fontWeight: '700', background: 'rgba(16, 185, 129, 0.12)', padding: '4px 8px', borderRadius: '6px', border: '1px solid rgba(16, 185, 129, 0.3)', display: 'inline-block' }}>
                                   ✓ Available across 4 local pharmacies
                                 </div>
                               </div>
 
                               {/* Multi-Shop Picker Trigger Buttons */}
-                              <div style={{ marginTop: '1.25rem', display: 'flex', gap: '8px', alignItems: 'center', borderTop: '1px solid rgba(203, 213, 225, 0.6)', paddingTop: '0.85rem' }}>
+                              <div style={{ marginTop: '1.25rem', display: 'flex', gap: '8px', alignItems: 'center', borderTop: '1px solid rgba(255, 255, 255, 0.08)', paddingTop: '0.85rem' }}>
                                 <button
                                   type="button"
                                   onClick={(e) => {
@@ -5723,8 +5913,8 @@ export default function Home() {
                                     fontSize: '0.8rem',
                                     borderRadius: '12px',
                                     fontWeight: '800',
-                                    background: inCart ? 'linear-gradient(135deg, #15803d 0%, #166534 100%)' : 'linear-gradient(135deg, #0d9488 0%, #0f766e 100%)',
-                                    boxShadow: '0 4px 12px rgba(13, 148, 136, 0.25)',
+                                    background: inCart ? 'linear-gradient(135deg, #15803d 0%, #166534 100%)' : 'linear-gradient(135deg, #14b8a6 0%, #0d9488 100%)',
+                                    boxShadow: '0 4px 12px rgba(20, 184, 166, 0.25)',
                                     display: 'flex',
                                     alignItems: 'center',
                                     justifyContent: 'center',
@@ -5819,7 +6009,6 @@ export default function Home() {
             </div>
           </section>
         </main>
-      </section>
 
       {/* Modal: Order Tracking */}
       <div className={`modal-overlay ${isTrackingOpen ? 'active' : ''}`} onClick={() => setIsTrackingOpen(false)}>
@@ -6124,8 +6313,9 @@ export default function Home() {
                                   form: med.dosage_form || med.form || 'Tablet',
                                   image_url: med.image_url
                                 });
-                                alert(`Added ${brandName} to cart!`);
+                                showToast(`Added ${brandName} to cart!`, '🛒');
                               }} 
+
                               className="btn-primary" 
                               style={{ padding: '0.35rem 0.85rem', fontSize: '0.75rem', borderRadius: '6px', fontWeight: '700' }}
                             >
@@ -6213,20 +6403,20 @@ export default function Home() {
           setPaymentStep('cart');
         }
       }}>
-        <div className="modal-content glass-panel" style={{ padding: '2rem', maxWidth: '580px', background: '#ffffff', border: '1px solid rgba(226, 232, 240, 0.95)', boxShadow: '0 24px 70px rgba(0, 0, 0, 0.15)' }} onClick={(e) => e.stopPropagation()}>
+        <div className="modal-content glass-panel" style={{ padding: '2rem', maxWidth: '580px', background: '#151a24', border: '1.5px solid rgba(56, 189, 248, 0.25)', boxShadow: '0 24px 70px rgba(0, 0, 0, 0.8), -3px -3px 10px rgba(255, 255, 255, 0.03)', borderRadius: '24px' }} onClick={(e) => e.stopPropagation()}>
           
           {/* Header Bar */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.85rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', borderBottom: '1px solid rgba(255, 255, 255, 0.08)', paddingBottom: '0.85rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
               {paymentStep === 'payment' && (
                 <button 
                   onClick={() => setPaymentStep('cart')}
-                  style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', color: 'var(--text-main)', borderRadius: '8px', padding: '4px 10px', cursor: 'pointer', fontSize: '0.82rem', fontWeight: 'bold' }}
+                  style={{ background: '#1c2331', border: '1px solid rgba(255, 255, 255, 0.12)', color: '#f1f5f9', borderRadius: '8px', padding: '4px 10px', cursor: 'pointer', fontSize: '0.82rem', fontWeight: 'bold' }}
                 >
                   ← Back
                 </button>
               )}
-              <h2 style={{ margin: 0, color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '1.4rem' }}>
+              <h2 style={{ margin: 0, color: '#38bdf8', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '1.4rem', fontWeight: '800' }}>
                 {paymentStep === 'cart' && <span>🛒 Shopping Cart</span>}
                 {paymentStep === 'payment' && <span>💳 Payment Gateway</span>}
                 {paymentStep === 'processing' && <span>⚡ Authorizing Payment</span>}
@@ -6240,7 +6430,7 @@ export default function Home() {
                   setIsCartOpen(false);
                   setPaymentStep('cart');
                 }} 
-                style={{ background: 'transparent', border: 'none', color: '#64748b', fontSize: '1.75rem', cursor: 'pointer', lineHeight: 1 }}
+                style={{ background: 'transparent', border: 'none', color: '#94a3b8', fontSize: '1.75rem', cursor: 'pointer', lineHeight: 1 }}
               >
                 &times;
               </button>
@@ -6251,28 +6441,29 @@ export default function Home() {
           {paymentStep === 'cart' && (
             <>
               {cart.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '3rem 0', color: 'var(--text-muted)' }}>
+                <div style={{ textAlign: 'center', padding: '3rem 0', color: '#94a3b8' }}>
                   <span style={{ fontSize: '2.5rem', display: 'block', marginBottom: '1rem' }}>🛒</span>
-                  <p style={{ fontWeight: '700', color: 'var(--text-main)' }}>Your cart is empty</p>
+                  <p style={{ fontWeight: '700', color: '#f1f5f9' }}>Your cart is empty</p>
                   <p style={{ fontSize: '0.88rem', marginTop: '0.5rem' }}>Search and add medicines to start order checkout!</p>
                 </div>
               ) : (
                 <>
                   {/* Swiggy Instamart Delivery Address Selector Card in Cart */}
                   <div style={{
-                    background: '#f0fdfa',
-                    border: '1px solid #ccfbf1',
-                    borderRadius: '14px',
+                    background: '#181e2b',
+                    border: '1px solid rgba(20, 184, 166, 0.3)',
+                    borderRadius: '16px',
                     padding: '0.9rem 1.1rem',
                     marginBottom: '1.2rem',
                     display: 'flex',
                     justifyContent: 'space-between',
-                    alignItems: 'center'
+                    alignItems: 'center',
+                    boxShadow: 'var(--neo-shadow-inset)'
                   }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
                       <div style={{
                         width: '40px', height: '40px', borderRadius: '50%',
-                        background: 'rgba(13, 148, 136, 0.15)',
+                        background: 'rgba(45, 212, 191, 0.15)',
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                         fontSize: '1.2rem'
                       }}>
@@ -6280,20 +6471,20 @@ export default function Home() {
                       </div>
                       <div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <span style={{ fontSize: '0.9rem', fontWeight: '800', color: 'var(--text-main)' }}>
+                          <span style={{ fontSize: '0.9rem', fontWeight: '800', color: '#f1f5f9' }}>
                             Delivering to {selectedAddress?.tag || 'Home'}
                           </span>
                           <span style={{
-                            background: 'rgba(74, 222, 128, 0.15)', color: 'var(--green)',
+                            background: 'rgba(52, 211, 153, 0.15)', color: '#34d399',
                             fontSize: '0.68rem', fontWeight: '800', padding: '1px 6px', borderRadius: '4px'
                           }}>
                             ⚡ 10-15 MINS
                           </span>
                         </div>
-                        <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '2px', maxWidth: '300px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        <div style={{ fontSize: '0.78rem', color: '#94a3b8', marginTop: '2px', maxWidth: '300px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {selectedAddress ? `${selectedAddress.houseNo}, ${selectedAddress.area}` : 'Click to select delivery address'}
                         </div>
-                        <div style={{ fontSize: '0.7rem', color: 'var(--primary)', marginTop: '2px', fontWeight: '600' }}>
+                        <div style={{ fontSize: '0.7rem', color: '#2dd4bf', marginTop: '2px', fontWeight: '600' }}>
                           👤 {selectedAddress?.receiverName} • {selectedAddress?.receiverPhone}
                         </div>
                       </div>
@@ -6302,15 +6493,15 @@ export default function Home() {
                       type="button"
                       onClick={() => setIsAddressDrawerOpen(true)}
                       style={{
-                        background: '#ffffff',
-                        border: '1px solid var(--primary)',
-                        color: 'var(--primary)',
+                        background: '#121620',
+                        border: '1px solid #2dd4bf',
+                        color: '#2dd4bf',
                         borderRadius: '8px',
                         padding: '6px 12px',
                         fontSize: '0.75rem',
                         fontWeight: '800',
                         cursor: 'pointer',
-                        boxShadow: '0 2px 6px rgba(0,0,0,0.03)'
+                        boxShadow: 'var(--neo-shadow-raised-sm)'
                       }}
                     >
                       CHANGE
@@ -6318,10 +6509,10 @@ export default function Home() {
                   </div>
 
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                    <span style={{ color: 'var(--text-muted)', fontSize: '0.88rem' }}>Items in Cart ({cart.length}):</span>
+                    <span style={{ color: '#94a3b8', fontSize: '0.88rem' }}>Items in Cart ({cart.length}):</span>
                     <button 
                       onClick={() => setCart([])} 
-                      style={{ background: 'transparent', border: 'none', color: 'var(--red)', cursor: 'pointer', fontSize: '0.82rem', textDecoration: 'underline' }}
+                      style={{ background: 'transparent', border: 'none', color: '#f87171', cursor: 'pointer', fontSize: '0.82rem', textDecoration: 'underline' }}
                     >
                       Clear All
                     </button>
@@ -6329,16 +6520,16 @@ export default function Home() {
 
                   <ul style={{ listStyle: 'none', padding: 0, maxHeight: '250px', overflowY: 'auto', paddingRight: '0.5rem' }}>
                     {cart.map((item, idx) => (
-                      <li key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.85rem 0', borderBottom: '1px solid #e2e8f0' }}>
+                      <li key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.85rem 0', borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }}>
                         <div>
-                          <strong style={{ color: 'var(--text-main)', fontSize: '0.92rem' }}>{item.brand_name}</strong> {item.dosage && `(${item.dosage})`}
-                          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '2px' }}>Generic: {item.generic_name}</div>
+                          <strong style={{ color: '#f1f5f9', fontSize: '0.92rem' }}>{item.brand_name}</strong> {item.dosage && `(${item.dosage})`}
+                          <div style={{ fontSize: '0.75rem', color: '#94a3b8', marginTop: '2px' }}>Generic: {item.generic_name}</div>
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
-                          <span style={{ color: 'var(--primary)', fontWeight: 'bold', fontSize: '1rem' }}>₹{item.price_mrp}</span>
+                          <span style={{ color: '#2dd4bf', fontWeight: 'bold', fontSize: '1rem' }}>₹{item.price_mrp}</span>
                           <button 
                             onClick={() => removeFromCart(idx)} 
-                            style={{ background: 'transparent', color: '#e11d48', border: '1px solid #fecdd3', borderRadius: '6px', padding: '2px 8px', cursor: 'pointer', fontSize: '0.75rem' }}
+                            style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#f87171', border: '1px solid rgba(239, 68, 68, 0.3)', borderRadius: '6px', padding: '2px 8px', cursor: 'pointer', fontSize: '0.75rem' }}
                           >
                             Remove
                           </button>
@@ -6347,12 +6538,12 @@ export default function Home() {
                     ))}
                   </ul>
 
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1.5rem', paddingTop: '1.25rem', borderTop: '1px solid #e2e8f0' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1.5rem', paddingTop: '1.25rem', borderTop: '1px solid rgba(255, 255, 255, 0.08)' }}>
                     <div>
-                      <span style={{ color: 'var(--text-muted)', fontSize: '0.82rem' }}>Grand Total</span>
-                      <h3 style={{ margin: 0, fontSize: '1.6rem', color: 'var(--primary)' }}>₹{cart.reduce((s, i) => s + parseFloat(i.price_mrp), 0).toFixed(2)}</h3>
+                      <span style={{ color: '#94a3b8', fontSize: '0.82rem' }}>Grand Total</span>
+                      <h3 style={{ margin: 0, fontSize: '1.6rem', color: '#2dd4bf' }}>₹{cart.reduce((s, i) => s + parseFloat(i.price_mrp), 0).toFixed(2)}</h3>
                       {uploadedPrescriptionId && (
-                        <div style={{ fontSize: '0.75rem', color: 'var(--green)', marginTop: '2px', fontWeight: 'bold' }}>
+                        <div style={{ fontSize: '0.75rem', color: '#34d399', marginTop: '2px', fontWeight: 'bold' }}>
                           ✓ Prescription attached: {uploadedPrescriptionId}
                         </div>
                       )}
@@ -6361,9 +6552,9 @@ export default function Home() {
                       <a
                         href="/cart"
                         style={{
-                          background: '#f8fafc',
-                          border: '1px solid #cbd5e1',
-                          color: 'var(--text-main)',
+                          background: '#181e2b',
+                          border: '1px solid rgba(255, 255, 255, 0.12)',
+                          color: '#f1f5f9',
                           padding: '0.8rem 1rem',
                           borderRadius: '99px',
                           textDecoration: 'none',
@@ -6377,7 +6568,7 @@ export default function Home() {
                         onClick={handleInitiatePayment} 
                         className="btn-primary" 
                         style={{
-                          background: 'linear-gradient(135deg, #0d9488 0%, #0f766e 100%)',
+                          background: 'linear-gradient(135deg, #14b8a6 0%, #0d9488 100%)',
                           fontWeight: '800',
                           padding: '0.9rem 1.8rem',
                           fontSize: '0.95rem',
@@ -6403,19 +6594,19 @@ export default function Home() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
               
               {/* Total Summary Header */}
-              <div style={{ background: '#f0fdfa', border: '1px solid #ccfbf1', borderRadius: '12px', padding: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ background: '#181e2b', border: '1px solid rgba(20, 184, 166, 0.3)', borderRadius: '14px', padding: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
-                  <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block' }}>Total Amount Payable</span>
-                  <span style={{ fontSize: '1.4rem', fontWeight: 'bold', color: 'var(--primary)' }}>
+                  <span style={{ fontSize: '0.8rem', color: '#94a3b8', display: 'block' }}>Total Amount Payable</span>
+                  <span style={{ fontSize: '1.4rem', fontWeight: 'bold', color: '#2dd4bf' }}>
                     ₹{cart.reduce((s, i) => s + parseFloat(i.price_mrp), 0).toFixed(2)}
                   </span>
                 </div>
-                <span style={{ background: 'rgba(74, 222, 128, 0.15)', color: 'var(--green)', padding: '4px 10px', borderRadius: '99px', fontSize: '0.75rem', fontWeight: 'bold' }}>
+                <span style={{ background: 'rgba(52, 211, 153, 0.15)', color: '#34d399', padding: '4px 10px', borderRadius: '99px', fontSize: '0.75rem', fontWeight: 'bold' }}>
                   ⚡ Free 15-Min Delivery
                 </span>
               </div>
 
-              <span style={{ fontSize: '0.88rem', color: 'var(--text-muted)', fontWeight: '600' }}>Select Payment Option:</span>
+              <span style={{ fontSize: '0.88rem', color: '#94a3b8', fontWeight: '600' }}>Select Payment Option:</span>
 
               {/* Payment Option Cards - Rider UPI, Store UPI & COD */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '0.75rem' }}>
@@ -6426,18 +6617,18 @@ export default function Home() {
                   style={{
                     padding: '1rem',
                     borderRadius: '14px',
-                    border: selectedPaymentMethod === 'rider_upi' ? '2px solid var(--primary)' : '1px solid #e2e8f0',
-                    background: selectedPaymentMethod === 'rider_upi' ? '#f0fdfa' : '#f8fafc',
+                    border: selectedPaymentMethod === 'rider_upi' ? '2px solid #2dd4bf' : '1px solid rgba(255, 255, 255, 0.08)',
+                    background: selectedPaymentMethod === 'rider_upi' ? '#1c2436' : '#181e2b',
                     cursor: 'pointer',
                     transition: 'all 0.2s ease',
-                    boxShadow: selectedPaymentMethod === 'rider_upi' ? '0 4px 16px rgba(13, 148, 136, 0.15)' : 'none'
+                    boxShadow: selectedPaymentMethod === 'rider_upi' ? '0 4px 16px rgba(45, 212, 191, 0.2)' : 'none'
                   }}
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                    <span style={{ fontSize: '0.98rem', color: 'var(--text-main)', fontWeight: '800' }}>🛵 Pay Delivery Rider</span>
-                    {selectedPaymentMethod === 'rider_upi' && <span style={{ color: 'var(--primary)', fontWeight: 'bold' }}>✓</span>}
+                    <span style={{ fontSize: '0.98rem', color: '#f1f5f9', fontWeight: '800' }}>🛵 Pay Delivery Rider</span>
+                    {selectedPaymentMethod === 'rider_upi' && <span style={{ color: '#2dd4bf', fontWeight: 'bold' }}>✓</span>}
                   </div>
-                  <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>Direct UPI to Rider • Uploaded QR PNG</div>
+                  <div style={{ fontSize: '0.74rem', color: '#94a3b8' }}>Direct UPI to Rider • Uploaded QR PNG</div>
                 </div>
 
                 {/* Store UPI Card */}
@@ -6446,18 +6637,18 @@ export default function Home() {
                   style={{
                     padding: '1rem',
                     borderRadius: '14px',
-                    border: selectedPaymentMethod === 'upi' ? '2px solid var(--primary)' : '1px solid #e2e8f0',
-                    background: selectedPaymentMethod === 'upi' ? '#f0fdfa' : '#f8fafc',
+                    border: selectedPaymentMethod === 'upi' ? '2px solid #2dd4bf' : '1px solid rgba(255, 255, 255, 0.08)',
+                    background: selectedPaymentMethod === 'upi' ? '#1c2436' : '#181e2b',
                     cursor: 'pointer',
                     transition: 'all 0.2s ease',
-                    boxShadow: selectedPaymentMethod === 'upi' ? '0 4px 16px rgba(13, 148, 136, 0.15)' : 'none'
+                    boxShadow: selectedPaymentMethod === 'upi' ? '0 4px 16px rgba(45, 212, 191, 0.2)' : 'none'
                   }}
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                    <span style={{ fontSize: '0.98rem', color: 'var(--text-main)', fontWeight: '800' }}>⚡ Store POS Terminal</span>
-                    {selectedPaymentMethod === 'upi' && <span style={{ color: 'var(--primary)', fontWeight: 'bold' }}>✓</span>}
+                    <span style={{ fontSize: '0.98rem', color: '#f1f5f9', fontWeight: '800' }}>⚡ Store POS Terminal</span>
+                    {selectedPaymentMethod === 'upi' && <span style={{ color: '#2dd4bf', fontWeight: 'bold' }}>✓</span>}
                   </div>
-                  <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>Counter Soundbox Sync & Merchant QR</div>
+                  <div style={{ fontSize: '0.74rem', color: '#94a3b8' }}>Counter Soundbox Sync & Merchant QR</div>
                 </div>
 
                 {/* Cash on Delivery */}
@@ -6466,38 +6657,38 @@ export default function Home() {
                   style={{
                     padding: '1rem',
                     borderRadius: '14px',
-                    border: selectedPaymentMethod === 'cod' ? '2px solid var(--primary)' : '1px solid #e2e8f0',
-                    background: selectedPaymentMethod === 'cod' ? '#f0fdfa' : '#f8fafc',
+                    border: selectedPaymentMethod === 'cod' ? '2px solid #2dd4bf' : '1px solid rgba(255, 255, 255, 0.08)',
+                    background: selectedPaymentMethod === 'cod' ? '#1c2436' : '#181e2b',
                     cursor: 'pointer',
                     transition: 'all 0.2s ease',
-                    boxShadow: selectedPaymentMethod === 'cod' ? '0 4px 16px rgba(13, 148, 136, 0.15)' : 'none'
+                    boxShadow: selectedPaymentMethod === 'cod' ? '0 4px 16px rgba(45, 212, 191, 0.2)' : 'none'
                   }}
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                    <span style={{ fontSize: '0.98rem', color: 'var(--text-main)', fontWeight: '800' }}>💵 Cash on Delivery</span>
-                    {selectedPaymentMethod === 'cod' && <span style={{ color: 'var(--primary)', fontWeight: 'bold' }}>✓</span>}
+                    <span style={{ fontSize: '0.98rem', color: '#f1f5f9', fontWeight: '800' }}>💵 Cash on Delivery</span>
+                    {selectedPaymentMethod === 'cod' && <span style={{ color: '#2dd4bf', fontWeight: 'bold' }}>✓</span>}
                   </div>
-                  <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>Pay cash or UPI to rider at doorstep</div>
+                  <div style={{ fontSize: '0.74rem', color: '#94a3b8' }}>Pay cash or UPI to rider at doorstep</div>
                 </div>
 
               </div>
 
               {/* Dynamic Payment Body */}
               {selectedPaymentMethod === 'upi' && (
-                <div style={{ background: '#f8fafc', padding: '1.25rem', borderRadius: '14px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                <div style={{ background: '#181e2b', padding: '1.25rem', borderRadius: '14px', border: '1px solid rgba(255, 255, 255, 0.08)', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                   
                   {/* Store Terminal Header with Live Sync Status */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.75rem', flexWrap: 'wrap', gap: '8px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255, 255, 255, 0.08)', paddingBottom: '0.75rem', flexWrap: 'wrap', gap: '8px' }}>
                     <div>
-                      <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                      <div style={{ fontSize: '0.72rem', color: '#94a3b8', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                         DISPATCHING PARTNER PHARMACY:
                       </div>
-                      <div style={{ fontSize: '0.96rem', color: 'var(--text-main)', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <div style={{ fontSize: '0.96rem', color: '#f1f5f9', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '6px' }}>
                         <span>🏥</span>
                         <span>{liveTerminalData?.pharmacy_name || 'Vamanjoor Express Pharmacy'}</span>
                       </div>
-                      <div style={{ fontSize: '0.72rem', color: '#10b981', display: 'flex', alignItems: 'center', gap: '5px', marginTop: '2px', fontWeight: '600' }}>
-                        <span style={{ display: 'inline-block', width: '7px', height: '7px', borderRadius: '50%', background: '#10b981', boxShadow: '0 0 6px #10b981' }} />
+                      <div style={{ fontSize: '0.72rem', color: '#34d399', display: 'flex', alignItems: 'center', gap: '5px', marginTop: '2px', fontWeight: '600' }}>
+                        <span style={{ display: 'inline-block', width: '7px', height: '7px', borderRadius: '50%', background: '#34d399', boxShadow: '0 0 6px #34d399' }} />
                         <span>Live Terminal Synced {lastSyncTime ? `(${lastSyncTime})` : '• Auto-updating'}</span>
                       </div>
                     </div>
@@ -6507,9 +6698,9 @@ export default function Home() {
                       onClick={fetchPharmacyLiveTerminalQr}
                       disabled={isRefreshingLiveQr}
                       style={{
-                        background: 'rgba(13, 148, 136, 0.1)',
-                        border: '1px solid var(--primary)',
-                        color: 'var(--primary)',
+                        background: 'rgba(56, 189, 248, 0.15)',
+                        border: '1px solid #38bdf8',
+                        color: '#38bdf8',
                         padding: '6px 12px',
                         borderRadius: '8px',
                         fontSize: '0.75rem',
@@ -6533,9 +6724,9 @@ export default function Home() {
                       style={{
                         padding: '8px 10px',
                         borderRadius: '8px',
-                        border: (qrViewMode === 'live' || (qrViewMode === 'auto' && liveTerminalData?.has_live_scanner_qr)) ? '2px solid #10b981' : '1px solid #cbd5e1',
-                        background: (qrViewMode === 'live' || (qrViewMode === 'auto' && liveTerminalData?.has_live_scanner_qr)) ? '#f0fdf4' : '#ffffff',
-                        color: (qrViewMode === 'live' || (qrViewMode === 'auto' && liveTerminalData?.has_live_scanner_qr)) ? '#15803d' : '#64748b',
+                        border: (qrViewMode === 'live' || (qrViewMode === 'auto' && liveTerminalData?.has_live_scanner_qr)) ? '2px solid #2dd4bf' : '1px solid rgba(255, 255, 255, 0.1)',
+                        background: (qrViewMode === 'live' || (qrViewMode === 'auto' && liveTerminalData?.has_live_scanner_qr)) ? '#1c2436' : '#121620',
+                        color: (qrViewMode === 'live' || (qrViewMode === 'auto' && liveTerminalData?.has_live_scanner_qr)) ? '#2dd4bf' : '#94a3b8',
                         fontSize: '0.78rem',
                         fontWeight: 'bold',
                         cursor: 'pointer',
@@ -6555,9 +6746,9 @@ export default function Home() {
                       style={{
                         padding: '8px 10px',
                         borderRadius: '8px',
-                        border: qrViewMode === 'shop' || (!liveTerminalData?.has_live_scanner_qr && qrViewMode === 'auto') ? '2px solid var(--primary)' : '1px solid #cbd5e1',
-                        background: qrViewMode === 'shop' || (!liveTerminalData?.has_live_scanner_qr && qrViewMode === 'auto') ? '#f0fdfa' : '#ffffff',
-                        color: qrViewMode === 'shop' || (!liveTerminalData?.has_live_scanner_qr && qrViewMode === 'auto') ? 'var(--primary)' : '#64748b',
+                        border: qrViewMode === 'shop' || (!liveTerminalData?.has_live_scanner_qr && qrViewMode === 'auto') ? '2px solid #2dd4bf' : '1px solid rgba(255, 255, 255, 0.1)',
+                        background: qrViewMode === 'shop' || (!liveTerminalData?.has_live_scanner_qr && qrViewMode === 'auto') ? '#1c2436' : '#121620',
+                        color: qrViewMode === 'shop' || (!liveTerminalData?.has_live_scanner_qr && qrViewMode === 'auto') ? '#2dd4bf' : '#94a3b8',
                         fontSize: '0.78rem',
                         fontWeight: 'bold',
                         cursor: 'pointer',
@@ -6581,7 +6772,7 @@ export default function Home() {
                           background: '#fff',
                           padding: '10px',
                           borderRadius: '14px',
-                          boxShadow: '0 8px 24px rgba(16, 185, 129, 0.15)',
+                          boxShadow: '0 8px 24px rgba(16, 185, 129, 0.25)',
                           border: '2px solid #10b981',
                           display: 'inline-block'
                         }}>
@@ -6592,10 +6783,10 @@ export default function Home() {
                           />
                         </div>
                         <div style={{ marginTop: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
-                          <span style={{ background: '#dcfce7', color: '#15803d', padding: '3px 10px', borderRadius: '99px', fontSize: '0.72rem', fontWeight: 'bold' }}>
+                          <span style={{ background: 'rgba(52, 211, 153, 0.15)', color: '#34d399', padding: '3px 10px', borderRadius: '99px', fontSize: '0.72rem', fontWeight: 'bold' }}>
                             🟢 LIVE POS SOUNDBOX DISPLAY
                           </span>
-                          <span style={{ fontSize: '0.72rem', color: '#64748b' }}>
+                          <span style={{ fontSize: '0.72rem', color: '#94a3b8' }}>
                             {liveTerminalData.terminal_label || 'Counter POS Terminal'}
                           </span>
                         </div>
@@ -6607,8 +6798,8 @@ export default function Home() {
                           background: '#fff',
                           padding: '12px',
                           borderRadius: '14px',
-                          boxShadow: '0 8px 24px rgba(0,0,0,0.06)',
-                          border: '2px solid var(--primary)',
+                          boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
+                          border: '2px solid #2dd4bf',
                           display: 'inline-block'
                         }}>
                           <img 
@@ -6618,10 +6809,10 @@ export default function Home() {
                           />
                         </div>
                         <div style={{ marginTop: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
-                          <span style={{ background: 'rgba(13, 148, 136, 0.12)', color: 'var(--primary)', padding: '3px 10px', borderRadius: '99px', fontSize: '0.72rem', fontWeight: 'bold' }}>
+                          <span style={{ background: 'rgba(45, 212, 191, 0.15)', color: '#2dd4bf', padding: '3px 10px', borderRadius: '99px', fontSize: '0.72rem', fontWeight: 'bold' }}>
                             ₹{cart.reduce((s, i) => s + parseFloat(i.price_mrp || 0), 0).toFixed(2)} PRE-ENCODED
                           </span>
-                          <span style={{ fontSize: '0.72rem', color: '#64748b' }}>
+                          <span style={{ fontSize: '0.72rem', color: '#94a3b8' }}>
                             Auto-fills amount in your UPI app
                           </span>
                         </div>
@@ -6638,7 +6829,7 @@ export default function Home() {
                         alignItems: 'center',
                         justifyContent: 'center',
                         gap: '8px',
-                        background: 'linear-gradient(135deg, #0d9488 0%, #059669 100%)',
+                        background: 'linear-gradient(135deg, #14b8a6 0%, #0d9488 100%)',
                         color: '#ffffff',
                         padding: '10px 16px',
                         borderRadius: '10px',
@@ -6654,7 +6845,7 @@ export default function Home() {
                     </a>
 
                     {/* Store Counter Soundbox Voice Confirmation Guarantee */}
-                    <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '10px', padding: '10px 14px', fontSize: '0.76rem', color: '#166534', display: 'flex', alignItems: 'center', gap: '8px', width: '100%', boxSizing: 'border-box' }}>
+                    <div style={{ background: '#121620', border: '1px solid rgba(16, 185, 129, 0.3)', borderRadius: '10px', padding: '10px 14px', fontSize: '0.76rem', color: '#86efac', display: 'flex', alignItems: 'center', gap: '8px', width: '100%', boxSizing: 'border-box' }}>
                       <span style={{ fontSize: '1.25rem' }}>🔊</span>
                       <div>
                         <strong>Soundbox Voice Confirmation:</strong> Counter POS speaker at {liveTerminalData?.pharmacy_name || 'Vamanjoor Express'} will announce <em>&quot;₹{cart.reduce((s, i) => s + parseFloat(i.price_mrp || 0), 0).toFixed(2)} received&quot;</em> instantly upon payment.
@@ -6664,7 +6855,7 @@ export default function Home() {
 
                   {/* Store Verified VPA with 1-Click Copy */}
                   <div style={{ width: '100%' }}>
-                    <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '4px', fontWeight: 'bold' }}>
+                    <label style={{ display: 'block', fontSize: '0.75rem', color: '#94a3b8', marginBottom: '4px', fontWeight: 'bold' }}>
                       Shop's Verified UPI VPA / ID:
                     </label>
                     <div style={{ display: 'flex', gap: '0.5rem' }}>
@@ -6672,7 +6863,7 @@ export default function Home() {
                         type="text" 
                         readOnly
                         value={liveTerminalData?.shop_upi_id || 'vamanjoor.pharmacy@upi'} 
-                        style={{ flex: 1, padding: '0.65rem 0.85rem', borderRadius: '8px', background: '#ffffff', border: '1px solid #cbd5e1', color: 'var(--text-main)', fontSize: '0.88rem', fontFamily: 'monospace', fontWeight: 'bold' }}
+                        style={{ flex: 1, padding: '0.65rem 0.85rem', borderRadius: '8px', background: '#121620', border: '1px solid rgba(255, 255, 255, 0.12)', color: '#f1f5f9', fontSize: '0.88rem', fontFamily: 'monospace', fontWeight: 'bold' }}
                       />
                       <button
                         type="button"
@@ -6685,9 +6876,9 @@ export default function Home() {
                           setTimeout(() => setCopiedVpa(false), 2000);
                         }}
                         style={{
-                          background: copiedVpa ? '#dcfce7' : 'rgba(13, 148, 136, 0.1)',
-                          border: '1px solid var(--primary)',
-                          color: copiedVpa ? '#15803d' : 'var(--primary)',
+                          background: copiedVpa ? 'rgba(52, 211, 153, 0.2)' : 'rgba(45, 212, 191, 0.15)',
+                          border: '1px solid #2dd4bf',
+                          color: copiedVpa ? '#34d399' : '#2dd4bf',
                           padding: '6px 14px',
                           borderRadius: '8px',
                           fontSize: '0.8rem',
@@ -6704,22 +6895,22 @@ export default function Home() {
               )}
 
               {selectedPaymentMethod === 'rider_upi' && (
-                <div style={{ background: '#f8fafc', padding: '1.25rem', borderRadius: '14px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.75rem', flexWrap: 'wrap', gap: '8px' }}>
+                <div style={{ background: '#181e2b', padding: '1.25rem', borderRadius: '14px', border: '1px solid rgba(255, 255, 255, 0.08)', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255, 255, 255, 0.08)', paddingBottom: '0.75rem', flexWrap: 'wrap', gap: '8px' }}>
                     <div>
-                      <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                      <div style={{ fontSize: '0.72rem', color: '#94a3b8', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                         ASSIGNED DELIVERY PARTNER:
                       </div>
-                      <div style={{ fontSize: '0.96rem', color: 'var(--text-main)', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <div style={{ fontSize: '0.96rem', color: '#f1f5f9', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '6px' }}>
                         <span>🛵</span>
                         <span>Rider Partner #{activeUser?.role === 'delivery' ? (activeUser.name || 'Arjun K') : 'AGT-591 (Verified)'}</span>
                       </div>
-                      <div style={{ fontSize: '0.72rem', color: '#0d9488', display: 'flex', alignItems: 'center', gap: '5px', marginTop: '2px', fontWeight: '600' }}>
-                        <span style={{ display: 'inline-block', width: '7px', height: '7px', borderRadius: '50%', background: '#0d9488', boxShadow: '0 0 6px #0d9488' }} />
+                      <div style={{ fontSize: '0.72rem', color: '#2dd4bf', display: 'flex', alignItems: 'center', gap: '5px', marginTop: '2px', fontWeight: '600' }}>
+                        <span style={{ display: 'inline-block', width: '7px', height: '7px', borderRadius: '50%', background: '#2dd4bf', boxShadow: '0 0 6px #2dd4bf' }} />
                         <span>Rider Direct Settlement • Settle at Dark-store</span>
                       </div>
                     </div>
-                    <span style={{ background: '#dcfce7', color: '#15803d', fontSize: '0.72rem', fontWeight: '800', padding: '3px 10px', borderRadius: '99px' }}>
+                    <span style={{ background: 'rgba(52, 211, 153, 0.15)', color: '#34d399', fontSize: '0.72rem', fontWeight: '800', padding: '3px 10px', borderRadius: '99px' }}>
                       ✓ REGISTERED UPI QR
                     </span>
                   </div>
@@ -6737,8 +6928,8 @@ export default function Home() {
                             background: '#ffffff',
                             padding: '12px',
                             borderRadius: '14px',
-                            boxShadow: '0 8px 24px rgba(13, 148, 136, 0.15)',
-                            border: '2px solid var(--primary)',
+                            boxShadow: '0 8px 24px rgba(45, 212, 191, 0.25)',
+                            border: '2px solid #2dd4bf',
                             display: 'inline-block',
                             textAlign: 'center'
                           }}>
@@ -6758,10 +6949,10 @@ export default function Home() {
                           </div>
 
                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <span style={{ background: 'rgba(13, 148, 136, 0.12)', color: 'var(--primary)', padding: '3px 10px', borderRadius: '99px', fontSize: '0.72rem', fontWeight: 'bold' }}>
+                            <span style={{ background: 'rgba(45, 212, 191, 0.15)', color: '#2dd4bf', padding: '3px 10px', borderRadius: '99px', fontSize: '0.72rem', fontWeight: 'bold' }}>
                               ₹{totalAmount} DUE TO RIDER
                             </span>
-                            <span style={{ fontSize: '0.72rem', color: '#64748b' }}>
+                            <span style={{ fontSize: '0.72rem', color: '#94a3b8' }}>
                               {storedRiderQr ? "★ Verified Rider Registration PNG" : "Dynamic Rider Gateway"}
                             </span>
                           </div>
@@ -6776,7 +6967,7 @@ export default function Home() {
                               alignItems: 'center',
                               justifyContent: 'center',
                               gap: '8px',
-                              background: 'linear-gradient(135deg, #0d9488 0%, #0f766e 100%)',
+                              background: 'linear-gradient(135deg, #14b8a6 0%, #0d9488 100%)',
                               color: '#ffffff',
                               padding: '10px 16px',
                               borderRadius: '10px',
@@ -6791,7 +6982,7 @@ export default function Home() {
                           </a>
 
                           {/* Direct Settlement Explanation Banner */}
-                          <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '10px', padding: '10px 14px', fontSize: '0.76rem', color: '#166534', display: 'flex', alignItems: 'center', gap: '8px', width: '100%', boxSizing: 'border-box' }}>
+                          <div style={{ background: '#121620', border: '1px solid rgba(16, 185, 129, 0.3)', borderRadius: '10px', padding: '10px 14px', fontSize: '0.76rem', color: '#86efac', display: 'flex', alignItems: 'center', gap: '8px', width: '100%', boxSizing: 'border-box' }}>
                             <span style={{ fontSize: '1.25rem' }}>ℹ️</span>
                             <div>
                               <strong>Dark-Store Settlement Guarantee:</strong> Your payment goes straight to the rider. The rider pays the pharmacy at pickup and delivers your medicine in 10-15 mins.
@@ -6800,7 +6991,7 @@ export default function Home() {
 
                           {/* Rider VPA display & copy */}
                           <div style={{ width: '100%' }}>
-                            <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '4px', fontWeight: 'bold' }}>
+                            <label style={{ display: 'block', fontSize: '0.75rem', color: '#94a3b8', marginBottom: '4px', fontWeight: 'bold' }}>
                               Rider's Registered UPI ID:
                             </label>
                             <div style={{ display: 'flex', gap: '0.5rem' }}>
@@ -6808,7 +6999,7 @@ export default function Home() {
                                 type="text"
                                 readOnly
                                 value={riderVpa}
-                                style={{ flex: 1, padding: '0.65rem 0.85rem', borderRadius: '8px', background: '#ffffff', border: '1px solid #cbd5e1', color: 'var(--text-main)', fontSize: '0.88rem', fontFamily: 'monospace', fontWeight: 'bold' }}
+                                style={{ flex: 1, padding: '0.65rem 0.85rem', borderRadius: '8px', background: '#121620', border: '1px solid rgba(255, 255, 255, 0.12)', color: '#f1f5f9', fontSize: '0.88rem', fontFamily: 'monospace', fontWeight: 'bold' }}
                               />
                               <button
                                 type="button"
@@ -6820,9 +7011,9 @@ export default function Home() {
                                   setTimeout(() => setCopiedVpa(false), 2000);
                                 }}
                                 style={{
-                                  background: copiedVpa ? '#dcfce7' : 'rgba(13, 148, 136, 0.1)',
-                                  border: '1px solid var(--primary)',
-                                  color: copiedVpa ? '#15803d' : 'var(--primary)',
+                                  background: copiedVpa ? 'rgba(52, 211, 153, 0.2)' : 'rgba(45, 212, 191, 0.15)',
+                                  border: '1px solid #2dd4bf',
+                                  color: copiedVpa ? '#34d399' : '#2dd4bf',
                                   padding: '6px 14px',
                                   borderRadius: '8px',
                                   fontSize: '0.78rem',
@@ -6842,10 +7033,10 @@ export default function Home() {
               )}
 
               {selectedPaymentMethod === 'cod' && (
-                <div style={{ background: '#fffbeb', padding: '1.25rem', borderRadius: '14px', border: '1px dashed #fde68a', fontSize: '0.88rem', color: '#b45309', display: 'flex', alignItems: 'center', gap: '14px' }}>
+                <div style={{ background: '#181e2b', padding: '1.25rem', borderRadius: '14px', border: '1px dashed #f59e0b', fontSize: '0.88rem', color: '#fbbf24', display: 'flex', alignItems: 'center', gap: '14px' }}>
                   <span style={{ fontSize: '2rem' }}>💵</span>
                   <div>
-                    <div style={{ fontWeight: '800', color: '#92400e', marginBottom: '3px' }}>Cash on Doorstep Delivery</div>
+                    <div style={{ fontWeight: '800', color: '#f59e0b', marginBottom: '3px' }}>Cash on Doorstep Delivery</div>
                     Pay ₹{cart.reduce((s, i) => s + parseFloat(i.price_mrp || 0), 0).toFixed(2)} directly to your rider via cash or mobile UPI scan when your parcel arrives in 15 mins.
                   </div>
                 </div>
@@ -6854,7 +7045,7 @@ export default function Home() {
               <button 
                 onClick={handleExecutePayment}
                 className="btn-primary" 
-                style={{ width: '100%', justifyContent: 'center', background: 'linear-gradient(135deg, #0d9488 0%, #0f766e 100%)', padding: '0.95rem', fontSize: '1rem', fontWeight: 'bold', marginTop: '0.5rem' }}
+                style={{ width: '100%', justifyContent: 'center', background: 'linear-gradient(135deg, #14b8a6 0%, #0d9488 100%)', padding: '0.95rem', fontSize: '1rem', fontWeight: 'bold', marginTop: '0.5rem' }}
               >
                 {selectedPaymentMethod === 'cod' 
                   ? 'Confirm COD Order 🛵' 
@@ -6872,15 +7063,15 @@ export default function Home() {
                 width: '60px',
                 height: '60px',
                 borderRadius: '50%',
-                border: '4px solid #ccfbf1',
-                borderTop: '4px solid var(--primary)',
+                border: '4px solid #1c2436',
+                borderTop: '4px solid #2dd4bf',
                 animation: 'spin 1s linear infinite'
               }} />
               <div>
-                <h3 style={{ margin: '0 0 0.5rem 0', color: 'var(--text-main)', fontSize: '1.2rem', fontWeight: '800' }}>Processing Payment</h3>
-                <p style={{ color: 'var(--primary)', fontSize: '0.88rem', margin: 0, fontWeight: '700' }}>{paymentStatusMsg}</p>
+                <h3 style={{ margin: '0 0 0.5rem 0', color: '#f1f5f9', fontSize: '1.2rem', fontWeight: '800' }}>Processing Payment</h3>
+                <p style={{ color: '#2dd4bf', fontSize: '0.88rem', margin: 0, fontWeight: '700' }}>{paymentStatusMsg}</p>
               </div>
-              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', background: '#f1f5f9', padding: '6px 14px', borderRadius: '99px' }}>
+              <div style={{ fontSize: '0.75rem', color: '#94a3b8', background: '#181e2b', border: '1px solid rgba(255, 255, 255, 0.08)', padding: '6px 14px', borderRadius: '99px' }}>
                 🔒 256-bit Encrypted PCI-DSS Gateway Connection
               </div>
               <style jsx>{`
@@ -6896,29 +7087,29 @@ export default function Home() {
           {paymentStep === 'success' && completedOrderInfo && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', textAlign: 'center', padding: '1rem 0' }}>
               <div style={{ fontSize: '3rem' }}>🎉</div>
-              <h3 style={{ margin: 0, color: 'var(--primary)', fontSize: '1.5rem', fontWeight: '800' }}>Payment & Order Confirmed!</h3>
-              <p style={{ color: 'var(--text-muted)', fontSize: '0.88rem', margin: 0 }}>Your order has been routed to Vamanjoor Pharmacy for rapid 15-min packing.</p>
+              <h3 style={{ margin: 0, color: '#2dd4bf', fontSize: '1.5rem', fontWeight: '800' }}>Payment & Order Confirmed!</h3>
+              <p style={{ color: '#94a3b8', fontSize: '0.88rem', margin: 0 }}>Your order has been routed to Vamanjoor Pharmacy for rapid 15-min packing.</p>
 
-              <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '1rem', textAlign: 'left', display: 'flex', flexDirection: 'column', gap: '0.5rem', fontSize: '0.85rem' }}>
+              <div style={{ background: '#181e2b', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '12px', padding: '1rem', textAlign: 'left', display: 'flex', flexDirection: 'column', gap: '0.5rem', fontSize: '0.85rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ color: 'var(--text-muted)' }}>Order Reference:</span>
-                  <strong style={{ color: 'var(--text-main)' }}>#{completedOrderInfo.order_id}</strong>
+                  <span style={{ color: '#94a3b8' }}>Order Reference:</span>
+                  <strong style={{ color: '#f1f5f9' }}>#{completedOrderInfo.order_id}</strong>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ color: 'var(--text-muted)' }}>Payment ID:</span>
-                  <span style={{ color: 'var(--primary)', fontFamily: 'monospace' }}>{completedOrderInfo.payment_id}</span>
+                  <span style={{ color: '#94a3b8' }}>Payment ID:</span>
+                  <span style={{ color: '#38bdf8', fontFamily: 'monospace' }}>{completedOrderInfo.payment_id}</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ color: 'var(--text-muted)' }}>Method:</span>
-                  <span style={{ color: 'var(--text-main)', fontWeight: 'bold' }}>{completedOrderInfo.payment_method}</span>
+                  <span style={{ color: '#94a3b8' }}>Method:</span>
+                  <span style={{ color: '#f1f5f9', fontWeight: 'bold' }}>{completedOrderInfo.payment_method}</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ color: 'var(--text-muted)' }}>Payment Status:</span>
-                  <span style={{ color: 'var(--green)', fontWeight: 'bold' }}>{completedOrderInfo.payment_status}</span>
+                  <span style={{ color: '#94a3b8' }}>Payment Status:</span>
+                  <span style={{ color: '#34d399', fontWeight: 'bold' }}>{completedOrderInfo.payment_status}</span>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid #e2e8f0', paddingTop: '0.5rem', marginTop: '0.25rem' }}>
-                  <span style={{ color: 'var(--text-muted)' }}>Amount Paid:</span>
-                  <strong style={{ color: 'var(--primary)', fontSize: '1rem' }}>₹{completedOrderInfo.total.toFixed(2)}</strong>
+                <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid rgba(255, 255, 255, 0.08)', paddingTop: '0.5rem', marginTop: '0.25rem' }}>
+                  <span style={{ color: '#94a3b8' }}>Amount Paid:</span>
+                  <strong style={{ color: '#2dd4bf', fontSize: '1rem' }}>₹{completedOrderInfo.total.toFixed(2)}</strong>
                 </div>
               </div>
 
@@ -6929,7 +7120,7 @@ export default function Home() {
                   setIsTrackingOpen(true);
                 }} 
                 className="btn-primary" 
-                style={{ width: '100%', justifyContent: 'center', background: 'linear-gradient(135deg, #0d9488 0%, #0f766e 100%)', padding: '0.9rem', fontSize: '1rem', fontWeight: 'bold' }}
+                style={{ width: '100%', justifyContent: 'center', background: 'linear-gradient(135deg, #14b8a6 0%, #0d9488 100%)', padding: '0.9rem', fontSize: '1rem', fontWeight: 'bold' }}
               >
                 Track Order Live 🛵
               </button>
@@ -6942,35 +7133,35 @@ export default function Home() {
       {/* Modal: 3D Secure Bank OTP Verification */}
       {showOtpModal && (
         <div className="modal-overlay active" style={{ zIndex: 1100 }}>
-          <div className="modal-content glass-panel" style={{ padding: '2rem', maxWidth: '440px', background: '#ffffff', border: '1px solid var(--primary)', boxShadow: '0 24px 70px rgba(0,0,0,0.15)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.75rem' }}>
+          <div className="modal-content glass-panel" style={{ padding: '2rem', maxWidth: '440px', background: '#151a24', border: '1.5px solid rgba(56, 189, 248, 0.25)', boxShadow: '0 24px 70px rgba(0,0,0,0.8), -3px -3px 10px rgba(255,255,255,0.03)', borderRadius: '24px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', borderBottom: '1px solid rgba(255, 255, 255, 0.08)', paddingBottom: '0.75rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <span style={{ fontSize: '1.4rem' }}>🛡️</span>
                 <div>
-                  <h3 style={{ margin: 0, color: 'var(--text-main)', fontSize: '1.1rem', fontWeight: '800' }}>Bank 3D Secure Authorization</h3>
-                  <span style={{ fontSize: '0.72rem', color: 'var(--primary)', fontWeight: '600' }}>Verified by Visa / MasterCard SecureCode</span>
+                  <h3 style={{ margin: 0, color: '#f1f5f9', fontSize: '1.1rem', fontWeight: '800' }}>Bank 3D Secure Authorization</h3>
+                  <span style={{ fontSize: '0.72rem', color: '#2dd4bf', fontWeight: '600' }}>Verified by Visa / MasterCard SecureCode</span>
                 </div>
               </div>
-              <button onClick={() => setShowOtpModal(false)} style={{ background: 'transparent', border: 'none', color: '#64748b', fontSize: '1.5rem', cursor: 'pointer' }}>&times;</button>
+              <button onClick={() => setShowOtpModal(false)} style={{ background: 'transparent', border: 'none', color: '#94a3b8', fontSize: '1.5rem', cursor: 'pointer' }}>&times;</button>
             </div>
 
-            <div style={{ background: '#f8fafc', padding: '1rem', borderRadius: '10px', marginBottom: '1.25rem', fontSize: '0.85rem', color: 'var(--text-muted)', border: '1px solid #e2e8f0' }}>
+            <div style={{ background: '#181e2b', padding: '1rem', borderRadius: '14px', marginBottom: '1.25rem', fontSize: '0.85rem', color: '#94a3b8', border: '1px solid rgba(255, 255, 255, 0.08)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
                 <span>Merchant:</span>
-                <strong style={{ color: 'var(--text-main)' }}>MEDORA Quick Commerce</strong>
+                <strong style={{ color: '#f1f5f9' }}>MEDORA Quick Commerce</strong>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
                 <span>Card ending in:</span>
-                <span style={{ color: 'var(--text-main)', fontFamily: 'monospace' }}>•••• {cardNumber.slice(-4) || '7890'}</span>
+                <span style={{ color: '#f1f5f9', fontFamily: 'monospace' }}>•••• {cardNumber.slice(-4) || '7890'}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span>Amount:</span>
-                <strong style={{ color: 'var(--primary)', fontSize: '1rem' }}>₹{cart.reduce((s, i) => s + parseFloat(i.price_mrp), 0).toFixed(2)}</strong>
+                <strong style={{ color: '#2dd4bf', fontSize: '1rem' }}>₹{cart.reduce((s, i) => s + parseFloat(i.price_mrp), 0).toFixed(2)}</strong>
               </div>
             </div>
 
             <div style={{ marginBottom: '1.5rem' }}>
-              <label style={{ display: 'block', fontSize: '0.82rem', color: 'var(--text-main)', marginBottom: '8px', fontWeight: 'bold' }}>
+              <label style={{ display: 'block', fontSize: '0.82rem', color: '#cbd5e1', marginBottom: '8px', fontWeight: 'bold' }}>
                 Enter 6-Digit Bank OTP:
               </label>
               <input 
@@ -6978,9 +7169,9 @@ export default function Home() {
                 maxLength={6}
                 value={otpInput} 
                 onChange={e => setOtpInput(e.target.value)}
-                style={{ width: '100%', padding: '0.8rem', borderRadius: '8px', background: '#f8fafc', border: '2px solid var(--primary)', color: 'var(--text-main)', fontSize: '1.4rem', letterSpacing: '0.4em', textAlign: 'center', fontWeight: 'bold' }}
+                style={{ width: '100%', padding: '0.8rem', borderRadius: '12px', background: '#121620', border: '2px solid #2dd4bf', color: '#f1f5f9', fontSize: '1.4rem', letterSpacing: '0.4em', textAlign: 'center', fontWeight: 'bold', boxShadow: 'var(--neo-shadow-inset)' }}
               />
-              <span style={{ fontSize: '0.72rem', color: 'var(--green)', display: 'block', marginTop: '6px', textAlign: 'center', fontWeight: '600' }}>
+              <span style={{ fontSize: '0.72rem', color: '#34d399', display: 'block', marginTop: '6px', textAlign: 'center', fontWeight: '600' }}>
                 ✓ Demo OTP prefilled (`123456`). Click below to authorize transaction.
               </span>
             </div>
@@ -6988,7 +7179,7 @@ export default function Home() {
             <button 
               onClick={handleExecutePayment} 
               className="btn-primary" 
-              style={{ width: '100%', justifyContent: 'center', background: 'linear-gradient(135deg, #0d9488 0%, #0f766e 100%)', padding: '0.9rem', fontSize: '1rem', fontWeight: 'bold' }}
+              style={{ width: '100%', justifyContent: 'center', background: 'linear-gradient(135deg, #14b8a6 0%, #0d9488 100%)', padding: '0.9rem', fontSize: '1rem', fontWeight: 'bold' }}
             >
               Authorize & Complete Payment 🔒
             </button>
@@ -7006,12 +7197,12 @@ export default function Home() {
               style={{ 
                 padding: '0.85rem 1.15rem', 
                 borderRadius: '16px 16px 4px 16px', 
-                border: '1px solid rgba(13, 148, 136, 0.3)', 
-                background: '#ffffff', 
-                color: 'var(--text-main)', 
+                border: '1px solid rgba(56, 189, 248, 0.3)', 
+                background: '#151a24', 
+                color: '#f1f5f9', 
                 fontSize: '0.88rem', 
                 maxWidth: '260px', 
-                boxShadow: '0 8px 24px rgba(0,0,0,0.08)',
+                boxShadow: '0 8px 24px rgba(0,0,0,0.6)',
                 position: 'relative',
                 cursor: 'pointer',
                 display: 'flex',
@@ -7032,7 +7223,7 @@ export default function Home() {
                 style={{
                   background: 'transparent',
                   border: 'none',
-                  color: 'var(--text-muted)',
+                  color: '#94a3b8',
                   cursor: 'pointer',
                   fontSize: '1.2rem',
                   padding: '0 4px',
@@ -7061,35 +7252,35 @@ export default function Home() {
       )}
 
       {/* Floating Chatbot Drawer/Window */}
-      <div className={`chatbot-window glass-panel ${isChatOpen ? 'active' : ''}`} style={{ background: '#ffffff', border: '1px solid rgba(226, 232, 240, 0.95)', boxShadow: '0 20px 60px rgba(0, 0, 0, 0.12)' }}>
-        <div className="chatbot-header" style={{ borderBottom: '1px solid #e2e8f0', background: '#f8fafc' }}>
+      <div className={`chatbot-window glass-panel ${isChatOpen ? 'active' : ''}`} style={{ background: '#151a24', border: '1.5px solid rgba(56, 189, 248, 0.25)', boxShadow: '0 20px 60px rgba(0, 0, 0, 0.8), -3px -3px 10px rgba(255, 255, 255, 0.03)' }}>
+        <div className="chatbot-header" style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.08)', background: '#181e2b' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
             <span style={{ fontSize: '1.5rem' }}>🩺</span>
             <div>
-              <strong style={{ display: 'block', fontSize: '0.95rem', color: 'var(--primary)' }}>MEDORA AI Clinical Doctor</strong>
+              <strong style={{ display: 'block', fontSize: '0.95rem', color: '#38bdf8' }}>MEDORA AI Clinical Doctor</strong>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <span style={{ fontSize: '0.68rem', color: '#10b981', fontWeight: '800' }}>● ONLINE</span>
-                <span style={{ background: '#ccfbf1', color: '#0d9488', fontSize: '0.65rem', padding: '1px 6px', borderRadius: '4px', fontWeight: '700' }}>⚡ Gemini 3.1 Flash</span>
+                <span style={{ fontSize: '0.68rem', color: '#34d399', fontWeight: '800' }}>● ONLINE</span>
+                <span style={{ background: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8', fontSize: '0.65rem', padding: '1px 6px', borderRadius: '4px', fontWeight: '700' }}>⚡ Gemini 3.1 Flash</span>
               </div>
             </div>
           </div>
           <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center' }}>
             <button 
               onClick={resetChat} 
-              style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', fontSize: '0.75rem', cursor: 'pointer', textDecoration: 'underline' }}
+              style={{ background: 'transparent', border: 'none', color: '#94a3b8', fontSize: '0.75rem', cursor: 'pointer', textDecoration: 'underline' }}
             >
               Reset
             </button>
             <button 
               onClick={() => setIsChatOpen(false)} 
-              style={{ background: 'transparent', border: 'none', color: '#64748b', fontSize: '1.5rem', cursor: 'pointer', lineHeight: 1, padding: '0 4px' }}
+              style={{ background: 'transparent', border: 'none', color: '#94a3b8', fontSize: '1.5rem', cursor: 'pointer', lineHeight: 1, padding: '0 4px' }}
             >
               &times;
             </button>
           </div>
         </div>
 
-        <div className="chatbot-body" style={{ background: '#ffffff', padding: '1rem' }}>
+        <div className="chatbot-body" style={{ background: '#121620', padding: '1rem' }}>
           {chatMessages.map((msg, idx) => {
             const isUser = msg.role === 'user';
             return (
@@ -7099,27 +7290,27 @@ export default function Home() {
                     width: '30px',
                     height: '30px',
                     borderRadius: '50%',
-                    background: isUser ? 'var(--primary)' : 'rgba(13, 148, 136, 0.12)',
-                    color: isUser ? '#ffffff' : 'var(--primary)',
+                    background: isUser ? 'var(--primary)' : 'rgba(56, 189, 248, 0.15)',
+                    color: isUser ? '#ffffff' : '#38bdf8',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     fontSize: '0.85rem',
                     flexShrink: 0,
-                    boxShadow: '0 2px 5px rgba(0,0,0,0.05)'
+                    boxShadow: '0 2px 5px rgba(0,0,0,0.2)'
                   }}>
                     {isUser ? '👤' : '🩺'}
                   </div>
                   <div style={{
                     padding: isUser ? '0.75rem 1rem' : '0.9rem 1.15rem',
                     borderRadius: isUser ? '16px 4px 16px 16px' : '4px 16px 16px 16px',
-                    background: isUser ? 'linear-gradient(135deg, #0d9488 0%, #0f766e 100%)' : '#f8fafc',
-                    border: isUser ? 'none' : '1px solid #e2e8f0',
-                    color: isUser ? '#ffffff' : '#0f172a',
+                    background: isUser ? 'linear-gradient(135deg, #0d9488 0%, #0f766e 100%)' : '#181e2b',
+                    border: isUser ? 'none' : '1px solid rgba(255, 255, 255, 0.08)',
+                    color: '#f1f5f9',
                     fontSize: '0.89rem',
                     lineHeight: '1.55',
                     whiteSpace: isUser ? 'pre-wrap' : 'normal',
-                    boxShadow: '0 2px 10px rgba(0,0,0,0.03)',
+                    boxShadow: 'var(--neo-shadow-raised-sm)',
                     width: '100%'
                   }}>
                     {!isUser && (
@@ -7129,17 +7320,17 @@ export default function Home() {
                         justifyContent: 'space-between',
                         marginBottom: '8px',
                         paddingBottom: '6px',
-                        borderBottom: '1px solid #e2e8f0'
+                        borderBottom: '1px solid rgba(255, 255, 255, 0.08)'
                       }}>
-                        <span style={{ fontSize: '0.78rem', fontWeight: '800', color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <span style={{ fontSize: '0.78rem', fontWeight: '800', color: '#38bdf8', display: 'flex', alignItems: 'center', gap: '4px' }}>
                           <span>🩺</span> MEDORA AI Pharmacist
                         </span>
                         <span style={{
                           fontSize: '0.72rem',
                           fontWeight: '800',
-                          background: (msg.confidence_score || 0.95) >= 0.9 ? 'rgba(16, 185, 129, 0.12)' : (msg.confidence_score || 0.95) >= 0.75 ? 'rgba(14, 165, 233, 0.12)' : 'rgba(245, 158, 11, 0.12)',
-                          color: (msg.confidence_score || 0.95) >= 0.9 ? '#059669' : (msg.confidence_score || 0.95) >= 0.75 ? '#0284c7' : '#d97706',
-                          border: `1px solid ${(msg.confidence_score || 0.95) >= 0.9 ? 'rgba(16, 185, 129, 0.3)' : (msg.confidence_score || 0.95) >= 0.75 ? 'rgba(14, 165, 233, 0.3)' : 'rgba(245, 158, 11, 0.3)'}`,
+                          background: (msg.confidence_score || 0.95) >= 0.9 ? 'rgba(16, 185, 129, 0.15)' : (msg.confidence_score || 0.95) >= 0.75 ? 'rgba(56, 189, 248, 0.15)' : 'rgba(245, 158, 11, 0.15)',
+                          color: (msg.confidence_score || 0.95) >= 0.9 ? '#34d399' : (msg.confidence_score || 0.95) >= 0.75 ? '#38bdf8' : '#fbbf24',
+                          border: `1px solid ${(msg.confidence_score || 0.95) >= 0.9 ? 'rgba(16, 185, 129, 0.3)' : (msg.confidence_score || 0.95) >= 0.75 ? 'rgba(56, 189, 248, 0.3)' : 'rgba(245, 158, 11, 0.3)'}`,
                           padding: '2px 8px',
                           borderRadius: '99px',
                           display: 'inline-flex',
@@ -7154,8 +7345,8 @@ export default function Home() {
 
                     {/* Interactive Clinical Quiz Options Chips inside Assistant Bubble */}
                     {!isUser && Array.isArray(msg.quiz_options) && msg.quiz_options.length > 0 && (
-                      <div style={{ marginTop: '10px', paddingTop: '8px', borderTop: '1px dashed #cbd5e1', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                        <span style={{ fontSize: '0.72rem', fontWeight: '800', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                      <div style={{ marginTop: '10px', paddingTop: '8px', borderTop: '1px dashed rgba(255, 255, 255, 0.12)', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        <span style={{ fontSize: '0.72rem', fontWeight: '800', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                           ⚡ Tap to Answer & Increase Confidence:
                         </span>
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
@@ -7165,9 +7356,9 @@ export default function Home() {
                               type="button"
                               onClick={() => handleTriggerChatMessage(opt)}
                               style={{
-                                background: '#ffffff',
-                                border: '1.5px solid var(--primary)',
-                                color: 'var(--primary)',
+                                background: '#1c2331',
+                                border: '1.5px solid #2dd4bf',
+                                color: '#2dd4bf',
                                 padding: '5px 11px',
                                 borderRadius: '8px',
                                 fontSize: '0.76rem',
@@ -7175,10 +7366,10 @@ export default function Home() {
                                 cursor: 'pointer',
                                 textAlign: 'left',
                                 transition: 'all 0.15s ease',
-                                boxShadow: '0 2px 4px rgba(13, 148, 136, 0.08)'
+                                boxShadow: '0 2px 4px rgba(0, 0, 0, 0.2)'
                               }}
-                              onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(13, 148, 136, 0.08)'; }}
-                              onMouseLeave={(e) => { e.currentTarget.style.background = '#ffffff'; }}
+                              onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(45, 212, 191, 0.15)'; }}
+                              onMouseLeave={(e) => { e.currentTarget.style.background = '#1c2331'; }}
                             >
                               👉 {opt}
                             </button>
@@ -7197,17 +7388,17 @@ export default function Home() {
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <div style={{
                   width: '28px', height: '28px', borderRadius: '50%',
-                  background: 'rgba(13, 148, 136, 0.1)', color: 'var(--primary)',
+                  background: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8',
                   display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.8rem'
                 }}>🩺</div>
-                <div style={{ padding: '0.55rem 0.9rem', borderRadius: '4px 14px 14px 14px', background: '#f1f5f9', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span className="dot-typing" style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>Doctor is analyzing...</span>
+                <div style={{ padding: '0.55rem 0.9rem', borderRadius: '4px 14px 14px 14px', background: '#181e2b', border: '1px solid rgba(255, 255, 255, 0.08)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span className="dot-typing" style={{ color: '#94a3b8', fontSize: '0.8rem' }}>Doctor is analyzing...</span>
                   <button
                     type="button"
                     onClick={cancelChatRequest}
                     style={{
-                      background: 'rgba(239, 68, 68, 0.1)',
-                      color: '#dc2626',
+                      background: 'rgba(239, 68, 68, 0.2)',
+                      color: '#f87171',
                       border: '1px solid rgba(239, 68, 68, 0.3)',
                       padding: '2px 7px',
                       borderRadius: '5px',
@@ -7226,26 +7417,26 @@ export default function Home() {
 
           {chatSuggestedMedicines.length > 0 && (
             <div style={{
-              background: '#f0fdf4',
-              border: '1px solid #bbf7d0',
+              background: '#181e2b',
+              border: '1px solid rgba(16, 185, 129, 0.3)',
               borderRadius: '12px',
               padding: '0.85rem 1rem',
               marginTop: '0.5rem',
               display: 'flex',
               flexDirection: 'column',
               gap: '0.55rem',
-              boxShadow: '0 4px 14px rgba(16, 185, 129, 0.08)'
+              boxShadow: '0 4px 14px rgba(0, 0, 0, 0.25)'
             }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                   <span style={{ fontSize: '1.1rem' }}>💊</span>
-                  <strong style={{ color: '#15803d', fontSize: '0.88rem' }}>Recommended OTC Remedies:</strong>
+                  <strong style={{ color: '#86efac', fontSize: '0.88rem' }}>Recommended OTC Remedies:</strong>
                 </div>
                 <button
                   type="button"
                   onClick={() => handleCheckoutFromChat(true)}
                   style={{
-                    background: '#15803d',
+                    background: '#10b981',
                     color: '#ffffff',
                     border: 'none',
                     fontSize: '0.72rem',
@@ -7263,16 +7454,16 @@ export default function Home() {
                   <span 
                     key={idx} 
                     style={{
-                      background: '#ffffff',
-                      color: '#15803d',
-                      border: '1px solid #86efac',
+                      background: '#1c2331',
+                      color: '#34d399',
+                      border: '1px solid #10b981',
                       padding: '4px 10px',
                       borderRadius: '10px',
                       fontSize: '0.78rem',
                       fontWeight: '800',
                       cursor: 'pointer',
                       transition: 'all 0.2s ease',
-                      boxShadow: '0 2px 5px rgba(0, 0, 0, 0.04)'
+                      boxShadow: '0 2px 5px rgba(0, 0, 0, 0.2)'
                     }}
                     onClick={() => handleSuggestedMedicineClick(med)}
                     title={`Click to add ${med} to cart`}
@@ -7287,7 +7478,7 @@ export default function Home() {
         </div>
 
         {/* Quick Symptom Assessment Chips */}
-        <div style={{ padding: '8px 1rem', background: '#f8fafc', borderTop: '1px solid #e2e8f0', display: 'flex', gap: '6px', overflowX: 'auto', scrollbarWidth: 'none' }}>
+        <div style={{ padding: '8px 1rem', background: '#181e2b', borderTop: '1px solid rgba(255, 255, 255, 0.08)', display: 'flex', gap: '6px', overflowX: 'auto', scrollbarWidth: 'none' }}>
           {[
             { label: "🤒 High Fever", query: "I have high fever and severe headache since yesterday. What medicines can I take for relief?" },
             { label: "🤧 Cold & Allergy", query: "I am having persistent sneezing, runny nose, and itchy eyes. Recommend OTC allergy medicine." },
@@ -7301,16 +7492,16 @@ export default function Home() {
               type="button"
               onClick={() => handleTriggerChatMessage(chip.query)}
               style={{
-                background: '#ffffff',
-                border: '1px solid #cbd5e1',
+                background: '#1c2331',
+                border: '1px solid rgba(255, 255, 255, 0.12)',
                 borderRadius: '99px',
                 padding: '4px 10px',
                 fontSize: '0.72rem',
                 fontWeight: '700',
-                color: 'var(--text-main)',
+                color: '#f1f5f9',
                 cursor: 'pointer',
                 whiteSpace: 'nowrap',
-                boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
                 transition: 'all 0.15s ease'
               }}
             >
@@ -7319,7 +7510,7 @@ export default function Home() {
           ))}
         </div>
 
-        <div className="chatbot-footer" style={{ borderTop: '1px solid #e2e8f0', background: '#f8fafc' }}>
+        <div className="chatbot-footer" style={{ borderTop: '1px solid rgba(255, 255, 255, 0.08)', background: '#181e2b' }}>
           <form onSubmit={sendChatMessage} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
             <input
               type="text"
@@ -7327,16 +7518,16 @@ export default function Home() {
               placeholder={isChatLoading ? "Doctor is analyzing... (you can type follow-ups)" : "Type your symptom, quiz answer, or follow-up question..."}
               value={chatInput}
               onChange={e => setChatInput(e.target.value)}
-              style={{ flex: 1, padding: '0.65rem 0.9rem', borderRadius: '8px', fontSize: '0.88rem', background: '#ffffff', border: '1px solid #cbd5e1' }}
+              style={{ flex: 1, padding: '0.65rem 0.9rem', borderRadius: '8px', fontSize: '0.88rem', background: '#121620', border: '1px solid rgba(255, 255, 255, 0.12)', color: '#f1f5f9' }}
             />
             {isChatLoading && (
               <button
                 type="button"
                 onClick={cancelChatRequest}
                 style={{
-                  background: '#fef2f2',
-                  border: '1px solid #fca5a5',
-                  color: '#dc2626',
+                  background: 'rgba(239, 68, 68, 0.2)',
+                  border: '1px solid rgba(239, 68, 68, 0.4)',
+                  color: '#f87171',
                   padding: '0.65rem 0.85rem',
                   borderRadius: '8px',
                   fontSize: '0.82rem',
@@ -7367,15 +7558,15 @@ export default function Home() {
         <div className="modal-overlay active" onClick={() => setSelectedMedicineDetail(null)}>
           <div 
             className="modal-content glass-panel animate-fade-in" 
-            style={{ padding: '2rem', maxWidth: '620px', background: '#ffffff', border: '1px solid rgba(226, 232, 240, 0.95)', boxShadow: '0 24px 70px rgba(0,0,0,0.15)' }} 
+            style={{ padding: '2rem', maxWidth: '620px', background: '#151a24', border: '1.5px solid rgba(56, 189, 248, 0.25)', boxShadow: '0 24px 70px rgba(0,0,0,0.8), -3px -3px 10px rgba(255,255,255,0.03)' }} 
             onClick={e => e.stopPropagation()}
           >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '1px solid #e2e8f0', paddingBottom: '1rem', marginBottom: '1.25rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '1px solid rgba(255, 255, 255, 0.08)', paddingBottom: '1rem', marginBottom: '1.25rem' }}>
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
                   <span style={{
-                    background: 'rgba(13, 148, 136, 0.12)',
-                    color: 'var(--primary)',
+                    background: 'rgba(20, 184, 166, 0.15)',
+                    color: '#2dd4bf',
                     fontSize: '0.72rem',
                     fontWeight: '800',
                     padding: '3px 10px',
@@ -7384,20 +7575,20 @@ export default function Home() {
                   }}>
                     {selectedMedicineDetail.category || selectedMedicineDetail.form || 'Prescription & OTC'}
                   </span>
-                  <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)', fontWeight: '600' }}>
+                  <span style={{ fontSize: '0.82rem', color: '#94a3b8', fontWeight: '600' }}>
                     {selectedMedicineDetail.dosage}
                   </span>
                 </div>
-                <h2 style={{ margin: 0, fontSize: '1.5rem', fontWeight: '800', color: 'var(--text-main)' }}>
+                <h2 style={{ margin: 0, fontSize: '1.5rem', fontWeight: '800', color: '#f1f5f9' }}>
                   {selectedMedicineDetail.brand_name}
                 </h2>
-                <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '4px' }}>
-                  Composition Salt: <strong style={{ color: 'var(--primary)' }}>{selectedMedicineDetail.generic_name}</strong>
+                <div style={{ fontSize: '0.85rem', color: '#94a3b8', marginTop: '4px' }}>
+                  Composition Salt: <strong style={{ color: '#2dd4bf' }}>{selectedMedicineDetail.generic_name}</strong>
                 </div>
               </div>
               <button
                 onClick={() => setSelectedMedicineDetail(null)}
-                style={{ background: 'transparent', border: 'none', color: '#64748b', fontSize: '1.75rem', cursor: 'pointer', lineHeight: 1 }}
+                style={{ background: 'transparent', border: 'none', color: '#94a3b8', fontSize: '1.75rem', cursor: 'pointer', lineHeight: 1 }}
               >
                 &times;
               </button>
@@ -7405,18 +7596,19 @@ export default function Home() {
 
             {/* Pricing & Speed Pill */}
             <div style={{
-              background: '#f8fafc',
-              border: '1px solid #e2e8f0',
+              background: '#121620',
+              border: '1px solid rgba(255, 255, 255, 0.08)',
               borderRadius: '16px',
               padding: '1.2rem',
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center',
-              marginBottom: '1.25rem'
+              marginBottom: '1.25rem',
+              boxShadow: 'var(--neo-shadow-inset)'
             }}>
               <div>
-                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block' }}>MRP Inclusive of all Taxes</span>
-                <span style={{ fontSize: '1.65rem', fontWeight: '800', color: 'var(--primary)' }}>₹{selectedMedicineDetail.price_mrp}</span>
+                <span style={{ fontSize: '0.75rem', color: '#94a3b8', display: 'block' }}>MRP Inclusive of all Taxes</span>
+                <span style={{ fontSize: '1.65rem', fontWeight: '800', color: '#2dd4bf' }}>₹{selectedMedicineDetail.price_mrp}</span>
               </div>
               <div style={{ textAlign: 'right' }}>
                 <span style={{
@@ -7430,7 +7622,7 @@ export default function Home() {
                 }}>
                   ⚡ 10-15 MINS DELIVERY
                 </span>
-                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '4px' }}>
+                <div style={{ fontSize: '0.75rem', color: '#94a3b8', marginTop: '4px' }}>
                   From {selectedMedicineDetail.instamart?.nearest_pharmacy?.pharmacy_name || 'Vamanjoor Central Pharmacy'}
                 </div>
               </div>
@@ -7438,27 +7630,27 @@ export default function Home() {
 
             {/* Clinical Usage & Indication */}
             <div style={{ marginBottom: '1.25rem' }}>
-              <h4 style={{ margin: '0 0 6px 0', fontSize: '0.95rem', fontWeight: '700', color: 'var(--text-main)' }}>
+              <h4 style={{ margin: '0 0 6px 0', fontSize: '0.95rem', fontWeight: '700', color: '#f1f5f9' }}>
                 Clinical Indication & Guidance
               </h4>
-              <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: '1.55' }}>
+              <p style={{ margin: 0, fontSize: '0.85rem', color: '#cbd5e1', lineHeight: '1.55' }}>
                 {selectedMedicineDetail.description || `${selectedMedicineDetail.brand_name} (${selectedMedicineDetail.generic_name}) is approved for high-efficacy symptomatic relief. Certified WHO-GMP manufactured standard dosage. Follow prescribed guidelines.`}
               </p>
             </div>
 
             {/* Dark-Store Availability Breakdown */}
-            <div style={{ marginBottom: '1.5rem', background: '#f0fdfa', border: '1px solid #ccfbf1', borderRadius: '14px', padding: '1.1rem' }}>
-              <div style={{ fontSize: '0.84rem', fontWeight: '800', color: 'var(--primary)', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <div style={{ marginBottom: '1.5rem', background: '#181e2b', border: '1px solid rgba(20, 184, 166, 0.3)', borderRadius: '14px', padding: '1.1rem' }}>
+              <div style={{ fontSize: '0.84rem', fontWeight: '800', color: '#2dd4bf', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <span>🏪</span> Real-Time Connected Dark-Store Verification:
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '0.8rem', color: 'var(--text-main)' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '0.8rem', color: '#cbd5e1' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <span>• Vamanjoor Central Pharmacy (0.8 km):</span>
-                  <strong style={{ color: 'var(--green)' }}>✓ 28 Units In Stock (Fastest Pickup)</strong>
+                  <strong style={{ color: '#34d399' }}>✓ 28 Units In Stock (Fastest Pickup)</strong>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <span>• City Meds Express (1.4 km):</span>
-                  <strong style={{ color: 'var(--green)' }}>✓ 15 Units In Stock</strong>
+                  <strong style={{ color: '#34d399' }}>✓ 15 Units In Stock</strong>
                 </div>
               </div>
             </div>
@@ -7467,28 +7659,28 @@ export default function Home() {
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.8rem', alignItems: 'center' }}>
               {getItemCartCount(selectedMedicineDetail.medicine_id) > 0 ? (
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Quantity in cart:</span>
+                  <span style={{ fontSize: '0.85rem', color: '#94a3b8' }}>Quantity in cart:</span>
                   <div style={{
                     display: 'flex',
                     alignItems: 'center',
                     gap: '8px',
-                    background: '#f0fdf4',
-                    border: '1.5px solid #16a34a',
+                    background: 'rgba(16, 185, 129, 0.12)',
+                    border: '1.5px solid #10b981',
                     borderRadius: '10px',
                     padding: '4px 12px'
                   }}>
                     <button
                       onClick={() => handleUpdateItemQuantity(selectedMedicineDetail, -1)}
-                      style={{ background: 'transparent', border: 'none', color: '#16a34a', fontSize: '1.1rem', fontWeight: '800', cursor: 'pointer' }}
+                      style={{ background: 'transparent', border: 'none', color: '#34d399', fontSize: '1.1rem', fontWeight: '800', cursor: 'pointer' }}
                     >
                       −
                     </button>
-                    <strong style={{ color: '#16a34a', fontSize: '0.95rem', minWidth: '20px', textAlign: 'center' }}>
+                    <strong style={{ color: '#34d399', fontSize: '0.95rem', minWidth: '20px', textAlign: 'center' }}>
                       {getItemCartCount(selectedMedicineDetail.medicine_id)}
                     </strong>
                     <button
                       onClick={() => handleUpdateItemQuantity(selectedMedicineDetail, 1)}
-                      style={{ background: 'transparent', border: 'none', color: '#16a34a', fontSize: '1.1rem', fontWeight: '800', cursor: 'pointer' }}
+                      style={{ background: 'transparent', border: 'none', color: '#34d399', fontSize: '1.1rem', fontWeight: '800', cursor: 'pointer' }}
                     >
                       +
                     </button>
@@ -7525,41 +7717,41 @@ export default function Home() {
               padding: '1.75rem 2rem',
               maxWidth: '680px',
               width: '92%',
-              background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.98) 0%, rgba(248, 250, 252, 0.94) 100%)',
-              border: '1.5px solid rgba(203, 213, 225, 0.95)',
-              boxShadow: '0 24px 70px rgba(15, 23, 42, 0.22)',
+              background: '#151a24',
+              border: '1.5px solid rgba(56, 189, 248, 0.25)',
+              boxShadow: '0 24px 70px rgba(0, 0, 0, 0.8), -3px -3px 10px rgba(255, 255, 255, 0.03)',
               borderRadius: '24px'
             }}
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '1px solid #e2e8f0', paddingBottom: '1rem', marginBottom: '1.25rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '1px solid rgba(255, 255, 255, 0.08)', paddingBottom: '1rem', marginBottom: '1.25rem' }}>
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <span style={{ fontSize: '1.4rem' }}>🏪</span>
-                  <h3 style={{ margin: 0, color: '#0f172a', fontSize: '1.3rem', fontWeight: '800' }}>
+                  <h3 style={{ margin: 0, color: '#f1f5f9', fontSize: '1.3rem', fontWeight: '800' }}>
                     Select Fulfilling Pharmacy & Price
                   </h3>
                 </div>
-                <div style={{ fontSize: '0.85rem', color: '#64748b', marginTop: '4px' }}>
-                  For <strong style={{ color: '#0f172a' }}>{selectedMedicineForShopPicker.brand_name}</strong> {selectedMedicineForShopPicker.dosage && `(${selectedMedicineForShopPicker.dosage})`} • Salt: {selectedMedicineForShopPicker.generic_name}
+                <div style={{ fontSize: '0.85rem', color: '#94a3b8', marginTop: '4px' }}>
+                  For <strong style={{ color: '#f1f5f9' }}>{selectedMedicineForShopPicker.brand_name}</strong> {selectedMedicineForShopPicker.dosage && `(${selectedMedicineForShopPicker.dosage})`} • Salt: {selectedMedicineForShopPicker.generic_name}
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => setSelectedMedicineForShopPicker(null)}
-                style={{ background: 'transparent', border: 'none', color: '#64748b', fontSize: '1.75rem', cursor: 'pointer', lineHeight: 1 }}
+                style={{ background: 'transparent', border: 'none', color: '#94a3b8', fontSize: '1.75rem', cursor: 'pointer', lineHeight: 1 }}
               >
                 &times;
               </button>
             </div>
 
             {/* Currently in Cart Summary */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f0fdfa', border: '1px solid #ccfbf1', padding: '0.65rem 1rem', borderRadius: '12px', marginBottom: '1.25rem' }}>
-              <span style={{ fontSize: '0.82rem', color: '#0f766e', fontWeight: '700' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#181e2b', border: '1px solid rgba(20, 184, 166, 0.3)', padding: '0.65rem 1rem', borderRadius: '12px', marginBottom: '1.25rem' }}>
+              <span style={{ fontSize: '0.82rem', color: '#2dd4bf', fontWeight: '700' }}>
                 Total in your cart: <strong>{getItemCartCount(selectedMedicineForShopPicker.medicine_id)} {getItemCartCount(selectedMedicineForShopPicker.medicine_id) === 1 ? 'unit' : 'units'}</strong>
               </span>
-              <span style={{ fontSize: '0.74rem', color: '#64748b' }}>
+              <span style={{ fontSize: '0.74rem', color: '#94a3b8' }}>
                 Pick whichever local store offers the best price or fastest dispatch
               </span>
             </div>
@@ -7573,26 +7765,26 @@ export default function Home() {
                   <div
                     key={shop.id}
                     style={{
-                      border: shopCartCount > 0 ? '2px solid #0d9488' : '1px solid #cbd5e1',
+                      border: shopCartCount > 0 ? '2px solid #2dd4bf' : '1px solid rgba(255, 255, 255, 0.08)',
                       borderRadius: '16px',
                       padding: '1.1rem 1.25rem',
-                      background: shopCartCount > 0 ? '#f0fdfa' : '#ffffff',
+                      background: shopCartCount > 0 ? '#1c2436' : '#181e2b',
                       display: 'flex',
                       justifyContent: 'space-between',
                       alignItems: 'center',
                       gap: '1rem',
                       transition: 'all 0.2s ease',
-                      boxShadow: '0 2px 8px rgba(0,0,0,0.03)'
+                      boxShadow: 'var(--neo-shadow-raised-sm)'
                     }}
                   >
                     {/* Left: Shop Details */}
                     <div style={{ flex: 1 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '4px' }}>
-                        <strong style={{ fontSize: '0.98rem', color: '#0f172a' }}>{shop.name}</strong>
+                        <strong style={{ fontSize: '0.98rem', color: '#f1f5f9' }}>{shop.name}</strong>
                         <span style={{
                           fontSize: '0.68rem',
-                          background: shop.badge.includes('Express') ? '#ccfbf1' : shop.badge.includes('Best Seller') ? '#fef3c7' : '#f1f5f9',
-                          color: shop.badge.includes('Express') ? '#0f766e' : shop.badge.includes('Best Seller') ? '#b45309' : '#334155',
+                          background: shop.badge.includes('Express') ? 'rgba(20, 184, 166, 0.15)' : shop.badge.includes('Best Seller') ? 'rgba(255, 119, 0, 0.15)' : 'rgba(255, 255, 255, 0.08)',
+                          color: shop.badge.includes('Express') ? '#2dd4bf' : shop.badge.includes('Best Seller') ? '#fb923c' : '#cbd5e1',
                           fontWeight: '800',
                           padding: '2px 8px',
                           borderRadius: '4px'
@@ -7601,13 +7793,13 @@ export default function Home() {
                         </span>
                       </div>
                       
-                      <div style={{ fontSize: '0.78rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                      <div style={{ fontSize: '0.78rem', color: '#94a3b8', display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
                         <span>📍 {shop.distance}</span>
                         <span>⚡ {shop.deliveryTime}</span>
                         <span>⭐ {shop.rating} ({shop.reviews})</span>
-                        <span style={{ color: '#16a34a', fontWeight: '700' }}>✓ {shop.stock} in stock</span>
+                        <span style={{ color: '#34d399', fontWeight: '700' }}>✓ {shop.stock} in stock</span>
                       </div>
-                      <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: '2px' }}>
+                      <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '2px' }}>
                         {shop.address}
                       </div>
                     </div>
@@ -7615,11 +7807,11 @@ export default function Home() {
                     {/* Right: Price & Stepper Button */}
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '6px', flexShrink: 0 }}>
                       <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px' }}>
-                        <span style={{ fontSize: '1.25rem', fontWeight: '900', color: '#0f172a' }}>
+                        <span style={{ fontSize: '1.25rem', fontWeight: '900', color: '#2dd4bf' }}>
                           ₹{shop.price}
                         </span>
                         {shop.discount !== 'M.R.P.' && (
-                          <span style={{ fontSize: '0.7rem', color: '#15803d', fontWeight: '800', background: '#dcfce7', padding: '1px 5px', borderRadius: '4px' }}>
+                          <span style={{ fontSize: '0.7rem', color: '#34d399', fontWeight: '800', background: 'rgba(16, 185, 129, 0.15)', padding: '1px 5px', borderRadius: '4px' }}>
                             {shop.discount}
                           </span>
                         )}
@@ -7631,27 +7823,27 @@ export default function Home() {
                           display: 'flex',
                           alignItems: 'center',
                           gap: '6px',
-                          background: '#ffffff',
-                          border: '1.5px solid #0d9488',
+                          background: '#121620',
+                          border: '1.5px solid #2dd4bf',
                           borderRadius: '10px',
                           padding: '3px 8px',
-                          boxShadow: '0 2px 6px rgba(13, 148, 136, 0.2)'
+                          boxShadow: '0 2px 6px rgba(45, 212, 191, 0.2)'
                         }}>
                           <button
                             type="button"
                             onClick={() => handleAddMedicineFromShop(selectedMedicineForShopPicker, shop, -1)}
-                            style={{ background: 'transparent', border: 'none', color: '#0d9488', fontSize: '1.1rem', fontWeight: '800', cursor: 'pointer', padding: '0 4px' }}
+                            style={{ background: 'transparent', border: 'none', color: '#2dd4bf', fontSize: '1.1rem', fontWeight: '800', cursor: 'pointer', padding: '0 4px' }}
                             title="Decrease quantity from this shop"
                           >
                             −
                           </button>
-                          <span style={{ fontWeight: '800', fontSize: '0.88rem', color: '#0d9488', minWidth: '20px', textAlign: 'center' }}>
+                          <span style={{ fontWeight: '800', fontSize: '0.88rem', color: '#f1f5f9', minWidth: '20px', textAlign: 'center' }}>
                             {shopCartCount}
                           </span>
                           <button
                             type="button"
                             onClick={() => handleAddMedicineFromShop(selectedMedicineForShopPicker, shop, 1)}
-                            style={{ background: 'transparent', border: 'none', color: '#0d9488', fontSize: '1.1rem', fontWeight: '800', cursor: 'pointer', padding: '0 4px' }}
+                            style={{ background: 'transparent', border: 'none', color: '#2dd4bf', fontSize: '1.1rem', fontWeight: '800', cursor: 'pointer', padding: '0 4px' }}
                             title="Increase quantity from this shop"
                           >
                             +
@@ -7670,7 +7862,7 @@ export default function Home() {
                             fontSize: '0.78rem',
                             fontWeight: '800',
                             borderRadius: '10px',
-                            background: 'linear-gradient(135deg, #0d9488 0%, #0f766e 100%)',
+                            background: 'linear-gradient(135deg, #14b8a6 0%, #0d9488 100%)',
                             display: 'flex',
                             alignItems: 'center',
                             gap: '4px'
@@ -7686,11 +7878,11 @@ export default function Home() {
             </div>
 
             {/* Modal Bottom Actions */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #e2e8f0', paddingTop: '1rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid rgba(255, 255, 255, 0.08)', paddingTop: '1rem' }}>
               <button
                 type="button"
                 onClick={() => setSelectedMedicineForShopPicker(null)}
-                style={{ background: 'transparent', border: 'none', color: '#64748b', fontSize: '0.82rem', fontWeight: '700', cursor: 'pointer' }}
+                style={{ background: 'transparent', border: 'none', color: '#94a3b8', fontSize: '0.82rem', fontWeight: '700', cursor: 'pointer' }}
               >
                 ← Back to Catalog
               </button>
@@ -7725,10 +7917,10 @@ export default function Home() {
               padding: '2rem',
               maxWidth: '640px',
               width: '92%',
-              background: '#ffffff',
+              background: '#151a24',
               border: aiInteractionReport.severity === 'CRITICAL' ? '2px solid #ef4444' : '2px solid #f59e0b',
               borderRadius: '24px',
-              boxShadow: '0 25px 60px rgba(0, 0, 0, 0.3)'
+              boxShadow: '0 25px 60px rgba(0, 0, 0, 0.8), -3px -3px 10px rgba(255, 255, 255, 0.03)'
             }}
             onClick={(e) => e.stopPropagation()}
           >
@@ -7738,8 +7930,8 @@ export default function Home() {
                 width: '52px',
                 height: '52px',
                 borderRadius: '50%',
-                background: aiInteractionReport.severity === 'CRITICAL' ? '#fee2e2' : '#fef3c7',
-                color: aiInteractionReport.severity === 'CRITICAL' ? '#dc2626' : '#d97706',
+                background: aiInteractionReport.severity === 'CRITICAL' ? 'rgba(239, 68, 68, 0.2)' : 'rgba(245, 158, 11, 0.2)',
+                color: aiInteractionReport.severity === 'CRITICAL' ? '#f87171' : '#fbbf24',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -7750,7 +7942,7 @@ export default function Home() {
               </div>
               <div style={{ flex: 1 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <h3 style={{ margin: 0, color: aiInteractionReport.severity === 'CRITICAL' ? '#b91c1c' : '#b45309', fontSize: '1.3rem', fontWeight: '800' }}>
+                  <h3 style={{ margin: 0, color: aiInteractionReport.severity === 'CRITICAL' ? '#f87171' : '#fbbf24', fontSize: '1.3rem', fontWeight: '800' }}>
                     Dangerous Drug Combination Detected!
                   </h3>
                   <span style={{
@@ -7765,7 +7957,7 @@ export default function Home() {
                     {aiInteractionReport.severity} HAZARD
                   </span>
                 </div>
-                <p style={{ margin: '6px 0 0 0', fontSize: '0.82rem', color: '#475569', lineHeight: '1.4' }}>
+                <p style={{ margin: '6px 0 0 0', fontSize: '0.82rem', color: '#cbd5e1', lineHeight: '1.4' }}>
                   MEDORA's AI Clinical Pharmacist reviewed your cart and identified adverse drug-drug interactions that are dangerous if consumed together.
                 </p>
               </div>
@@ -7779,24 +7971,24 @@ export default function Home() {
                   style={{
                     padding: '1.1rem',
                     borderRadius: '14px',
-                    background: alert.severity === 'CRITICAL' ? '#fff5f5' : '#fffbeb',
-                    border: alert.severity === 'CRITICAL' ? '1px solid #fecaca' : '1px solid #fde68a'
+                    background: alert.severity === 'CRITICAL' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(245, 158, 11, 0.1)',
+                    border: alert.severity === 'CRITICAL' ? '1px solid rgba(239, 68, 68, 0.35)' : '1px solid rgba(245, 158, 11, 0.35)'
                   }}
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                    <strong style={{ fontSize: '0.92rem', color: alert.severity === 'CRITICAL' ? '#991b1b' : '#92400e' }}>
+                    <strong style={{ fontSize: '0.92rem', color: alert.severity === 'CRITICAL' ? '#f87171' : '#fbbf24' }}>
                       {alert.title}
                     </strong>
-                    <span style={{ fontSize: '0.72rem', background: '#ffffff', border: '1px solid #cbd5e1', padding: '2px 8px', borderRadius: '4px', fontWeight: '700', color: '#334155' }}>
+                    <span style={{ fontSize: '0.72rem', background: '#121620', border: '1px solid rgba(255, 255, 255, 0.1)', padding: '2px 8px', borderRadius: '4px', fontWeight: '700', color: '#f1f5f9' }}>
                       {alert.medicine_a} ⚡ {alert.medicine_b}
                     </span>
                   </div>
 
-                  <p style={{ margin: '0 0 8px 0', fontSize: '0.8rem', color: '#334155', lineHeight: '1.45' }}>
+                  <p style={{ margin: '0 0 8px 0', fontSize: '0.8rem', color: '#cbd5e1', lineHeight: '1.45' }}>
                     {alert.description}
                   </p>
 
-                  <div style={{ fontSize: '0.78rem', color: '#0369a1', background: '#f0f9ff', padding: '6px 10px', borderRadius: '8px', border: '1px solid #bae6fd', marginBottom: '10px' }}>
+                  <div style={{ fontSize: '0.78rem', color: '#38bdf8', background: 'rgba(56, 189, 248, 0.1)', padding: '6px 10px', borderRadius: '8px', border: '1px solid rgba(56, 189, 248, 0.25)', marginBottom: '10px' }}>
                     <strong>Clinical Direction:</strong> {alert.recommendation}
                   </div>
 
@@ -7813,9 +8005,9 @@ export default function Home() {
                         }
                       }}
                       style={{
-                        background: '#fee2e2',
-                        border: '1px solid #fca5a5',
-                        color: '#b91c1c',
+                        background: 'rgba(239, 68, 68, 0.2)',
+                        border: '1px solid rgba(239, 68, 68, 0.4)',
+                        color: '#f87171',
                         padding: '5px 12px',
                         borderRadius: '8px',
                         fontWeight: '700',
@@ -7837,9 +8029,9 @@ export default function Home() {
                         }
                       }}
                       style={{
-                        background: '#fee2e2',
-                        border: '1px solid #fca5a5',
-                        color: '#b91c1c',
+                        background: 'rgba(239, 68, 68, 0.2)',
+                        border: '1px solid rgba(239, 68, 68, 0.4)',
+                        color: '#f87171',
                         padding: '5px 12px',
                         borderRadius: '8px',
                         fontWeight: '700',
@@ -7855,7 +8047,7 @@ export default function Home() {
             </div>
 
             {/* Action Footer */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #e2e8f0', paddingTop: '1rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid rgba(255, 255, 255, 0.08)', paddingTop: '1rem' }}>
               <button
                 type="button"
                 onClick={() => {
@@ -7863,9 +8055,9 @@ export default function Home() {
                   setIsChatOpen(true);
                 }}
                 style={{
-                  background: '#f0fdfa',
-                  border: '1px solid #ccfbf1',
-                  color: '#0d9488',
+                  background: 'rgba(20, 184, 166, 0.15)',
+                  border: '1px solid rgba(20, 184, 166, 0.3)',
+                  color: '#2dd4bf',
                   padding: '8px 16px',
                   borderRadius: '10px',
                   fontWeight: '700',
@@ -7885,9 +8077,9 @@ export default function Home() {
                   type="button"
                   onClick={() => setAiInteractionModalOpen(false)}
                   style={{
-                    background: '#f1f5f9',
-                    border: '1px solid #cbd5e1',
-                    color: '#334155',
+                    background: '#1c2331',
+                    border: '1px solid rgba(255, 255, 255, 0.12)',
+                    color: '#cbd5e1',
                     padding: '8px 16px',
                     borderRadius: '10px',
                     fontWeight: '700',
@@ -7901,11 +8093,10 @@ export default function Home() {
                 <button
                   type="button"
                   onClick={() => {
-                    if (confirm("Proceeding with potentially hazardous drug combination. Do you confirm you have consulted a registered medical practitioner?")) {
-                      setAiInteractionModalOpen(false);
-                      setPaymentStep('payment');
-                      fetchPharmacyLiveTerminalQr();
-                    }
+                    setAiInteractionModalOpen(false);
+                    showToast("Acknowledged clinical advisory. Proceeding to checkout...", "⚠️");
+                    setPaymentStep('payment');
+                    fetchPharmacyLiveTerminalQr();
                   }}
                   style={{
                     background: '#ef4444',
@@ -8059,9 +8250,11 @@ export default function Home() {
       {/* Mobile Sticky Bottom Navigation Bar */}
       <nav className="medora-mobile-nav">
         <button
-          className={`medora-nav-item ${activeMainView === 'shelf' ? 'active' : ''}`}
+          className={`medora-nav-item ${activeMainView === 'home' && !isChatOpen && !isOcrOpen ? 'active' : ''}`}
           onClick={() => {
-            setActiveMainView('shelf');
+            setActiveMainView('home');
+            setIsChatOpen(false);
+            setIsOcrOpen(false);
             if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'smooth' });
           }}
         >
@@ -8072,7 +8265,9 @@ export default function Home() {
         <button
           className="medora-nav-item"
           onClick={() => {
-            setActiveMainView('shelf');
+            setActiveMainView('home');
+            setIsChatOpen(false);
+            setIsOcrOpen(false);
             const el = document.getElementById('instamart-shelf-section');
             if (el) el.scrollIntoView({ behavior: 'smooth' });
           }}
@@ -8082,36 +8277,43 @@ export default function Home() {
         </button>
 
         <button
-          className={`medora-nav-item ${activeMainView === 'radar' ? 'active' : ''}`}
+          className={`medora-nav-item ${isChatOpen ? 'active' : ''}`}
           onClick={() => {
-            setActiveMainView(activeMainView === 'radar' ? 'shelf' : 'radar');
+            setIsChatOpen(true);
+            setIsOcrOpen(false);
           }}
         >
-          <span className="medora-nav-icon">📡</span>
-          <span className="medora-nav-label">Radar</span>
+          <span className="medora-nav-icon">🩺</span>
+          <span className="medora-nav-label">AI Doctor</span>
         </button>
 
         <button
-          className="medora-nav-item"
+          className={`medora-nav-item ${isOcrOpen ? 'active' : ''}`}
           onClick={() => {
-            if (activeOrders.length > 0) {
-              setPaymentStep('order_success');
+            setIsOcrOpen(true);
+            setIsChatOpen(false);
+          }}
+        >
+          <span className="medora-nav-icon">📄</span>
+          <span className="medora-nav-label">Upload Rx</span>
+        </button>
+
+        <button
+          className={`medora-nav-item ${isCartOpen || activeMainView === 'account' ? 'active' : ''}`}
+          onClick={() => {
+            if (cart.length > 0) {
               setIsCartOpen(true);
             } else {
-              showToast('No active orders right now', '📦');
+              setActiveMainView(prev => prev === 'account' ? 'home' : 'account');
+              setActiveAccountSection('hub');
             }
           }}
         >
-          <span className="medora-nav-icon">📦</span>
-          <span className="medora-nav-label">Orders</span>
-        </button>
 
-        <button
-          className="medora-nav-item"
-          onClick={() => setShowBootup(true)}
-        >
-          <span className="medora-nav-icon">🎬</span>
-          <span className="medora-nav-label">Cartoon</span>
+          <span className="medora-nav-icon">{cart.length > 0 ? '🛒' : '👤'}</span>
+          <span className="medora-nav-label">
+            {cart.length > 0 ? `Cart (${cart.length})` : 'Account'}
+          </span>
         </button>
       </nav>
     </>

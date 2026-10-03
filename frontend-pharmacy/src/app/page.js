@@ -78,9 +78,16 @@ export default function PharmacyDashboard() {
   const [isBroadcasting, setIsBroadcasting] = useState(false);
   const [scannerNotice, setScannerNotice] = useState(null);
   const [cameraError, setCameraError] = useState(null);
+  const [pharmacyToast, setPharmacyToast] = useState(null);
   const videoRef = useRef(null);
 
+  const showPharmacyToast = (msg, icon = '✓', isError = false) => {
+    setPharmacyToast({ msg, icon, isError });
+    setTimeout(() => setPharmacyToast(null), 4000);
+  };
+
   // ─── DATA FETCHING ───
+
 
   // Fetch Full Catalog of All Medicines in Database
   const fetchFullCatalog = async () => {
@@ -200,31 +207,32 @@ export default function PharmacyDashboard() {
       });
       if (res.ok) {
         setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: newStatus } : o));
+        showPharmacyToast(`Order #${orderId} moved to ${newStatus.replace(/_/g, ' ')}`, '📦');
       } else {
-        alert(`Failed to update order ${orderId}`);
+        showPharmacyToast(`Failed to update order ${orderId}`, '⚠️', true);
       }
     } catch (e) {
-      alert("Lost connection to backend.");
+      showPharmacyToast("Lost connection to backend.", '⚠️', true);
     }
     setUpdatingId(null);
   };
 
   const handleReject = async (orderId) => {
-    if (!confirm(`Reject order ${orderId}?`)) return;
     await handleStatusUpdate(orderId, "rejected");
     setOrders(prev => prev.filter(o => o.id !== orderId));
+    showPharmacyToast(`Order #${orderId} rejected.`, '🚫');
   };
 
   const clearOrders = async () => {
-    if (!confirm("Clear ALL orders from the system? This cannot be undone.")) return;
     try {
       await fetch(`${API}/api/v1/orders/clear`, { method: 'DELETE' });
       setOrders([]);
-      alert("✅ All orders cleared.");
+      showPharmacyToast("All orders cleared from pharmacy queue.", '✅');
     } catch (e) {
-      alert("Failed to reach backend.");
+      showPharmacyToast("Failed to reach backend.", '⚠️', true);
     }
   };
+
 
   // ─── STOCK & FULL CATALOG MANAGEMENT HANDLERS ───
   const handleToggleStock = (medId) => {
@@ -273,7 +281,7 @@ export default function PharmacyDashboard() {
   const handleApplyInventoryChanges = async () => {
     const keys = Object.keys(inventoryEdits);
     if (keys.length === 0) {
-      alert("No stock changes pending. Toggle medicines as available or out of stock to apply.");
+      showPharmacyToast("No stock changes pending. Toggle medicines as available or out of stock to apply.", "⚠️");
       return;
     }
     setIsSavingInventory(true);
@@ -289,17 +297,19 @@ export default function PharmacyDashboard() {
       if (res.ok) {
         const data = await res.json();
         setInventorySaveNotice(`✅ Live Stock Updated! Successfully modified ${data.updated_count || keys.length} medicines in your pharmacy catalog.`);
+        showPharmacyToast(`Updated ${data.updated_count || keys.length} medicines in live catalog`, '✅');
         setInventoryEdits({});
         setTimeout(() => setInventorySaveNotice(null), 5000);
       } else {
-        alert("Failed to apply stock updates to database.");
+        showPharmacyToast("Failed to apply stock updates to database.", "⚠️", true);
       }
     } catch (e) {
-      alert("Error contacting inventory server.");
+      showPharmacyToast("Error contacting inventory server.", "⚠️", true);
     } finally {
       setIsSavingInventory(false);
     }
   };
+
 
   // ─── OCR SCANNER HANDLERS ───
   const handleFileUpload = async (e) => {
@@ -353,7 +363,7 @@ export default function PharmacyDashboard() {
       setManufacturer(parsed.manufacturer);
       setQuantityToAdd('50');
     } catch (err) {
-      alert("OCR scanning error");
+      showPharmacyToast("OCR scanning error", "⚠️", true);
     } finally {
       setIsExtracting(false);
     }
@@ -375,15 +385,15 @@ export default function PharmacyDashboard() {
         })
       });
       if (res.ok) {
-        alert(`✅ Successfully synced ${quantityToAdd} units of "${medicineName}" to inventory!`);
+        showPharmacyToast(`Successfully synced ${quantityToAdd} units of "${medicineName}" to inventory!`, '✅');
         setOcrResult(null);
         setOcrImage(null);
         fetchFullCatalog();
       } else {
-        alert("Failed to sync inventory.");
+        showPharmacyToast("Failed to sync inventory.", "⚠️", true);
       }
     } catch (e) {
-      alert("Error syncing to inventory backend.");
+      showPharmacyToast("Error syncing to inventory backend.", "⚠️", true);
     }
   };
 
@@ -412,7 +422,7 @@ export default function PharmacyDashboard() {
 
   const handleProcessBatchGemini = async () => {
     if (batchFiles.length === 0) {
-      alert("Please select at least one medicine strip photo to scan.");
+      showPharmacyToast("Please select at least one medicine strip photo to scan.", "📷");
       return;
     }
     
@@ -434,14 +444,15 @@ export default function PharmacyDashboard() {
         setExtractedBatch(data.items || []);
         setBatchNotice(`✨ Google Gemini Vision successfully extracted ${data.total_extracted} medicine strip(s)! Review details below and click Add to Inventory.`);
       } else {
-        alert("Batch strip OCR failed. Please verify connection to backend.");
+        showPharmacyToast("Batch strip OCR failed. Please verify connection to backend.", "⚠️", true);
       }
     } catch (err) {
-      alert(`Error during Gemini OCR processing: ${err.message}`);
+      showPharmacyToast(`Error during Gemini OCR processing: ${err.message}`, "⚠️", true);
     } finally {
       setIsExtractingBatch(false);
     }
   };
+
 
   const handleUpdateBatchItem = (id, field, value) => {
     setExtractedBatch(prev => prev.map(item => item.id === id ? { ...item, [field]: value } : item));
@@ -480,10 +491,10 @@ export default function PharmacyDashboard() {
         setBatchPreviews([]);
         fetchFullCatalog();
       } else {
-        alert("Failed to commit batch medicines to database.");
+        showPharmacyToast("Failed to commit batch medicines to database.", "⚠️", true);
       }
     } catch (err) {
-      alert(`Failed to commit batch: ${err.message}`);
+      showPharmacyToast(`Failed to commit batch: ${err.message}`, "⚠️", true);
     } finally {
       setIsCommittingBatch(false);
     }
@@ -525,10 +536,10 @@ export default function PharmacyDashboard() {
           setQuizSuccessNotice(null);
         }, 3000);
       } else {
-        alert("Failed to sync compound inventory.");
+        showPharmacyToast("Failed to sync compound inventory.", "⚠️", true);
       }
     } catch (e) {
-      alert("Error saving compound inventory to backend.");
+      showPharmacyToast("Error saving compound inventory to backend.", "⚠️", true);
     } finally {
       setIsSavingQuiz(false);
     }
@@ -550,7 +561,7 @@ export default function PharmacyDashboard() {
       });
       if (res.ok) {
         if (action === 'in_stock') {
-          alert(`✅ Stock Added! You marked this medicine in stock (+${qty} units).`);
+          showPharmacyToast(`✅ Stock Added! You marked this medicine in stock (+${qty} units).`, "💊");
         }
         setCurrentUrgentAlert(null);
         setAcceptingReq(null);
@@ -558,7 +569,7 @@ export default function PharmacyDashboard() {
         fetchFullCatalog();
       }
     } catch (e) {
-      alert("Failed to respond to medicine request.");
+      showPharmacyToast("Failed to respond to medicine request.", "⚠️", true);
     }
   };
 
@@ -583,7 +594,8 @@ export default function PharmacyDashboard() {
 
   const savePermanentUpiSettings = async () => {
     if (!customUpiId || !customUpiId.includes('@')) {
-      return alert("Please enter a valid UPI VPA (e.g. yourstore@okaxis, 9876543210@paytm).");
+      showPharmacyToast("Please enter a valid UPI VPA (e.g. yourstore@okaxis, 9876543210@paytm).", "⚠️", true);
+      return;
     }
     setIsSavingUpiSettings(true);
     setUpiSettingsNotice(null);
@@ -602,12 +614,13 @@ export default function PharmacyDashboard() {
       const data = await res.json();
       if (res.ok) {
         setUpiSettingsNotice("✅ Store UPI VPA & QR settings synchronized with all customer checkouts!");
+        showPharmacyToast("Store UPI VPA & QR synchronized!", "✅");
         fetchLiveTerminalStatus();
       } else {
-        alert(data.detail || "Failed to save UPI settings.");
+        showPharmacyToast(data.detail || "Failed to save UPI settings.", "⚠️", true);
       }
     } catch (e) {
-      alert("Error updating UPI settings: " + e.message);
+      showPharmacyToast("Error updating UPI settings: " + e.message, "⚠️", true);
     } finally {
       setIsSavingUpiSettings(false);
     }
@@ -690,8 +703,9 @@ export default function PharmacyDashboard() {
       const dataUrl = canvas.toDataURL('image/jpeg', 0.88);
       setCapturedMachinePhoto(dataUrl);
       setScannerNotice("📸 Machine screen captured! Click 'Broadcast Snapshot to Customer Checkout' below to send it live.");
+      showPharmacyToast("Machine screen captured successfully!", "📸");
     } catch (err) {
-      alert("Snapshot capture failed: " + err.message);
+      showPharmacyToast("Snapshot capture failed: " + err.message, "⚠️", true);
     }
   };
 
@@ -708,7 +722,8 @@ export default function PharmacyDashboard() {
 
   const broadcastLiveQr = async () => {
     if (!capturedMachinePhoto) {
-      return alert("Please take a snapshot of your UPI machine screen or upload a photo first.");
+      showPharmacyToast("Please take a snapshot of your UPI machine screen or upload a photo first.", "⚠️", true);
+      return;
     }
     setIsBroadcasting(true);
     setScannerNotice(null);
@@ -725,13 +740,14 @@ export default function PharmacyDashboard() {
       });
       if (res.ok) {
         setScannerNotice("🟢 Live Machine Photo is now ACTIVE! Customers in checkout will see this display before confirming orders.");
+        showPharmacyToast("Live Machine Photo broadcasted to customer checkouts!", "🟢");
         fetchLiveTerminalStatus();
         stopCamera();
       } else {
-        alert("Failed to broadcast terminal QR.");
+        showPharmacyToast("Failed to broadcast terminal QR.", "⚠️", true);
       }
     } catch (e) {
-      alert("Broadcast error: " + e.message);
+      showPharmacyToast("Broadcast error: " + e.message, "⚠️", true);
     } finally {
       setIsBroadcasting(false);
     }
@@ -752,8 +768,9 @@ export default function PharmacyDashboard() {
       setCapturedMachinePhoto(null);
       fetchLiveTerminalStatus();
       setScannerNotice("Reverted: Customer checkout will now display your official static KYC Shop QR code.");
+      showPharmacyToast("Reverted to official KYC Shop QR code.", "🔄");
     } catch (e) {
-      alert("Failed to reset QR.");
+      showPharmacyToast("Failed to reset QR.", "⚠️", true);
     }
   };
 
@@ -787,7 +804,31 @@ export default function PharmacyDashboard() {
   return (
     <div style={{ maxWidth: '1280px', margin: '0 auto', padding: '1.5rem', fontFamily: 'Outfit, sans-serif' }}>
       
+      {/* Floating Pharmacy Toast Notification */}
+      {pharmacyToast && (
+        <div style={{
+          position: 'fixed',
+          top: '25px',
+          right: '25px',
+          zIndex: 9999,
+          background: pharmacyToast.isError ? '#ef4444' : '#0d9488',
+          color: '#ffffff',
+          padding: '12px 22px',
+          borderRadius: '12px',
+          boxShadow: '0 8px 30px rgba(0,0,0,0.4)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '10px',
+          fontWeight: '700',
+          fontSize: '0.9rem'
+        }}>
+          <span>{pharmacyToast.icon}</span>
+          <span>{pharmacyToast.msg}</span>
+        </div>
+      )}
+
       {/* ─── TOP PORTAL HEADER ─── */}
+
       <header style={{
         display: 'flex',
         justifyContent: 'space-between',

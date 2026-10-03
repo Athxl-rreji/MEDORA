@@ -208,8 +208,8 @@ export default function SwiggyAddressDrawer({
       left: 0,
       width: '100%',
       height: '100%',
-      background: 'rgba(15, 23, 42, 0.45)',
-      backdropFilter: 'blur(8px)',
+      background: 'rgba(5, 7, 10, 0.75)',
+      backdropFilter: 'blur(10px)',
       zIndex: 2500,
       display: 'flex',
       justifyContent: 'flex-start',
@@ -221,30 +221,30 @@ export default function SwiggyAddressDrawer({
         style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }} 
       />
 
-      {/* Drawer Container - Light Theme */}
+      {/* Drawer Container - Dark Obsidian Neumorphism */}
       <div style={{
         position: 'relative',
         width: '100%',
         maxWidth: '460px',
         height: '100%',
-        background: '#ffffff',
-        borderRight: '1px solid #e2e8f0',
+        background: '#151a24',
+        borderRight: '1.5px solid rgba(56, 189, 248, 0.25)',
         display: 'flex',
         flexDirection: 'column',
-        boxShadow: '12px 0 45px rgba(0, 0, 0, 0.12)',
+        boxShadow: '12px 0 45px rgba(0, 0, 0, 0.8)',
         zIndex: 2510,
         overflowY: 'auto',
-        color: '#0f172a'
+        color: '#f1f5f9'
       }}>
         
         {/* Drawer Header */}
         <div style={{
           padding: '1.25rem 1.5rem',
-          borderBottom: '1px solid #e2e8f0',
+          borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          background: '#ffffff',
+          background: '#181e2b',
           position: 'sticky',
           top: 0,
           zIndex: 10
@@ -255,10 +255,10 @@ export default function SwiggyAddressDrawer({
                 type="button"
                 onClick={() => setViewMode('list')}
                 style={{
-                  background: '#f1f5f9',
-                  border: '1px solid #cbd5e1',
+                  background: '#1c2331',
+                  border: '1px solid rgba(255, 255, 255, 0.12)',
                   borderRadius: '8px',
-                  color: '#0d9488',
+                  color: '#2dd4bf',
                   fontSize: '1rem',
                   cursor: 'pointer',
                   padding: '4px 8px'
@@ -268,10 +268,10 @@ export default function SwiggyAddressDrawer({
               </button>
             )}
             <div>
-              <h2 style={{ fontSize: '1.15rem', fontWeight: '800', color: '#0f172a', margin: 0 }}>
+              <h2 style={{ fontSize: '1.15rem', fontWeight: '800', color: '#f1f5f9', margin: 0 }}>
                 {viewMode === 'list' ? 'Delivery Location' : 'Save Delivery Address'}
               </h2>
-              <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
+              <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
                 {viewMode === 'list' ? 'Instant 10-15 min delivery address' : 'Swiggy Instamart Standard Address'}
               </span>
             </div>
@@ -279,12 +279,12 @@ export default function SwiggyAddressDrawer({
           <button
             onClick={onClose}
             style={{
-              background: '#f1f5f9',
-              border: 'none',
+              background: '#1c2331',
+              border: '1px solid rgba(255, 255, 255, 0.12)',
               borderRadius: '50%',
               width: '32px',
               height: '32px',
-              color: '#475569',
+              color: '#94a3b8',
               fontSize: '1rem',
               cursor: 'pointer',
               display: 'flex',
@@ -313,10 +313,10 @@ export default function SwiggyAddressDrawer({
                   style={{
                     width: '100%',
                     padding: '0.75rem 0.75rem 0.75rem 2.6rem',
-                    background: '#f8fafc',
-                    border: '1.5px solid #cbd5e1',
+                    background: '#121620',
+                    border: '1.5px solid rgba(255, 255, 255, 0.12)',
                     borderRadius: '12px',
-                    color: '#0f172a',
+                    color: '#f1f5f9',
                     fontSize: '0.9rem',
                     outline: 'none',
                     boxSizing: 'border-box'
@@ -335,9 +335,9 @@ export default function SwiggyAddressDrawer({
                       setViewMode('add');
                     }}
                     style={{
-                      background: '#f1f5f9',
-                      border: '1px solid #e2e8f0',
-                      color: '#475569',
+                      background: '#181e2b',
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      color: '#cbd5e1',
                       borderRadius: '16px',
                       padding: '4px 10px',
                       fontSize: '0.75rem',
@@ -354,39 +354,40 @@ export default function SwiggyAddressDrawer({
               <div
                 onClick={handleUseCurrentLocation}
                 style={{
-                  background: '#f0fdfa',
-                  border: '1.5px dashed #0d9488',
+                  background: '#181e2b',
+                  border: '1.5px dashed #2dd4bf',
                   borderRadius: '14px',
                   padding: '1rem',
                   display: 'flex',
                   alignItems: 'center',
                   gap: '0.9rem',
                   cursor: 'pointer',
-                  transition: 'all 0.2s ease'
+                  transition: 'all 0.2s ease',
+                  boxShadow: 'var(--neo-shadow-raised-sm)'
                 }}
               >
                 <div style={{
                   width: '40px',
                   height: '40px',
                   borderRadius: '50%',
-                  background: 'linear-gradient(135deg, #ccfbf1 0%, #b8f7e4 100%)',
+                  background: 'rgba(45, 212, 191, 0.15)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   fontSize: '1.3rem',
-                  color: '#0d9488'
+                  color: '#2dd4bf'
                 }}>
                   🎯
                 </div>
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontWeight: '800', color: '#0d9488', fontSize: '0.95rem' }}>
+                  <div style={{ fontWeight: '800', color: '#2dd4bf', fontSize: '0.95rem' }}>
                     {isLocating ? 'Detecting high-accuracy GPS...' : 'Use Current Device Location'}
                   </div>
-                  <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '2px' }}>
+                  <div style={{ fontSize: '0.75rem', color: '#94a3b8', marginTop: '2px' }}>
                     Real-time reverse geocoding • Instant 10-15 Min dispatch
                   </div>
                 </div>
-                <span style={{ color: '#0d9488', fontSize: '1rem', fontWeight: 'bold' }}>➔</span>
+                <span style={{ color: '#2dd4bf', fontSize: '1rem', fontWeight: 'bold' }}>➔</span>
               </div>
 
               {/* Add New Address Button */}
@@ -396,10 +397,10 @@ export default function SwiggyAddressDrawer({
                 style={{
                   width: '100%',
                   padding: '0.85rem',
-                  background: '#ffffff',
-                  border: '1.5px solid #cbd5e1',
+                  background: '#181e2b',
+                  border: '1.5px solid rgba(56, 189, 248, 0.3)',
                   borderRadius: '12px',
-                  color: '#0f172a',
+                  color: '#f1f5f9',
                   fontWeight: '800',
                   fontSize: '0.9rem',
                   display: 'flex',
@@ -407,10 +408,10 @@ export default function SwiggyAddressDrawer({
                   justifyContent: 'center',
                   gap: '0.5rem',
                   cursor: 'pointer',
-                  boxShadow: 'var(--shadow-sm)'
+                  boxShadow: 'var(--neo-shadow-raised-sm)'
                 }}
               >
-                <span style={{ color: '#0d9488', fontSize: '1.2rem' }}>+</span> Add New Address
+                <span style={{ color: '#2dd4bf', fontSize: '1.2rem' }}>+</span> Add New Address
               </button>
 
               {/* Saved Addresses Section */}
@@ -419,7 +420,7 @@ export default function SwiggyAddressDrawer({
                   fontSize: '0.75rem',
                   fontWeight: '800',
                   letterSpacing: '1px',
-                  color: '#64748b',
+                  color: '#94a3b8',
                   marginBottom: '0.8rem',
                   textTransform: 'uppercase'
                 }}>
@@ -437,28 +438,28 @@ export default function SwiggyAddressDrawer({
                           onClose();
                         }}
                         style={{
-                          background: isSelected ? '#f0fdfa' : '#ffffff',
-                          border: isSelected ? '2px solid #0d9488' : '1px solid #e2e8f0',
+                          background: isSelected ? '#1c2436' : '#181e2b',
+                          border: isSelected ? '2px solid #2dd4bf' : '1px solid rgba(255, 255, 255, 0.08)',
                           borderRadius: '16px',
                           padding: '1.1rem',
                           cursor: 'pointer',
                           position: 'relative',
-                          boxShadow: isSelected ? '0 4px 16px rgba(13, 148, 136, 0.12)' : 'var(--shadow-sm)',
+                          boxShadow: isSelected ? '0 4px 16px rgba(45, 212, 191, 0.2)' : 'var(--neo-shadow-raised-sm)',
                           transition: 'all 0.2s ease'
                         }}
                       >
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                             <span style={{ fontSize: '1.2rem' }}>{addr.icon || '📍'}</span>
-                            <span style={{ fontWeight: '800', fontSize: '0.95rem', color: '#0f172a' }}>
+                            <span style={{ fontWeight: '800', fontSize: '0.95rem', color: '#f1f5f9' }}>
                               {addr.tag}
                             </span>
                             {isSelected && (
                               <span style={{
-                                background: '#0d9488',
-                                color: '#ffffff',
+                                background: '#2dd4bf',
+                                color: '#0d1117',
                                 fontSize: '0.65rem',
-                                fontWeight: '800',
+                                fontWeight: '900',
                                 padding: '2px 8px',
                                 borderRadius: '12px'
                               }}>
@@ -482,11 +483,11 @@ export default function SwiggyAddressDrawer({
                           </button>
                         </div>
 
-                        <div style={{ marginTop: '0.5rem', fontSize: '0.85rem', color: '#334155', lineHeight: '1.4' }}>
-                          <div style={{ fontWeight: '700' }}>{addr.houseNo}</div>
+                        <div style={{ marginTop: '0.5rem', fontSize: '0.85rem', color: '#cbd5e1', lineHeight: '1.4' }}>
+                          <div style={{ fontWeight: '700', color: '#f1f5f9' }}>{addr.houseNo}</div>
                           <div>{addr.area}, {addr.city} {addr.pincode}</div>
                           {addr.landmark && (
-                            <div style={{ color: '#64748b', fontSize: '0.75rem', marginTop: '2px' }}>
+                            <div style={{ color: '#94a3b8', fontSize: '0.75rem', marginTop: '2px' }}>
                               Landmark: {addr.landmark}
                             </div>
                           )}
@@ -495,15 +496,15 @@ export default function SwiggyAddressDrawer({
                         <div style={{
                           marginTop: '0.75rem',
                           paddingTop: '0.6rem',
-                          borderTop: '1px solid #f1f5f9',
+                          borderTop: '1px solid rgba(255, 255, 255, 0.08)',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'space-between',
                           fontSize: '0.75rem',
-                          color: '#64748b'
+                          color: '#94a3b8'
                         }}>
                           <span>👤 {addr.receiverName} • {addr.receiverPhone}</span>
-                          <span style={{ color: '#0d9488', fontWeight: '800' }}>
+                          <span style={{ color: '#2dd4bf', fontWeight: '800' }}>
                             {isSelected ? '✓ Selected' : 'Deliver Here ➔'}
                           </span>
                         </div>
@@ -521,8 +522,8 @@ export default function SwiggyAddressDrawer({
               {/* Simulated Pin Map Box with Live GPS Detection */}
               <div style={{
                 borderRadius: '16px',
-                background: 'linear-gradient(135deg, #f0fdfa 0%, #e2e8f0 100%)',
-                border: '1.5px solid #99f6e4',
+                background: '#121620',
+                border: '1.5px solid rgba(56, 189, 248, 0.25)',
                 position: 'relative',
                 overflow: 'hidden',
                 padding: '1.25rem',
@@ -530,7 +531,8 @@ export default function SwiggyAddressDrawer({
                 alignItems: 'center',
                 justifyContent: 'center',
                 flexDirection: 'column',
-                gap: '8px'
+                gap: '8px',
+                boxShadow: 'var(--neo-shadow-inset)'
               }}>
                 <div style={{
                   fontSize: '2rem',
@@ -541,16 +543,16 @@ export default function SwiggyAddressDrawer({
                 </div>
                 
                 <div style={{
-                  background: '#ffffff',
-                  border: '1px solid #0d9488',
+                  background: '#181e2b',
+                  border: '1px solid #2dd4bf',
                   padding: '4px 14px',
                   borderRadius: '20px',
                   fontSize: '0.75rem',
-                  color: '#0d9488',
+                  color: '#2dd4bf',
                   fontWeight: '800',
                   zIndex: 2,
                   textAlign: 'center',
-                  boxShadow: '0 2px 8px rgba(0,0,0,0.06)'
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.4)'
                 }}>
                   📍 Pin: {detectedCoords.lat.toFixed(4)}° N, {detectedCoords.lng.toFixed(4)}° E {detectedCoords.accuracy ? `(±${detectedCoords.accuracy}m)` : ''}
                 </div>
@@ -560,7 +562,7 @@ export default function SwiggyAddressDrawer({
                   onClick={handleDetectGpsForForm}
                   disabled={isLocating}
                   style={{
-                    background: 'linear-gradient(135deg, #0d9488 0%, #10b981 100%)',
+                    background: 'linear-gradient(135deg, #14b8a6 0%, #0d9488 100%)',
                     border: 'none',
                     color: '#ffffff',
                     borderRadius: '20px',
@@ -572,7 +574,7 @@ export default function SwiggyAddressDrawer({
                     display: 'flex',
                     alignItems: 'center',
                     gap: '6px',
-                    boxShadow: '0 4px 12px rgba(13, 148, 136, 0.25)'
+                    boxShadow: '0 4px 12px rgba(13, 148, 136, 0.35)'
                   }}
                 >
                   <span>{isLocating ? '⏳' : '🎯'}</span>
@@ -580,7 +582,7 @@ export default function SwiggyAddressDrawer({
                 </button>
 
                 {gpsStatus && (
-                  <span style={{ fontSize: '0.7rem', color: '#0d9488', fontWeight: '700', zIndex: 2, textAlign: 'center' }}>
+                  <span style={{ fontSize: '0.7rem', color: '#34d399', fontWeight: '700', zIndex: 2, textAlign: 'center' }}>
                     {gpsStatus}
                   </span>
                 )}
@@ -588,7 +590,7 @@ export default function SwiggyAddressDrawer({
 
               {/* Save Address As Chips */}
               <div>
-                <label style={{ display: 'block', fontSize: '0.75rem', color: '#475569', marginBottom: '6px', fontWeight: '800' }}>
+                <label style={{ display: 'block', fontSize: '0.75rem', color: '#94a3b8', marginBottom: '6px', fontWeight: '800' }}>
                   SAVE ADDRESS AS:
                 </label>
                 <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
@@ -605,13 +607,13 @@ export default function SwiggyAddressDrawer({
                         key={item.key}
                         onClick={() => setTag(item.key)}
                         style={{
-                          background: active ? '#0d9488' : '#f8fafc',
-                          color: active ? '#ffffff' : '#334155',
-                          border: active ? '1.5px solid #0d9488' : '1px solid #cbd5e1',
+                          background: active ? '#2dd4bf' : '#181e2b',
+                          color: active ? '#0d1117' : '#cbd5e1',
+                          border: active ? '1.5px solid #2dd4bf' : '1px solid rgba(255, 255, 255, 0.12)',
                           borderRadius: '10px',
                           padding: '6px 12px',
                           fontSize: '0.82rem',
-                          fontWeight: '700',
+                          fontWeight: '800',
                           cursor: 'pointer',
                           display: 'flex',
                           alignItems: 'center',
@@ -627,7 +629,7 @@ export default function SwiggyAddressDrawer({
 
               {/* House / Flat / Floor */}
               <div>
-                <label style={{ display: 'block', fontSize: '0.75rem', color: '#475569', marginBottom: '4px', fontWeight: '800' }}>
+                <label style={{ display: 'block', fontSize: '0.75rem', color: '#94a3b8', marginBottom: '4px', fontWeight: '800' }}>
                   HOUSE / FLAT / FLOOR NO. *
                 </label>
                 <input
@@ -639,10 +641,10 @@ export default function SwiggyAddressDrawer({
                   style={{
                     width: '100%',
                     padding: '0.75rem',
-                    background: '#ffffff',
-                    border: '1.5px solid #cbd5e1',
+                    background: '#121620',
+                    border: '1.5px solid rgba(255, 255, 255, 0.12)',
                     borderRadius: '10px',
-                    color: '#0f172a',
+                    color: '#f1f5f9',
                     fontSize: '0.9rem',
                     outline: 'none',
                     boxSizing: 'border-box'
@@ -652,7 +654,7 @@ export default function SwiggyAddressDrawer({
 
               {/* Apartment / Road / Area */}
               <div>
-                <label style={{ display: 'block', fontSize: '0.75rem', color: '#475569', marginBottom: '4px', fontWeight: '800' }}>
+                <label style={{ display: 'block', fontSize: '0.75rem', color: '#94a3b8', marginBottom: '4px', fontWeight: '800' }}>
                   APARTMENT / ROAD / AREA *
                 </label>
                 <input
@@ -664,10 +666,10 @@ export default function SwiggyAddressDrawer({
                   style={{
                     width: '100%',
                     padding: '0.75rem',
-                    background: '#ffffff',
-                    border: '1.5px solid #cbd5e1',
+                    background: '#121620',
+                    border: '1.5px solid rgba(255, 255, 255, 0.12)',
                     borderRadius: '10px',
-                    color: '#0f172a',
+                    color: '#f1f5f9',
                     fontSize: '0.9rem',
                     outline: 'none',
                     boxSizing: 'border-box'
@@ -678,7 +680,7 @@ export default function SwiggyAddressDrawer({
               {/* City and Pincode */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.75rem', color: '#475569', marginBottom: '4px', fontWeight: '800' }}>
+                  <label style={{ display: 'block', fontSize: '0.75rem', color: '#94a3b8', marginBottom: '4px', fontWeight: '800' }}>
                     CITY *
                   </label>
                   <input
@@ -690,10 +692,10 @@ export default function SwiggyAddressDrawer({
                     style={{
                       width: '100%',
                       padding: '0.75rem',
-                      background: '#ffffff',
-                      border: '1.5px solid #cbd5e1',
+                      background: '#121620',
+                      border: '1.5px solid rgba(255, 255, 255, 0.12)',
                       borderRadius: '10px',
-                      color: '#0f172a',
+                      color: '#f1f5f9',
                       fontSize: '0.9rem',
                       outline: 'none',
                       boxSizing: 'border-box'
@@ -701,7 +703,7 @@ export default function SwiggyAddressDrawer({
                   />
                 </div>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.75rem', color: '#475569', marginBottom: '4px', fontWeight: '800' }}>
+                  <label style={{ display: 'block', fontSize: '0.75rem', color: '#94a3b8', marginBottom: '4px', fontWeight: '800' }}>
                     PINCODE *
                   </label>
                   <input
@@ -713,10 +715,10 @@ export default function SwiggyAddressDrawer({
                     style={{
                       width: '100%',
                       padding: '0.75rem',
-                      background: '#ffffff',
-                      border: '1.5px solid #cbd5e1',
+                      background: '#121620',
+                      border: '1.5px solid rgba(255, 255, 255, 0.12)',
                       borderRadius: '10px',
-                      color: '#0f172a',
+                      color: '#f1f5f9',
                       fontSize: '0.9rem',
                       outline: 'none',
                       boxSizing: 'border-box'
@@ -727,7 +729,7 @@ export default function SwiggyAddressDrawer({
 
               {/* Landmark */}
               <div>
-                <label style={{ display: 'block', fontSize: '0.75rem', color: '#475569', marginBottom: '4px', fontWeight: '800' }}>
+                <label style={{ display: 'block', fontSize: '0.75rem', color: '#94a3b8', marginBottom: '4px', fontWeight: '800' }}>
                   LANDMARK (OPTIONAL)
                 </label>
                 <input
@@ -738,10 +740,10 @@ export default function SwiggyAddressDrawer({
                   style={{
                     width: '100%',
                     padding: '0.75rem',
-                    background: '#ffffff',
-                    border: '1.5px solid #cbd5e1',
+                    background: '#121620',
+                    border: '1.5px solid rgba(255, 255, 255, 0.12)',
                     borderRadius: '10px',
-                    color: '#0f172a',
+                    color: '#f1f5f9',
                     fontSize: '0.9rem',
                     outline: 'none',
                     boxSizing: 'border-box'
@@ -752,7 +754,7 @@ export default function SwiggyAddressDrawer({
               {/* Receiver Info */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.75rem', color: '#475569', marginBottom: '4px', fontWeight: '800' }}>
+                  <label style={{ display: 'block', fontSize: '0.75rem', color: '#94a3b8', marginBottom: '4px', fontWeight: '800' }}>
                     RECEIVER NAME
                   </label>
                   <input
@@ -764,10 +766,10 @@ export default function SwiggyAddressDrawer({
                     style={{
                       width: '100%',
                       padding: '0.75rem',
-                      background: '#ffffff',
-                      border: '1.5px solid #cbd5e1',
+                      background: '#121620',
+                      border: '1.5px solid rgba(255, 255, 255, 0.12)',
                       borderRadius: '10px',
-                      color: '#0f172a',
+                      color: '#f1f5f9',
                       fontSize: '0.9rem',
                       outline: 'none',
                       boxSizing: 'border-box'
@@ -775,7 +777,7 @@ export default function SwiggyAddressDrawer({
                   />
                 </div>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.75rem', color: '#475569', marginBottom: '4px', fontWeight: '800' }}>
+                  <label style={{ display: 'block', fontSize: '0.75rem', color: '#94a3b8', marginBottom: '4px', fontWeight: '800' }}>
                     PHONE NUMBER
                   </label>
                   <input
@@ -787,10 +789,10 @@ export default function SwiggyAddressDrawer({
                     style={{
                       width: '100%',
                       padding: '0.75rem',
-                      background: '#ffffff',
-                      border: '1.5px solid #cbd5e1',
+                      background: '#121620',
+                      border: '1.5px solid rgba(255, 255, 255, 0.12)',
                       borderRadius: '10px',
-                      color: '#0f172a',
+                      color: '#f1f5f9',
                       fontSize: '0.9rem',
                       outline: 'none',
                       boxSizing: 'border-box'
@@ -805,7 +807,7 @@ export default function SwiggyAddressDrawer({
                 style={{
                   marginTop: '0.5rem',
                   padding: '0.95rem',
-                  background: 'linear-gradient(135deg, #0d9488 0%, #10b981 100%)',
+                  background: 'linear-gradient(135deg, #14b8a6 0%, #0d9488 100%)',
                   color: '#ffffff',
                   border: 'none',
                   borderRadius: '12px',

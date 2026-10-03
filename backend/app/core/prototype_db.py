@@ -117,6 +117,7 @@ class PrototypeDataStore:
 
         # Initialize SQLite database engine & seed from existing records if needed
         self.init_sqlite_db()
+        self.pull_state_from_supabase()
         self.load_deleted_users()
         self.load_users()
         self.load_data()
@@ -474,7 +475,135 @@ class PrototypeDataStore:
                                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                             """, dr)
                     conn.commit()
+
+            # Clean up any incorrect tombstones that hid approved or rejected partners
+            cur.execute("DELETE FROM deleted_partner_requests WHERE action IN ('approved', 'rejected')")
+            conn.commit()
+
         logger.info(f"SQLite SQL database ready and indexed at {SQLITE_DB_PATH}")
+
+    def push_state_to_supabase(self):
+        """Persists all SQLite users and partner requests into Supabase JSONB cloud store for permanent survival across restarts."""
+        try:
+            from app.core.db import get_supabase_client
+            supabase = get_supabase_client()
+            if not supabase:
+                return
+
+            with self.get_db() as conn:
+                cur = conn.cursor()
+                cur.execute("SELECT * FROM users")
+                users_list = [dict(r) for r in cur.fetchall()]
+                cur.execute("SELECT * FROM partner_requests")
+                requests_list = [dict(r) for r in cur.fetchall()]
+
+            payload = {
+                "users": users_list,
+                "partner_requests": requests_list,
+                "updated_at": datetime.now().isoformat()
+            }
+
+            res = supabase.table("prescriptions").select("id").eq("ai_validation_status", "system_sync_store").limit(1).execute()
+            if res.data and len(res.data) > 0:
+                rec_id = res.data[0]["id"]
+                supabase.table("prescriptions").update({"extracted_data": payload}).eq("id", rec_id).execute()
+            else:
+                supabase.table("prescriptions").insert({
+                    "image_url": "https://medora.app/sync/state",
+                    "ai_validation_status": "system_sync_store",
+                    "extracted_data": payload
+                }).execute()
+            logger.info(f"Successfully synced {len(users_list)} users and {len(requests_list)} partner requests to Supabase Cloud.")
+        except Exception as e:
+            logger.warning(f"Supabase cloud state push failed: {e}")
+
+    def sync_to_cloud(self):
+        """Dispatches push_state_to_supabase asynchronously in a background daemon thread."""
+        try:
+            import threading
+            threading.Thread(target=self.push_state_to_supabase, daemon=True).start()
+        except Exception as e:
+            logger.warning(f"Failed to spawn cloud sync thread: {e}")
+
+    def pull_state_from_supabase(self):
+        """Restores users and partner requests from Supabase cloud store into SQLite on server reboot."""
+        try:
+            from app.core.db import get_supabase_client
+            supabase = get_supabase_client()
+            if not supabase:
+                return
+
+            res = supabase.table("prescriptions").select("extracted_data").eq("ai_validation_status", "system_sync_store").order("created_at", desc=True).limit(1).execute()
+            if not res.data or len(res.data) == 0:
+                return
+
+            payload = res.data[0].get("extracted_data")
+            if not payload or not isinstance(payload, dict):
+                return
+
+            cloud_users = payload.get("users", [])
+            cloud_requests = payload.get("partner_requests", [])
+
+            with self.get_db() as conn:
+                cur = conn.cursor()
+                for u in cloud_users:
+                    em = (u.get("email") or "").strip().lower()
+                    if not em:
+                        continue
+                    cur.execute("SELECT identifier FROM deleted_users WHERE LOWER(identifier) = ?", (em,))
+                    if cur.fetchone():
+                        continue
+                    cur.execute("""
+                        INSERT OR REPLACE INTO users (
+                            id, full_name, role, email, phone, username, password, status,
+                            must_change_password, address, pharmacy_license, vehicle_type,
+                            driving_license, allergies, chronic_conditions, rider_upi_id,
+                            rider_upi_qr, shop_upi_id, shop_upi_qr, created_at, updated_at
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """, (
+                        u.get("id"), u.get("full_name") or "User", u.get("role", "patient"),
+                        em, u.get("phone", ""), u.get("username", em.split("@")[0]),
+                        u.get("password", ""), u.get("status", "active"),
+                        int(u.get("must_change_password") or 0),
+                        u.get("address", ""), u.get("pharmacy_license", ""),
+                        u.get("vehicle_type", ""), u.get("driving_license", ""),
+                        u.get("allergies", ""), u.get("chronic_conditions", ""),
+                        u.get("rider_upi_id", ""), u.get("rider_upi_qr", ""),
+                        u.get("shop_upi_id", ""), u.get("shop_upi_qr", ""),
+                        u.get("created_at") or datetime.now().isoformat(),
+                        u.get("updated_at")
+                    ))
+
+                for r in cloud_requests:
+                    req_id = r.get("id")
+                    if not req_id:
+                        continue
+                    cur.execute("""
+                        INSERT OR REPLACE INTO partner_requests (
+                            id, partner_type, full_name, email, phone, status, submitted_at,
+                            store_name, license_no, store_address, latitude, longitude,
+                            vehicle_type, driving_license, vehicle_number, delivery_zone,
+                            shift_preference, rider_upi_id, rider_upi_qr, shop_upi_id, shop_upi_qr,
+                            approved_at, rejected_at, rejection_reason, temp_password
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """, (
+                        req_id, r.get("partner_type", "pharmacy"), r.get("full_name", ""),
+                        r.get("email", ""), r.get("phone", ""), r.get("status", "pending"),
+                        r.get("submitted_at") or datetime.now().isoformat(),
+                        r.get("store_name", ""), r.get("license_no", ""),
+                        r.get("store_address", ""), float(r.get("latitude") or 19.0760),
+                        float(r.get("longitude") or 72.8777), r.get("vehicle_type", ""),
+                        r.get("driving_license", ""), r.get("vehicle_number", ""),
+                        r.get("delivery_zone", ""), r.get("shift_preference", ""),
+                        r.get("rider_upi_id", ""), r.get("rider_upi_qr", ""),
+                        r.get("shop_upi_id", ""), r.get("shop_upi_qr", ""),
+                        r.get("approved_at"), r.get("rejected_at"),
+                        r.get("rejection_reason"), r.get("temp_password")
+                    ))
+                conn.commit()
+            logger.info(f"Successfully restored {len(cloud_users)} users and {len(cloud_requests)} partner requests from Supabase Cloud on server boot.")
+        except Exception as e:
+            logger.warning(f"Supabase cloud state pull failed: {e}")
 
     def calculate_distance(self, lat1: float, lon1: float, lat2: float, lon2: float) -> float:
         """Haversine formula to compute geodesic distance in kilometers between two coordinates."""
@@ -1085,6 +1214,7 @@ class PrototypeDataStore:
 
         # Update in-memory state and CSV mirror
         self.load_users()
+        self.sync_to_cloud()
         new_user = self.find_user(user_id)
         logger.info(f"Registered user in SQLite: {clean_email} (Role: {role}, must_change_password: {must_change_password})")
         return new_user
@@ -1174,6 +1304,7 @@ class PrototypeDataStore:
             """, (new_password, now_iso, user["id"]))
             conn.commit()
         self.load_users()
+        self.sync_to_cloud()
         logger.info(f"Updated password in SQLite for user {user['email']}")
         return True
 
@@ -1216,6 +1347,7 @@ class PrototypeDataStore:
             conn.commit()
 
         self.load_users()
+        self.sync_to_cloud()
         updated = self.find_user(user["id"])
         logger.info(f"Updated profile details in SQLite for user {user['email']}")
         return updated
@@ -1244,6 +1376,7 @@ class PrototypeDataStore:
             conn.commit()
 
         self.load_users()
+        self.sync_to_cloud()
         updated_user = self.find_user(user["id"])
         logger.info(f"First-time password set for {updated_user['email']}! Temporary flag cleared.")
         return updated_user
@@ -1279,7 +1412,7 @@ class PrototypeDataStore:
                 cur = conn.cursor()
                 cur.execute("""
                     SELECT * FROM partner_requests
-                    WHERE id NOT IN (SELECT id FROM deleted_partner_requests)
+                    WHERE id NOT IN (SELECT id FROM deleted_partner_requests WHERE action IN ('removed', 'deleted'))
                     ORDER BY submitted_at DESC
                 """)
                 for r in cur.fetchall():
@@ -1294,7 +1427,7 @@ class PrototypeDataStore:
         """Mirrors active partner requests to partner_requests.json for backup/visibility."""
         clean_requests = [
             r for r in self.partner_requests
-            if r.get("id") and r.get("id") not in self.deleted_partner_requests
+            if r.get("id") and self.deleted_partner_requests.get(r.get("id"), {}).get("action") not in ['removed', 'deleted']
         ]
         for d in self.get_all_dataset_dirs():
             path = os.path.join(d, 'partner_requests.json')
@@ -1351,6 +1484,7 @@ class PrototypeDataStore:
             conn.commit()
 
         self.load_partner_requests()
+        self.sync_to_cloud()
         logger.info(f"Created partner request in SQLite: {req_id} for {full_name} ({partner_type})")
         return new_req
 
@@ -1359,7 +1493,7 @@ class PrototypeDataStore:
             cur = conn.cursor()
             query = """
                 SELECT * FROM partner_requests
-                WHERE id NOT IN (SELECT id FROM deleted_partner_requests)
+                WHERE id NOT IN (SELECT id FROM deleted_partner_requests WHERE action IN ('removed', 'deleted'))
             """
             params = []
             if status and status != 'all':
@@ -1386,6 +1520,7 @@ class PrototypeDataStore:
 
         self.load_deleted_partner_requests()
         self.load_partner_requests()
+        self.sync_to_cloud()
         logger.info(f"Recorded tombstone in SQLite for partner request {req_id} and removed from onboarding.")
         return True
 
@@ -1526,14 +1661,12 @@ class PrototypeDataStore:
                 SET status = 'approved', approved_at = ?, temp_password = ?
                 WHERE id = ?
             """, (now_iso, temp_pass, req_id))
-            cur.execute("""
-                INSERT OR REPLACE INTO deleted_partner_requests (id, action, timestamp, email)
-                VALUES (?, 'approved', ?, ?)
-            """, (req_id, now_iso, raw_email))
+            cur.execute("DELETE FROM deleted_partner_requests WHERE id = ?", (req_id,))
             conn.commit()
 
         self.load_deleted_partner_requests()
         self.load_partner_requests()
+        self.sync_to_cloud()
         req["status"] = "approved"
         req["approved_at"] = now_iso
         req["temp_password"] = temp_pass
@@ -1575,14 +1708,12 @@ class PrototypeDataStore:
                 SET status = 'rejected', rejected_at = ?, rejection_reason = ?
                 WHERE id = ?
             """, (now_iso, reason, req_id))
-            cur.execute("""
-                INSERT OR REPLACE INTO deleted_partner_requests (id, action, reason, timestamp, email)
-                VALUES (?, 'rejected', ?, ?, ?)
-            """, (req_id, reason, now_iso, req.get("email", "")))
+            cur.execute("DELETE FROM deleted_partner_requests WHERE id = ?", (req_id,))
             conn.commit()
 
         self.load_deleted_partner_requests()
         self.load_partner_requests()
+        self.sync_to_cloud()
         req["status"] = "rejected"
         req["rejected_at"] = now_iso
         req["rejection_reason"] = reason
@@ -1766,6 +1897,7 @@ class PrototypeDataStore:
             conn.commit()
 
         self.load_users()
+        self.sync_to_cloud()
         updated = self.find_user(user["id"])
         logger.info(f"Updated status of user {updated['email']} to {clean_status} in SQLite.")
         return updated
@@ -1804,6 +1936,7 @@ class PrototypeDataStore:
         self.load_deleted_users()
         self.load_users()
         self.save_deleted_users()
+        self.sync_to_cloud()
         logger.info(f"Permanently deleted user account {target_user['email']} from SQLite with tombstones recorded.")
         return True
 

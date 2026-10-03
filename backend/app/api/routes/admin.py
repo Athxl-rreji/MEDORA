@@ -20,10 +20,18 @@ def list_partner_requests(
     Returns all submitted Pharmacy and Rider partner applications.
     """
     requests = mock_db.get_partner_requests(status=status, partner_type=partner_type)
+    all_requests = mock_db.get_partner_requests(status='all', partner_type=partner_type)
+    counts = {
+        "total": len(all_requests),
+        "pending": sum(1 for r in all_requests if r.get("status") == "pending"),
+        "approved": sum(1 for r in all_requests if r.get("status") == "approved"),
+        "rejected": sum(1 for r in all_requests if r.get("status") == "rejected"),
+    }
     return {
         "status": "success",
         "count": len(requests),
-        "requests": requests
+        "requests": requests,
+        "counts": counts
     }
 
 @router.post("/partner-requests/{req_id}/approve")
