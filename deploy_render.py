@@ -16,8 +16,8 @@ ENV_VARS = [
     {"key": "ENVIRONMENT", "value": "production"},
     {"key": "ALLOWED_ORIGINS", "value": "*"},
     {"key": "SUPABASE_URL", "value": "https://pahrhwcigcrdwvpxyxop.supabase.co"},
-    {"key": "SUPABASE_KEY", "value": "sb_publishable_uoqbLCd0JokQJGizvo6PcA_4xj9rAQt"},
-    {"key": "SUPABASE_SERVICE_ROLE_KEY", "value": "sb_publishable_uoqbLCd0JokQJGizvo6PcA_4xj9rAQt"},
+    {"key": "SUPABASE_KEY", "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBhaHJod2NpZ2NyZHd2cHh5eG9wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcwMjQ3MjQsImV4cCI6MjA5MjYwMDcyNH0.0ygjeHbUOsSMyDlX6ShWEFukrZ0FRtllB2h_WqIADJ0"},
+    {"key": "SUPABASE_SERVICE_ROLE_KEY", "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBhaHJod2NpZ2NyZHd2cHh5eG9wIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NzAyNDcyNCwiZXhwIjoyMDkyNjAwNzI0fQ.1uyMbiK8l1HRgWtEzz-gbZgt_hs93RzmeFt2AglVYas"},
     {"key": "GEMINI_API_KEY", "value": "AQ.Ab8RN6Js_Iap5zHDJQp1PFrwsCfP8gWoEogju4w41SRKg02_TQ"},
     {"key": "RAZORPAY_KEY_ID", "value": "rzp_test_TGSG2Ef0As1aMa"},
     {"key": "RAZORPAY_KEY_SECRET", "value": "X44IAL2HuzatQ8PmZKli9ZpX"},
@@ -75,7 +75,7 @@ def main():
         print(f"        Live URL: {service_url}")
 
         # Update service settings to ensure correct start/build commands and health check
-        print("\n[2/4] Verifying and updating service settings...")
+        print("\n[2/4] Verifying and updating service settings & environment variables...")
         patch_payload = {
             "serviceDetails": {
                 "healthCheckPath": "/health",
@@ -86,6 +86,10 @@ def main():
             }
         }
         render_request(f"/services/{service_id}", method="PATCH", payload=patch_payload)
+
+        # Update environment variables with latest keys
+        e_code, e_resp = render_request(f"/services/{service_id}/env-vars", method="PUT", payload=ENV_VARS)
+        print(f"Environment variables updated on Render: status {e_code}")
 
         # Trigger deploy
         d_code, d_resp = render_request(f"/services/{service_id}/deploys", method="POST", payload={})
