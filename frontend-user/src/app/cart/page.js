@@ -20,63 +20,158 @@ export default function FullPageCart() {
   const [paymentStatusMsg, setPaymentStatusMsg] = useState('');
   const [completedOrderInfo, setCompletedOrderInfo] = useState(null);
 
-  useEffect(() => {
-    // Load local cart if present in localStorage or state
-    try {
-      const savedCart = localStorage.getItem('medora_cart');
-      if (savedCart) {
-        setCart(JSON.parse(savedCart));
-      }
-    } catch (e) {}
-  }, []);
+  // AI Drug Interaction Checker States
+  const [isAiCheckingInteractions, setIsAiCheckingInteractions] = useState(false);
+  const [aiInteractionModalOpen, setAiInteractionModalOpen] = useState(false);
+  const [aiInteractionReport, setAiInteractionReport] = useState(null);
+  const [safetyVerifiedBanner, setSafetyVerifiedBanner] = useState(false);
 
-  const saveCartToStorage = (updated) => {
-    setCart(updated);
-    try {
-      localStorage.setItem('medora_cart', JSON.stringify(updated));
-    } catch (e) {}
+  // Clinical Rule Matrix for Drug Interactions
+  const checkClientSideInteractions = (items) => {
+    if (!items || items.length < 2) return [];
+    const alerts = [];
+    const textOf = (m) => `${m.brand_name || m.name || ''} ${m.generic_name || m.salt || ''} ${m.dosage || ''}`.toLowerCase();
+
+    const paracetamolMeds = items.filter(m => /dolo|crocin|calpol|pacimol|paracetamol|acetaminophen|combiflam|febrex/.test(textOf(m)));
+    const nsaidMeds = items.filter(m => /ibuprofen|combiflam|diclofenac|voveran|aceclofenac|zerodol|naproxen|brufen|ketorolac/.test(textOf(m)));
+    const antibioticMeds = items.filter(m => /ciprofloxacin|cipro|azithromycin|azithral|azee|doxycycline|doxy|levofloxacin|norfloxacin|augmentin|amoxicillin|cefixime/.test(textOf(m)));
+    const antacidCalciumMeds = items.filter(m => /gelusil|digene|shelcal|calcium|antacid|sucralfate|aluminium|magnesium/.test(textOf(m)));
+    const sedativeAntihistamineMeds = items.filter(m => /cetirizine|allegra|fexofenadine|atarax|hydroxyzine|benadryl|pheniramine|avil|montelukast|ascoril/.test(textOf(m)));
+    const bloodThinnerMeds = items.filter(m => /aspirin|ecospirin|clopidogrel|clopilet|warfarin|eliquis|apixaban|heparin/.test(textOf(m)));
+    const steroidMeds = items.filter(m => /prednisolone|dexamethasone|betnesol|deflazacort|medrol|hydrocortisone/.test(textOf(m)));
+
+    if (paracetamolMeds.length >= 2) {
+      alerts.push({
+        medicine_a: paracetamolMeds[0].brand_name || paracetamolMeds[0].name,
+        medicine_b: paracetamolMeds[1].brand_name || paracetamolMeds[1].name,
+        severity: 'CRITICAL',
+        title: '⚠️ Duplicate Paracetamol Overdose Hazard',
+        description: `Both '${paracetamolMeds[0].brand_name}' and '${paracetamolMeds[1].brand_name}' contain Paracetamol. Co-administering multiple Paracetamol formulations risks exceeding safe hepatotoxic ceiling (2000-4000mg/day), carrying severe risk of acute toxic liver injury.`,
+        recommendation: `Remove one of the Paracetamol products (${paracetamolMeds[0].brand_name} or ${paracetamolMeds[1].brand_name}) before checkout.`
+      });
+    }
+
+    if (nsaidMeds.length >= 2) {
+      alerts.push({
+        medicine_a: nsaidMeds[0].brand_name || nsaidMeds[0].name,
+        medicine_b: nsaidMeds[1].brand_name || nsaidMeds[1].name,
+        severity: 'CRITICAL',
+        title: '⚠️ Dual NSAID Gastric Ulceration Hazard',
+        description: `Taking '${nsaidMeds[0].brand_name}' concurrently with '${nsaidMeds[1].brand_name}' combines two potent NSAIDs, multiplying the risk of gastric mucosal erosion, peptic ulcer perforation, and renal impairment.`,
+        recommendation: `Choose either '${nsaidMeds[0].brand_name}' or '${nsaidMeds[1].brand_name}'. Do not consume two NSAID pain relievers together.`
+      });
+    }
+
+    if (bloodThinnerMeds.length > 0 && nsaidMeds.length > 0) {
+      alerts.push({
+        medicine_a: bloodThinnerMeds[0].brand_name || bloodThinnerMeds[0].name,
+        medicine_b: nsaidMeds[0].brand_name || nsaidMeds[0].name,
+        severity: 'CRITICAL',
+        title: '🩸 Severe Internal Hemorrhage & Bleeding Risk',
+        description: `Combining blood thinner '${bloodThinnerMeds[0].brand_name}' with NSAID '${nsaidMeds[0].brand_name}' impairs clotting and mucosal protection, creating a severe risk of gastrointestinal bleeding.`,
+        recommendation: `Consult your doctor before taking '${nsaidMeds[0].brand_name}' with '${bloodThinnerMeds[0].brand_name}'.`
+      });
+    }
+
+    if (antibioticMeds.length > 0 && antacidCalciumMeds.length > 0) {
+      alerts.push({
+        medicine_a: antibioticMeds[0].brand_name || antibioticMeds[0].name,
+        medicine_b: antacidCalciumMeds[0].brand_name || antacidCalciumMeds[0].name,
+        severity: 'MODERATE',
+        title: '⚠️ Antibiotic Inactivation by Antacid / Minerals',
+        description: `Metal cations in '${antacidCalciumMeds[0].brand_name}' chelate and bind with '${antibioticMeds[0].brand_name}', preventing antibiotic absorption and causing treatment failure.`,
+        recommendation: `Maintain a minimum 2 to 3 hour gap between taking '${antibioticMeds[0].brand_name}' and '${antacidCalciumMeds[0].brand_name}'.`
+      });
+    }
+
+    if (steroidMeds.length > 0 && nsaidMeds.length > 0) {
+      alerts.push({
+        medicine_a: steroidMeds[0].brand_name || steroidMeds[0].name,
+        medicine_b: nsaidMeds[0].brand_name || nsaidMeds[0].name,
+        severity: 'CRITICAL',
+        title: '⚠️ Synergistic Peptic Ulceration & Perforation',
+        description: `Corticosteroid '${steroidMeds[0].brand_name}' combined with NSAID '${nsaidMeds[0].brand_name}' produces a 4x to 15x multiplied risk of acute upper gastrointestinal ulceration and hemorrhage.`,
+        recommendation: 'Do not combine steroids with NSAIDs without explicit physician direction.'
+      });
+    }
+
+    if (sedativeAntihistamineMeds.length >= 2) {
+      alerts.push({
+        medicine_a: sedativeAntihistamineMeds[0].brand_name || sedativeAntihistamineMeds[0].name,
+        medicine_b: sedativeAntihistamineMeds[1].brand_name || sedativeAntihistamineMeds[1].name,
+        severity: 'MODERATE',
+        title: '💤 Additive Sedation & CNS Depression',
+        description: `Combining '${sedativeAntihistamineMeds[0].brand_name}' with '${sedativeAntihistamineMeds[1].brand_name}' produces additive antihistaminic CNS suppression, causing marked drowsiness and impaired coordination.`,
+        recommendation: 'Avoid combining multiple anti-allergic preparations together. Do not drive or operate machinery.'
+      });
+    }
+
+    return alerts;
   };
 
-  const removeFromCart = (index) => {
-    const updated = cart.filter((_, i) => i !== index);
-    saveCartToStorage(updated);
-  };
+  const runAiDrugInteractionCheck = async () => {
+    if (cart.length === 0) return alert("Your cart is empty!");
 
-  const clearCart = () => {
-    saveCartToStorage([]);
-  };
+    if (cart.length < 2) {
+      setSafetyVerifiedBanner(true);
+      setTimeout(() => setSafetyVerifiedBanner(false), 4000);
+      setPaymentStep('payment');
+      fetchPharmacyLiveTerminalQr();
+      return;
+    }
 
-  const fetchPharmacyLiveTerminalQr = async () => {
-    setIsRefreshingLiveQr(true);
+    setIsAiCheckingInteractions(true);
+
     try {
-      const totalAmt = cart.reduce((s, i) => s + parseFloat(i.price_mrp || 0), 0);
-      const res = await fetch(`${API}/api/v1/medicines/pharmacy/live-terminal-qr?pharmacy_id=PHARM_001&amount=${totalAmt}`);
+      const payload = {
+        medicines: cart.map(item => ({
+          name: item.brand_name || item.name || '',
+          generic_name: item.generic_name || item.salt || '',
+          dosage: item.dosage || ''
+        }))
+      };
+
+      const res = await fetch(`${API}/api/v1/ai/check-interactions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
       if (res.ok) {
         const data = await res.json();
-        setLiveTerminalData(data);
-        setLastSyncTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+        if (!data.safe && data.alerts && data.alerts.length > 0) {
+          setAiInteractionReport(data);
+          setAiInteractionModalOpen(true);
+          setIsAiCheckingInteractions(false);
+          return;
+        }
       }
-    } catch (e) {
-      console.warn('Could not fetch pharmacy live terminal QR:', e);
-    } finally {
-      setIsRefreshingLiveQr(false);
+    } catch (err) {
+      console.warn("AI interaction API offline, using local clinical safety rules", err);
     }
-  };
 
-  // Real-time synchronization heartbeat with store UPI terminal
-  useEffect(() => {
-    if (paymentStep !== 'payment') return;
-    fetchPharmacyLiveTerminalQr();
-    const interval = setInterval(() => {
-      fetchPharmacyLiveTerminalQr();
-    }, 3500);
-    return () => clearInterval(interval);
-  }, [paymentStep, cart]);
+    const clientAlerts = checkClientSideInteractions(cart);
+    setIsAiCheckingInteractions(false);
 
-  const handleInitiatePayment = () => {
-    if (cart.length === 0) return alert("Your cart is empty!");
+    if (clientAlerts.length > 0) {
+      setAiInteractionReport({
+        safe: false,
+        severity: clientAlerts.some(a => a.severity === 'CRITICAL') ? 'CRITICAL' : 'MODERATE',
+        alerts: clientAlerts,
+        summary: `Detected ${clientAlerts.length} significant drug combination hazard(s) in your cart.`
+      });
+      setAiInteractionModalOpen(true);
+      return;
+    }
+
+    setSafetyVerifiedBanner(true);
+    setTimeout(() => setSafetyVerifiedBanner(false), 4000);
     setPaymentStep('payment');
     fetchPharmacyLiveTerminalQr();
+  };
+
+  const handleInitiatePayment = () => {
+    runAiDrugInteractionCheck();
   };
 
   const handleExecutePayment = async () => {
@@ -521,6 +616,213 @@ export default function FullPageCart() {
               </Link>
             </div>
           )}
+
+        {/* MODAL: AI CLINICAL DRUG-DRUG INTERACTION SAFETY ALERT */}
+        {aiInteractionModalOpen && aiInteractionReport && (
+          <div
+            className="modal-overlay active"
+            onClick={() => setAiInteractionModalOpen(false)}
+            style={{ zIndex: 2500 }}
+          >
+            <div
+              className="modal-content"
+              style={{
+                padding: '2rem',
+                maxWidth: '640px',
+                width: '92%',
+                background: '#ffffff',
+                border: aiInteractionReport.severity === 'CRITICAL' ? '2px solid #ef4444' : '2px solid #f59e0b',
+                borderRadius: '24px',
+                boxShadow: '0 25px 60px rgba(0, 0, 0, 0.3)',
+                color: '#0f172a'
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '14px', marginBottom: '1.25rem' }}>
+                <div style={{
+                  width: '52px',
+                  height: '52px',
+                  borderRadius: '50%',
+                  background: aiInteractionReport.severity === 'CRITICAL' ? '#fee2e2' : '#fef3c7',
+                  color: aiInteractionReport.severity === 'CRITICAL' ? '#dc2626' : '#d97706',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '1.75rem',
+                  flexShrink: 0
+                }}>
+                  ⚠️
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <h3 style={{ margin: 0, color: aiInteractionReport.severity === 'CRITICAL' ? '#b91c1c' : '#b45309', fontSize: '1.3rem', fontWeight: '800' }}>
+                      Dangerous Drug Combination Detected!
+                    </h3>
+                    <span style={{
+                      background: aiInteractionReport.severity === 'CRITICAL' ? '#ef4444' : '#f59e0b',
+                      color: '#ffffff',
+                      fontSize: '0.68rem',
+                      fontWeight: '900',
+                      padding: '2px 8px',
+                      borderRadius: '99px'
+                    }}>
+                      {aiInteractionReport.severity} HAZARD
+                    </span>
+                  </div>
+                  <p style={{ margin: '6px 0 0 0', fontSize: '0.82rem', color: '#475569', lineHeight: '1.4' }}>
+                    MEDORA's AI Clinical Pharmacist reviewed your cart and identified adverse drug interactions that are dangerous if consumed together.
+                  </p>
+                </div>
+              </div>
+
+              <div style={{ maxHeight: '320px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '1.5rem', paddingRight: '4px' }}>
+                {aiInteractionReport.alerts.map((alert, idx) => (
+                  <div
+                    key={idx}
+                    style={{
+                      padding: '1.1rem',
+                      borderRadius: '14px',
+                      background: alert.severity === 'CRITICAL' ? '#fff5f5' : '#fffbeb',
+                      border: alert.severity === 'CRITICAL' ? '1px solid #fecaca' : '1px solid #fde68a'
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                      <strong style={{ fontSize: '0.92rem', color: alert.severity === 'CRITICAL' ? '#991b1b' : '#92400e' }}>
+                        {alert.title}
+                      </strong>
+                      <span style={{ fontSize: '0.72rem', background: '#ffffff', border: '1px solid #cbd5e1', padding: '2px 8px', borderRadius: '4px', fontWeight: '700', color: '#334155' }}>
+                        {alert.medicine_a} ⚡ {alert.medicine_b}
+                      </span>
+                    </div>
+
+                    <p style={{ margin: '0 0 8px 0', fontSize: '0.8rem', color: '#334155', lineHeight: '1.45' }}>
+                      {alert.description}
+                    </p>
+
+                    <div style={{ fontSize: '0.78rem', color: '#0369a1', background: '#f0f9ff', padding: '6px 10px', borderRadius: '8px', border: '1px solid #bae6fd', marginBottom: '10px' }}>
+                      <strong>Clinical Direction:</strong> {alert.recommendation}
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const itemIndex = cart.findIndex(c => (c.brand_name || c.name || '').toLowerCase().includes(alert.medicine_a.toLowerCase()) || alert.medicine_a.toLowerCase().includes((c.brand_name || c.name || '').toLowerCase()));
+                          if (itemIndex >= 0) {
+                            removeFromCart(itemIndex);
+                            setAiInteractionModalOpen(false);
+                          }
+                        }}
+                        style={{
+                          background: '#fee2e2',
+                          border: '1px solid #fca5a5',
+                          color: '#b91c1c',
+                          padding: '5px 12px',
+                          borderRadius: '8px',
+                          fontWeight: '700',
+                          fontSize: '0.74rem',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        🗑️ Remove {alert.medicine_a}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const itemIndex = cart.findIndex(c => (c.brand_name || c.name || '').toLowerCase().includes(alert.medicine_b.toLowerCase()) || alert.medicine_b.toLowerCase().includes((c.brand_name || c.name || '').toLowerCase()));
+                          if (itemIndex >= 0) {
+                            removeFromCart(itemIndex);
+                            setAiInteractionModalOpen(false);
+                          }
+                        }}
+                        style={{
+                          background: '#fee2e2',
+                          border: '1px solid #fca5a5',
+                          color: '#b91c1c',
+                          padding: '5px 12px',
+                          borderRadius: '8px',
+                          fontWeight: '700',
+                          fontSize: '0.74rem',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        🗑️ Remove {alert.medicine_b}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', borderTop: '1px solid #e2e8f0', paddingTop: '1rem' }}>
+                <button
+                  type="button"
+                  onClick={() => setAiInteractionModalOpen(false)}
+                  style={{
+                    background: '#f1f5f9',
+                    border: '1px solid #cbd5e1',
+                    color: '#334155',
+                    padding: '8px 16px',
+                    borderRadius: '10px',
+                    fontWeight: '700',
+                    fontSize: '0.82rem',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Review Cart
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (confirm("Proceeding with potentially hazardous drug combination. Do you confirm you have medical approval?")) {
+                      setAiInteractionModalOpen(false);
+                      setPaymentStep('payment');
+                      fetchPharmacyLiveTerminalQr();
+                    }
+                  }}
+                  style={{
+                    background: '#ef4444',
+                    border: 'none',
+                    color: '#ffffff',
+                    padding: '8px 16px',
+                    borderRadius: '10px',
+                    fontWeight: '800',
+                    fontSize: '0.82rem',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Acknowledge & Proceed
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* FLOATING SAFETY VERIFIED BADGE */}
+        {safetyVerifiedBanner && (
+          <div style={{
+            position: 'fixed',
+            top: '75px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 2600,
+            background: 'linear-gradient(135deg, #15803d 0%, #166534 100%)',
+            color: '#ffffff',
+            padding: '0.8rem 1.8rem',
+            borderRadius: '30px',
+            boxShadow: '0 10px 30px rgba(22, 101, 52, 0.4)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+            fontSize: '0.88rem',
+            fontWeight: '800',
+            border: '1px solid #86efac'
+          }}>
+            <span style={{ fontSize: '1.2rem' }}>🛡️</span>
+            <span>AI Clinical Safety Check Passed: No Drug Interactions Detected!</span>
+          </div>
+        )}
 
         </main>
       </div>

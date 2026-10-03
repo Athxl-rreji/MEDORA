@@ -715,3 +715,120 @@ h1, h2, h3, h4, h5, h6 {
     transform: scale(1.15) translateY(-2px);
   }
 }
+
+/* ==========================================================================
+   METALLIC SILVER GLASSMORPHIC DESIGN SYSTEM & AMAZON THEMED UI
+   ========================================================================== */
+
+.metallic-silver-panel {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.92) 0%, rgba(248, 250, 252, 0.85) 45%, rgba(226, 232, 240, 0.75) 100%);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(203, 213, 225, 0.85);
+  border-radius: 20px;
+  box-shadow: 0 8px 30px -4px rgba(148, 163, 184, 0.2), inset 0 1px 1px 0 rgba(255, 255, 255, 0.95);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+.metallic-silver-panel::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -150%;
+  width: 80%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+  transition: 0.65s cubic-bezier(0.16, 1, 0.3, 1);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.metallic-silver-panel:hover::before {
+  left: 170%;
+}
+
+.metallic-silver-panel:hover {
+  transform: translateY(-4px);
+  border-color: rgba(148, 163, 184, 1);
+  box-shadow: 0 16px 36px -6px rgba(100, 116, 139, 0.28), inset 0 1px 2px rgba(255, 255, 255, 1);
+}
+
+.metallic-card {
+  background: linear-gradient(145deg, #ffffff 0%, #f8fafc 55%, #f1f5f9 100%);
+  border: 1px solid #cbd5e1;
+  border-radius: 16px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  transition: all 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
+  position: relative;
+}
+
+.metallic-card:hover {
+  transform: translateY(-3px);
+  border-color: #94a3b8;
+  box-shadow: 0 12px 28px -4px rgba(100, 116, 139, 0.2), inset 0 1px 1px rgba(255, 255, 255, 1);
+}
+
+.amazon-gold-badge {
+  background: linear-gradient(135deg, #e47911 0%, #c45500 100%);
+  color: #ffffff !important;
+  font-weight: 800;
+  font-size: 0.7rem;
+  padding: 3px 8px;
+  border-radius: 4px;
+  letter-spacing: 0.03em;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  box-shadow: 0 2px 4px rgba(196, 85, 0, 0.3);
+}
+
+.amazon-choice-badge {
+  background: linear-gradient(135deg, #232f3e 0%, #131921 100%);
+  color: #ffffff !important;
+  font-weight: 800;
+  font-size: 0.7rem;
+  padding: 3px 8px;
+  border-radius: 4px;
+  letter-spacing: 0.03em;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  box-shadow: 0 2px 4px rgba(19, 25, 33, 0.4);
+}
+
+.amazon-account-tile {
+  background: linear-gradient(145deg, #ffffff 0%, #f8fafc 100%);
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 1.25rem 1.4rem;
+  display: flex;
+  align-items: flex-start;
+  gap: 1.1rem;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
+}
+
+.amazon-account-tile:hover {
+  transform: translateY(-2px);
+  border-color: #94a3b8;
+  box-shadow: 0 8px 22px rgba(148, 163, 184, 0.2);
+  background: #ffffff;
+}
+
+.amazon-account-tile-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
+  border: 1px solid #cbd5e1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  flex-shrink: 0;
+  box-shadow: inset 0 1px 1px #fff;
+}
+

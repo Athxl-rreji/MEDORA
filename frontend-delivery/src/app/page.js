@@ -13,6 +13,72 @@ export default function DeliveryDashboard() {
   const [updatingId, setUpdatingId] = useState(null);
   const [backendStatus, setBackendStatus] = useState('checking');
 
+  // Doorstep Payment QR Controller: 'main' vs 'live'
+  const [qrMode, setQrMode] = useState('main');
+  const [mainQrImage, setMainQrImage] = useState('');
+  const [liveQrImage, setLiveQrImage] = useState('');
+  const [qrStatusMsg, setQrStatusMsg] = useState('');
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('medora_rider_main_qr');
+      if (saved) setMainQrImage(saved);
+      else {
+        setMainQrImage(`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=upi://pay?pa=rider.${AGENT_ID.toLowerCase()}@okhdfcbank%26pn=MEDORA_RIDER%26cu=INR`);
+      }
+    } catch (e) {}
+  }, []);
+
+  const handleSelectQrMode = async (mode) => {
+    setQrMode(mode);
+    const chosenQr = mode === 'live' && liveQrImage ? liveQrImage : (mainQrImage || `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=upi://pay?pa=rider.${AGENT_ID.toLowerCase()}@okhdfcbank%26pn=MEDORA_RIDER%26cu=INR`);
+    setQrStatusMsg(mode === 'live' ? 'Dynamic Live QR active for customer.' : 'Main Registered Profile QR active for customer.');
+    
+    if (activeJob) {
+      try {
+        localStorage.setItem(`medora_order_qr_${activeJob.id}`, JSON.stringify({ mode, qr: chosenQr }));
+        await fetch(`${API}/api/v1/orders/${activeJob.id}/rider-qr`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            rider_qr_image: chosenQr,
+            rider_qr_type: mode,
+            rider_name: `Rider ${AGENT_ID}`,
+            rider_upi_id: `rider.${AGENT_ID.toLowerCase()}@okhdfcbank`
+          })
+        });
+      } catch (err) {}
+    }
+  };
+
+  const handleUploadLiveQr = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async (uploadEvent) => {
+      const base64Data = uploadEvent.target.result;
+      setLiveQrImage(base64Data);
+      setQrMode('live');
+      setQrStatusMsg('Fresh Live QR uploaded! Broadcast to customer payment terminal.');
+      if (activeJob) {
+        try {
+          localStorage.setItem(`medora_order_qr_${activeJob.id}`, JSON.stringify({ mode: 'live', qr: base64Data }));
+          await fetch(`${API}/api/v1/orders/${activeJob.id}/rider-qr`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              rider_qr_image: base64Data,
+              rider_qr_type: 'live',
+              rider_name: `Rider ${AGENT_ID}`,
+              rider_upi_id: `rider.${AGENT_ID.toLowerCase()}@okhdfcbank`
+            })
+          });
+        } catch (err) {}
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
   // Poll for 'ready' orders — these are orders the pharmacy packed and marked ready for pickup
   useEffect(() => {
     if (!isOnline) return;
@@ -223,6 +289,115 @@ export default function DeliveryDashboard() {
                 <span className={`tracker-label ${s.done ? 'done' : ''}`}>{s.label}</span>
               </div>
             ))}
+          </div>
+
+          {/* Customer Doorstep Payment QR Code Controller (Main vs Live QR) */}
+          <div style={{
+            background: 'linear-gradient(135deg, rgba(30, 41, 59, 0.7) 0%, rgba(15, 23, 42, 0.85) 100%)',
+            border: '1.5px solid rgba(56, 189, 248, 0.35)',
+            borderRadius: '16px',
+            padding: '1.25rem',
+            margin: '1.25rem 0',
+            textAlign: 'center'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px', flexWrap: 'wrap', gap: '8px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: '1.3rem' }}>📲</span>
+                <strong style={{ fontSize: '0.95rem', color: '#ffffff' }}>Customer Doorstep UPI Payment QR</strong>
+              </div>
+              <span style={{
+                background: qrMode === 'live' ? '#f59e0b' : '#0284c7',
+                color: '#ffffff',
+                fontSize: '0.68rem',
+                fontWeight: '800',
+                padding: '3px 10px',
+                borderRadius: '99px',
+                textTransform: 'uppercase'
+              }}>
+                Active: {qrMode === 'live' ? 'Live Dynamic QR' : 'Main Registered QR'}
+              </span>
+            </div>
+
+            <p style={{ fontSize: '0.78rem', color: '#94a3b8', margin: '0 0 12px 0', textAlign: 'left', lineHeight: '1.4' }}>
+              Choose which payment QR is shared with the customer upon arrival. Use your pre-registered profile QR or capture a fresh live QR on the spot.
+            </p>
+
+            {/* Toggle Buttons: Main QR vs Live QR */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '12px' }}>
+              <button
+                type="button"
+                onClick={() => handleSelectQrMode('main')}
+                style={{
+                  padding: '10px 12px',
+                  borderRadius: '10px',
+                  border: qrMode === 'main' ? '2px solid #38bdf8' : '1px solid rgba(255, 255, 255, 0.1)',
+                  background: qrMode === 'main' ? 'rgba(56, 189, 248, 0.15)' : 'rgba(0, 0, 0, 0.25)',
+                  color: qrMode === 'main' ? '#38bdf8' : '#cbd5e1',
+                  fontWeight: '700',
+                  fontSize: '0.82rem',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px',
+                  transition: 'all 0.15s ease'
+                }}
+              >
+                <span>⭐</span>
+                <span>Use Main QR</span>
+              </button>
+
+              <label style={{
+                padding: '10px 12px',
+                borderRadius: '10px',
+                border: qrMode === 'live' ? '2px solid #f59e0b' : '1px solid rgba(255, 255, 255, 0.1)',
+                background: qrMode === 'live' ? 'rgba(245, 158, 11, 0.15)' : 'rgba(0, 0, 0, 0.25)',
+                color: qrMode === 'live' ? '#fbbf24' : '#cbd5e1',
+                fontWeight: '700',
+                fontSize: '0.82rem',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '6px',
+                transition: 'all 0.15s ease'
+              }}>
+                <span>📸</span>
+                <span>Upload Live QR</span>
+                <input type="file" accept="image/*" onChange={handleUploadLiveQr} style={{ display: 'none' }} />
+              </label>
+            </div>
+
+            {/* Live QR Display Box */}
+            <div style={{
+              background: '#ffffff',
+              borderRadius: '12px',
+              padding: '12px',
+              display: 'inline-flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              boxShadow: '0 4px 18px rgba(0,0,0,0.25)',
+              margin: '0 auto'
+            }}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={qrMode === 'live' && liveQrImage ? liveQrImage : (mainQrImage || `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=upi://pay?pa=rider.${AGENT_ID.toLowerCase()}@okhdfcbank%26pn=MEDORA_RIDER%26cu=INR`)}
+                alt="Active Rider UPI Payment QR"
+                style={{ width: '140px', height: '140px', objectFit: 'contain', display: 'block' }}
+              />
+              <span style={{ fontSize: '0.72rem', color: '#111827', fontWeight: '800', marginTop: '6px' }}>
+                {qrMode === 'live' ? 'Dynamic Live Order QR' : 'Registered Rider Main QR'}
+              </span>
+              <span style={{ fontSize: '0.65rem', color: '#059669', fontWeight: '700' }}>
+                ✓ Synced with Customer Payment Terminal
+              </span>
+            </div>
+
+            {qrStatusMsg && (
+              <div style={{ fontSize: '0.75rem', color: '#38bdf8', marginTop: '8px', fontWeight: '600' }}>
+                {qrStatusMsg}
+              </div>
+            )}
           </div>
 
           <button className="btn-deliver" onClick={handleDeliver}>✅ Confirm Delivery</button>

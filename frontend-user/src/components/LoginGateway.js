@@ -49,6 +49,8 @@ export default function LoginGateway({ onLoginSuccess }) {
   const [partnerVehicleNumber, setPartnerVehicleNumber] = useState('');
   const [partnerShiftPreference, setPartnerShiftPreference] = useState('Full Time (Express 10-Min)');
   const [partnerRiderUpi, setPartnerRiderUpi] = useState('');
+  const [partnerRiderUpiQr, setPartnerRiderUpiQr] = useState('');
+  const [partnerRiderUpiQrPreview, setPartnerRiderUpiQrPreview] = useState('');
   const [partnerBagConfirmed, setPartnerBagConfirmed] = useState(true);
 
   // Partner Login States
@@ -506,6 +508,7 @@ export default function LoginGateway({ onLoginSuccess }) {
           delivery_zone: partnerType === 'delivery' ? partnerDeliveryZone.trim() : null,
           shift_preference: partnerType === 'delivery' ? partnerShiftPreference : null,
           rider_upi_id: partnerType === 'delivery' ? (partnerRiderUpi.trim() || null) : null,
+          rider_upi_qr: partnerType === 'delivery' ? (partnerRiderUpiQr || null) : null,
           shop_upi_id: partnerType === 'pharmacy' ? (partnerShopUpiId.trim() || `${partnerStoreName.toLowerCase().replace(/\s+/g, '')}@upi`) : null,
           shop_upi_qr: partnerType === 'pharmacy' ? (partnerShopUpiQr || `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=upi://pay?pa=${encodeURIComponent(partnerShopUpiId.trim() || 'vamanjoor.pharmacy@upi')}%26pn=${encodeURIComponent(partnerStoreName)}%26cu=INR`) : null
         })
@@ -536,6 +539,19 @@ export default function LoginGateway({ onLoginSuccess }) {
       const base64Data = uploadEvent.target.result;
       setPartnerShopUpiQr(base64Data);
       setPartnerShopUpiQrPreview(base64Data);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleRiderUpiQrUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (uploadEvent) => {
+      const base64Data = uploadEvent.target.result;
+      setPartnerRiderUpiQr(base64Data);
+      setPartnerRiderUpiQrPreview(base64Data);
+      try { localStorage.setItem('medora_rider_main_qr', base64Data); } catch (err) {}
     };
     reader.readAsDataURL(file);
   };
@@ -1842,6 +1858,81 @@ export default function LoginGateway({ onLoginSuccess }) {
                         style={{ padding: '0.75rem 0.85rem', fontSize: '0.9rem' }}
                       />
                     </div>
+                  </div>
+
+                  {/* Rider Main Doorstep Payment QR Code Upload */}
+                  <div style={{
+                    background: 'linear-gradient(135deg, rgba(30, 41, 59, 0.7) 0%, rgba(15, 23, 42, 0.9) 100%)',
+                    border: '1.5px dashed rgba(56, 189, 248, 0.4)',
+                    borderRadius: '14px',
+                    padding: '1.1rem',
+                    textAlign: 'center'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginBottom: '6px' }}>
+                      <span style={{ fontSize: '1.3rem' }}>📲</span>
+                      <strong style={{ fontSize: '0.92rem', color: '#38bdf8' }}>
+                        Upload Main Rider UPI QR (For Customer Doorstep Payments)
+                      </strong>
+                    </div>
+                    <p style={{ fontSize: '0.75rem', color: '#94a3b8', margin: '0 0 10px 0', lineHeight: '1.4' }}>
+                      Upload your default GPay, PhonePe, or Paytm QR code. This will be your saved <strong>Main QR</strong> when collecting customer payments at delivery.
+                    </p>
+
+                    {partnerRiderUpiQrPreview ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+                        <div style={{
+                          padding: '8px',
+                          background: '#ffffff',
+                          borderRadius: '12px',
+                          boxShadow: '0 4px 16px rgba(0,0,0,0.3)',
+                          display: 'inline-block'
+                        }}>
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img 
+                            src={partnerRiderUpiQrPreview} 
+                            alt="Main Rider QR Code" 
+                            style={{ width: '130px', height: '130px', objectFit: 'contain', display: 'block' }} 
+                          />
+                        </div>
+                        <span style={{
+                          fontSize: '0.72rem',
+                          color: '#10b981',
+                          fontWeight: '800',
+                          background: 'rgba(16, 185, 129, 0.15)',
+                          padding: '3px 10px',
+                          borderRadius: '99px'
+                        }}>
+                          ✓ Main Payment QR Saved
+                        </span>
+                        <label style={{
+                          fontSize: '0.75rem',
+                          color: '#38bdf8',
+                          cursor: 'pointer',
+                          textDecoration: 'underline'
+                        }}>
+                          Change QR Image
+                          <input type="file" accept="image/*" onChange={handleRiderUpiQrUpload} style={{ display: 'none' }} />
+                        </label>
+                      </div>
+                    ) : (
+                      <label style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
+                        color: '#ffffff',
+                        padding: '8px 18px',
+                        borderRadius: '10px',
+                        fontSize: '0.82rem',
+                        fontWeight: '700',
+                        cursor: 'pointer',
+                        boxShadow: '0 2px 10px rgba(2, 132, 199, 0.35)'
+                      }}>
+                        <span>📸</span>
+                        <span>Upload QR Code (JPG / PNG)</span>
+                        <input type="file" accept="image/*" onChange={handleRiderUpiQrUpload} style={{ display: 'none' }} />
+                      </label>
+                    )}
                   </div>
 
                   {/* Rider Readiness Checklist */}

@@ -287,10 +287,44 @@ export default function Home() {
   const [lastSyncTime, setLastSyncTime] = useState(null);
   const [copiedVpa, setCopiedVpa] = useState(false);
 
-  // Dedicated Main View Toggle ('home' | 'radar')
+  // Dedicated Main View Toggle ('home' | 'radar' | 'account')
   const [activeMainView, setActiveMainView] = useState('home');
+  const [activeAccountSection, setActiveAccountSection] = useState('hub');
+  
   // Interactive Medicine Details Modal
   const [selectedMedicineDetail, setSelectedMedicineDetail] = useState(null);
+
+  // Shop Selection Popup on "+ Add to Cart"
+  const [selectedMedicineForShopPicker, setSelectedMedicineForShopPicker] = useState(null);
+
+  // AI Drug-Drug Interaction Safety Checker State
+  const [isAiCheckingInteractions, setIsAiCheckingInteractions] = useState(false);
+  const [aiInteractionModalOpen, setAiInteractionModalOpen] = useState(false);
+  const [aiInteractionReport, setAiInteractionReport] = useState(null);
+  const [safetyVerifiedBanner, setSafetyVerifiedBanner] = useState(false);
+
+  // Amazon-Style Search Filters & Sorting State
+  const [amazonSortBy, setAmazonSortBy] = useState('featured'); // 'featured' | 'price_asc' | 'price_desc' | 'rating' | 'fastest'
+  const [filterPrimeOnly, setFilterPrimeOnly] = useState(false);
+  const [filterMinRating, setFilterMinRating] = useState(0);
+  const [filterPriceBracket, setFilterPriceBracket] = useState('all');
+  const [filterDiscountOnly, setFilterDiscountOnly] = useState(false);
+
+  // Amazon Account Management Hub Profile States
+  const [accountEditName, setAccountEditName] = useState(activeUser?.name || 'Adhwaith');
+  const [accountEditPhone, setAccountEditPhone] = useState('+91 99999 99999');
+  const [accountEditEmail, setAccountEditEmail] = useState(activeUser?.email || 'patient@medora.com');
+  const [accountNewPassword, setAccountNewPassword] = useState('');
+  const [familyProfiles, setFamilyProfiles] = useState([
+    { id: 'fam_1', name: 'Adhwaith (Self)', age: 24, relation: 'Self', blood: 'O+', allergies: 'Sulfa Drugs', conditions: 'None' },
+    { id: 'fam_2', name: 'R. K. Shenoy (Father)', age: 58, relation: 'Father', blood: 'B+', allergies: 'Penicillin', conditions: 'Type 2 Diabetes, Hypertension' },
+    { id: 'fam_3', name: 'Geetha Shenoy (Mother)', age: 52, relation: 'Mother', blood: 'A+', allergies: 'None', conditions: 'Thyroid (Hypothyroid)' }
+  ]);
+  const [savedUpiIds, setSavedUpiIds] = useState([
+    { id: 'upi_1', vpa: 'adhwaith@okaxis', bank: 'Axis Bank', isDefault: true },
+    { id: 'upi_2', vpa: 'adhwaith@icici', bank: 'ICICI Bank', isDefault: false }
+  ]);
+
   // Elegant Toast Notification System
   const [toastNotification, setToastNotification] = useState(null);
 
@@ -299,6 +333,244 @@ export default function Home() {
     setTimeout(() => {
       setToastNotification(prev => (prev?.message === message ? null : prev));
     }, 3200);
+  };
+
+  // ─── AI CLINICAL DRUG-DRUG INTERACTION RULES ENGINE ───
+  const checkClientSideInteractions = (items) => {
+    if (!items || items.length < 2) return [];
+    const alerts = [];
+    const textOf = (m) => `${m.brand_name || m.name || ''} ${m.generic_name || m.salt || ''} ${m.dosage || ''}`.toLowerCase();
+
+    const paracetamolMeds = items.filter(m => /dolo|crocin|calpol|pacimol|paracetamol|acetaminophen|combiflam|febrex/.test(textOf(m)));
+    const nsaidMeds = items.filter(m => /ibuprofen|combiflam|diclofenac|voveran|aceclofenac|zerodol|naproxen|brufen|ketorolac/.test(textOf(m)));
+    const antibioticMeds = items.filter(m => /ciprofloxacin|cipro|azithromycin|azithral|azee|doxycycline|doxy|levofloxacin|norfloxacin|augmentin|amoxicillin|cefixime/.test(textOf(m)));
+    const antacidCalciumMeds = items.filter(m => /gelusil|digene|shelcal|calcium|antacid|sucralfate|aluminium|magnesium/.test(textOf(m)));
+    const sedativeAntihistamineMeds = items.filter(m => /cetirizine|allegra|fexofenadine|atarax|hydroxyzine|benadryl|pheniramine|avil|montelukast|ascoril/.test(textOf(m)));
+    const bloodThinnerMeds = items.filter(m => /aspirin|ecospirin|clopidogrel|clopilet|warfarin|eliquis|apixaban|heparin/.test(textOf(m)));
+    const steroidMeds = items.filter(m => /prednisolone|dexamethasone|betnesol|deflazacort|medrol|hydrocortisone/.test(textOf(m)));
+    const aceArbMeds = items.filter(m => /telmisartan|telma|losartan|enalapril|ramipril/.test(textOf(m)));
+    const potassiumMeds = items.filter(m => /potassium|k-bind|potcl/.test(textOf(m)));
+
+    if (paracetamolMeds.length >= 2) {
+      alerts.push({
+        medicine_a: paracetamolMeds[0].brand_name || paracetamolMeds[0].name,
+        medicine_b: paracetamolMeds[1].brand_name || paracetamolMeds[1].name,
+        severity: 'CRITICAL',
+        title: '⚠️ Duplicate Paracetamol Overdose Hazard',
+        description: `Both '${paracetamolMeds[0].brand_name}' and '${paracetamolMeds[1].brand_name}' contain Paracetamol (Acetaminophen). Co-administering multiple Paracetamol formulations risks exceeding the safe hepatotoxic ceiling (2000-4000mg/day), carrying severe risk of acute toxic liver injury.`,
+        recommendation: `Remove one of the Paracetamol products (${paracetamolMeds[0].brand_name} or ${paracetamolMeds[1].brand_name}) before completing checkout.`
+      });
+    }
+
+    if (nsaidMeds.length >= 2) {
+      alerts.push({
+        medicine_a: nsaidMeds[0].brand_name || nsaidMeds[0].name,
+        medicine_b: nsaidMeds[1].brand_name || nsaidMeds[1].name,
+        severity: 'CRITICAL',
+        title: '⚠️ Dual NSAID Gastric Ulceration Hazard',
+        description: `Taking '${nsaidMeds[0].brand_name}' concurrently with '${nsaidMeds[1].brand_name}' combines two potent non-steroidal anti-inflammatory drugs. This drastically increases the risk of severe gastric mucosal erosion, peptic ulcer perforation, and renal impairment.`,
+        recommendation: `Choose either '${nsaidMeds[0].brand_name}' or '${nsaidMeds[1].brand_name}'. Do not consume two NSAID pain relievers together.`
+      });
+    }
+
+    if (bloodThinnerMeds.length > 0 && nsaidMeds.length > 0) {
+      alerts.push({
+        medicine_a: bloodThinnerMeds[0].brand_name || bloodThinnerMeds[0].name,
+        medicine_b: nsaidMeds[0].brand_name || nsaidMeds[0].name,
+        severity: 'CRITICAL',
+        title: '🩸 Severe Internal Hemorrhage & Bleeding Risk',
+        description: `Combining blood thinner '${bloodThinnerMeds[0].brand_name}' with NSAID '${nsaidMeds[0].brand_name}' impairs normal clotting mechanisms and damages mucosal protection, creating a severe risk of gastrointestinal or systemic bleeding.`,
+        recommendation: `Consult your doctor before taking '${nsaidMeds[0].brand_name}' with '${bloodThinnerMeds[0].brand_name}'.`
+      });
+    }
+
+    if (antibioticMeds.length > 0 && antacidCalciumMeds.length > 0) {
+      alerts.push({
+        medicine_a: antibioticMeds[0].brand_name || antibioticMeds[0].name,
+        medicine_b: antacidCalciumMeds[0].brand_name || antacidCalciumMeds[0].name,
+        severity: 'MODERATE',
+        title: '⚠️ Antibiotic Inactivation by Antacid / Minerals',
+        description: `Metal cations (Calcium, Magnesium, Aluminium) in '${antacidCalciumMeds[0].brand_name}' chelate and bind with '${antibioticMeds[0].brand_name}' in the digestive tract, preventing antibiotic absorption and causing treatment failure.`,
+        recommendation: `Maintain a minimum 2 to 3 hour gap between taking '${antibioticMeds[0].brand_name}' and '${antacidCalciumMeds[0].brand_name}'.`
+      });
+    }
+
+    if (steroidMeds.length > 0 && nsaidMeds.length > 0) {
+      alerts.push({
+        medicine_a: steroidMeds[0].brand_name || steroidMeds[0].name,
+        medicine_b: nsaidMeds[0].brand_name || nsaidMeds[0].name,
+        severity: 'CRITICAL',
+        title: '⚠️ Synergistic Peptic Ulceration & Perforation',
+        description: `Corticosteroid '${steroidMeds[0].brand_name}' combined with NSAID '${nsaidMeds[0].brand_name}' produces a 4x to 15x multiplied risk of acute upper gastrointestinal ulceration and hemorrhage.`,
+        recommendation: 'Do not combine steroids with NSAIDs without explicit physician supervision and proton-pump inhibitor (e.g. Pantocid 40) co-prescription.'
+      });
+    }
+
+    if (sedativeAntihistamineMeds.length >= 2) {
+      alerts.push({
+        medicine_a: sedativeAntihistamineMeds[0].brand_name || sedativeAntihistamineMeds[0].name,
+        medicine_b: sedativeAntihistamineMeds[1].brand_name || sedativeAntihistamineMeds[1].name,
+        severity: 'MODERATE',
+        title: '💤 Additive Sedation & CNS Depression',
+        description: `Combining '${sedativeAntihistamineMeds[0].brand_name}' with '${sedativeAntihistamineMeds[1].brand_name}' produces additive antihistaminic CNS suppression, causing marked drowsiness, slowed reflexes, and impaired psychomotor coordination.`,
+        recommendation: 'Avoid combining multiple anti-allergic or cough preparations together. Do not drive or operate machinery.'
+      });
+    }
+
+    if (aceArbMeds.length > 0 && potassiumMeds.length > 0) {
+      alerts.push({
+        medicine_a: aceArbMeds[0].brand_name || aceArbMeds[0].name,
+        medicine_b: potassiumMeds[0].brand_name || potassiumMeds[0].name,
+        severity: 'CRITICAL',
+        title: '❤️ Life-Threatening Hyperkalemia Risk',
+        description: `Blood pressure medication '${aceArbMeds[0].brand_name}' reduces renal excretion of potassium. Combining with '${potassiumMeds[0].brand_name}' can cause acute hyperkalemia and lethal cardiac dysrhythmias.`,
+        recommendation: 'Do not take potassium supplements with blood pressure medicines without cardiologist direction.'
+      });
+    }
+
+    return alerts;
+  };
+
+  const runAiDrugInteractionCheck = async () => {
+    if (cart.length === 0) {
+      showToast('Your cart is empty!', '🛒');
+      return;
+    }
+
+    if (cart.length < 2) {
+      setSafetyVerifiedBanner(true);
+      setTimeout(() => setSafetyVerifiedBanner(false), 4000);
+      setPaymentStep('payment');
+      fetchPharmacyLiveTerminalQr();
+      return;
+    }
+
+    setIsAiCheckingInteractions(true);
+    showToast('🤖 AI Clinical Pharmacist: Checking Drug-Drug Interactions & Safety...', '🛡️');
+
+    try {
+      const payload = {
+        medicines: cart.map(item => ({
+          name: item.brand_name || item.name || '',
+          generic_name: item.generic_name || item.salt || '',
+          dosage: item.dosage || ''
+        }))
+      };
+
+      const res = await fetch(`${API}/api/v1/ai/check-interactions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (!data.safe && data.alerts && data.alerts.length > 0) {
+          setAiInteractionReport(data);
+          setAiInteractionModalOpen(true);
+          setIsAiCheckingInteractions(false);
+          return;
+        }
+      }
+    } catch (err) {
+      console.warn("AI interaction API offline, using local clinical safety matrix", err);
+    }
+
+    // Client-side instant clinical check as guaranteed backup
+    const clientAlerts = checkClientSideInteractions(cart);
+    setIsAiCheckingInteractions(false);
+
+    if (clientAlerts.length > 0) {
+      setAiInteractionReport({
+        safe: false,
+        severity: clientAlerts.some(a => a.severity === 'CRITICAL') ? 'CRITICAL' : 'MODERATE',
+        alerts: clientAlerts,
+        summary: `Detected ${clientAlerts.length} significant drug combination hazard(s) in your cart.`
+      });
+      setAiInteractionModalOpen(true);
+      return;
+    }
+
+    // Safe to proceed!
+    setSafetyVerifiedBanner(true);
+    setTimeout(() => setSafetyVerifiedBanner(false), 4000);
+    setPaymentStep('payment');
+    fetchPharmacyLiveTerminalQr();
+  };
+
+  // ─── MULTI-PHARMACY SHOP GENERATOR FOR MEDICINES ───
+  const getShopsForMedicine = (med) => {
+    if (!med) return [];
+    const basePrice = parseFloat(med.price_mrp || med.price || 45);
+    return [
+      {
+        id: "shop_apollo_vamanjoor",
+        name: "Apollo Pharmacy - Vamanjoor",
+        badge: "Express 10m ⚡",
+        distance: "0.8 km away",
+        deliveryTime: "10-12 mins",
+        rating: "4.9",
+        reviews: "680+",
+        stock: 28,
+        price: (basePrice * 0.95).toFixed(2),
+        discount: "5% OFF",
+        address: "Near SJEC College, Airport Road"
+      },
+      {
+        id: "shop_vamanjoor_central",
+        name: "Vamanjoor Central Chemist & Druggist",
+        badge: "Best Seller 🏆",
+        distance: "1.1 km away",
+        deliveryTime: "12-15 mins",
+        rating: "4.8",
+        reviews: "450+",
+        stock: 19,
+        price: basePrice.toFixed(2),
+        discount: "M.R.P.",
+        address: "Main Junction, Vamanjoor"
+      },
+      {
+        id: "shop_medplus_kadri",
+        name: "MedPlus Chemist - Kadri",
+        badge: "Best Value 🏷️",
+        distance: "2.3 km away",
+        deliveryTime: "15-20 mins",
+        rating: "4.7",
+        reviews: "320+",
+        stock: 45,
+        price: (basePrice * 0.92).toFixed(2),
+        discount: "8% OFF",
+        address: "Kadri Hills, Mangalore"
+      },
+      {
+        id: "shop_greencross_lifeline",
+        name: "GreenCross Lifeline 24x7",
+        badge: "24/7 Open 🌙",
+        distance: "3.2 km away",
+        deliveryTime: "20-25 mins",
+        rating: "4.8",
+        reviews: "210+",
+        stock: 12,
+        price: (basePrice * 0.97).toFixed(2),
+        discount: "3% OFF",
+        address: "Mallikatte Circle, Mangalore"
+      }
+    ];
+  };
+
+  const handleAddMedicineFromShop = (med, shop, qtyDelta = 1) => {
+    const itemWithShop = {
+      ...med,
+      medicine_id: med.medicine_id,
+      brand_name: med.brand_name,
+      generic_name: med.generic_name,
+      dosage: med.dosage,
+      price_mrp: shop.price,
+      pharmacy_id: shop.name,
+      pharmacy_badge: shop.badge,
+      delivery_time: shop.deliveryTime
+    };
+    handleUpdateItemQuantity(itemWithShop, qtyDelta);
   };
 
   const getItemCartCount = (medicineId) => {
@@ -1125,8 +1397,7 @@ export default function Home() {
 
   const handleInitiatePayment = () => {
     if (cart.length === 0) return alert("Cart is empty!");
-    setPaymentStep('payment');
-    fetchPharmacyLiveTerminalQr();
+    runAiDrugInteractionCheck();
   };
 
   const handleExecutePayment = async () => {
@@ -1762,34 +2033,62 @@ export default function Home() {
 
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
         {activeUser.role === 'patient' && (
-          <button
-            id="header-checkout-btn"
-            onClick={() => {
-              setIsCartOpen(true);
-              setPaymentStep('cart');
-            }}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              background: cart.length > 0 ? 'linear-gradient(135deg, #0d9488 0%, #059669 100%)' : '#ffffff',
-              color: cart.length > 0 ? '#ffffff' : 'var(--primary)',
-              border: cart.length > 0 ? 'none' : '1px solid var(--primary)',
-              padding: '6px 14px',
-              borderRadius: '20px',
-              cursor: 'pointer',
-              fontWeight: '800',
-              fontSize: '0.78rem',
-              boxShadow: cart.length > 0 ? '0 4px 14px rgba(13, 148, 136, 0.35)' : 'none',
-              transition: 'all 0.2s ease'
-            }}
-            title="Open Shopping Cart & Checkout Drawer"
-          >
-            <span>🛒</span>
-            <span>
-              {cart.length > 0 ? `Checkout (${cart.length}) • ₹${cart.reduce((s, i) => s + parseFloat(i.price_mrp), 0).toFixed(0)}` : 'Cart (0)'}
-            </span>
-          </button>
+          <>
+            <button
+              id="header-account-btn"
+              onClick={() => {
+                setActiveMainView(prev => prev === 'account' ? 'home' : 'account');
+                setActiveAccountSection('hub');
+              }}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                background: activeMainView === 'account' ? 'linear-gradient(135deg, #1e293b 0%, #334155 100%)' : '#ffffff',
+                color: activeMainView === 'account' ? '#ffffff' : 'var(--text-main)',
+                border: '1px solid rgba(203, 213, 225, 0.85)',
+                padding: '6px 14px',
+                borderRadius: '20px',
+                cursor: 'pointer',
+                fontWeight: '700',
+                fontSize: '0.78rem',
+                boxShadow: activeMainView === 'account' ? '0 4px 12px rgba(15, 23, 42, 0.25)' : 'none',
+                transition: 'all 0.2s ease'
+              }}
+              title="Open Amazon Style Account Management"
+            >
+              <span>👤</span>
+              <span>Your Account</span>
+            </button>
+            <button
+              id="header-checkout-btn"
+              onClick={() => {
+                setIsCartOpen(true);
+                setPaymentStep('cart');
+              }}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                background: cart.length > 0 ? 'linear-gradient(135deg, #0d9488 0%, #059669 100%)' : '#ffffff',
+                color: cart.length > 0 ? '#ffffff' : 'var(--primary)',
+                border: cart.length > 0 ? 'none' : '1px solid var(--primary)',
+                padding: '6px 14px',
+                borderRadius: '20px',
+                cursor: 'pointer',
+                fontWeight: '800',
+                fontSize: '0.78rem',
+                boxShadow: cart.length > 0 ? '0 4px 14px rgba(13, 148, 136, 0.35)' : 'none',
+                transition: 'all 0.2s ease'
+              }}
+              title="Open Shopping Cart & Checkout Drawer"
+            >
+              <span>🛒</span>
+              <span>
+                {cart.length > 0 ? `Checkout (${cart.length}) • ₹${cart.reduce((s, i) => s + parseFloat(i.price_mrp), 0).toFixed(0)}` : 'Cart (0)'}
+              </span>
+            </button>
+          </>
         )}
         <button
           onClick={handleLogout}
@@ -1948,6 +2247,24 @@ export default function Home() {
             </span>
           </a>
 
+          <a 
+            href="#" 
+            className="nav-link" 
+            onClick={(e) => { 
+              e.preventDefault(); 
+              setActiveMainView(prev => prev === 'account' ? 'home' : 'account'); 
+              setActiveAccountSection('hub');
+            }} 
+            style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '0.35rem',
+              fontWeight: activeMainView === 'account' ? '800' : '600',
+              color: activeMainView === 'account' ? 'var(--primary)' : 'inherit'
+            }}
+          >
+            👤 Account
+          </a>
           <a href="#" className="nav-link" onClick={(e) => { e.preventDefault(); setIsTrackingOpen(true); }} style={{ display: 'flex', alignItems: 'center' }}>
             Track Orders
             {activeOrders.length > 0 && <span className="badge">{activeOrders.length}</span>}
@@ -3297,6 +3614,649 @@ export default function Home() {
             </div>
           )}
 
+          {/* AMAZON "YOUR ACCOUNT" HUB VIEW */}
+          {activeMainView === 'account' && (
+            <div style={{ marginTop: '2rem', marginBottom: '4rem', width: '100%', textAlign: 'left' }} className="animate-fade-in">
+              {/* Account Top Navigation & Header */}
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                flexWrap: 'wrap',
+                gap: '1rem',
+                marginBottom: '2rem',
+                background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
+                padding: '1.25rem 1.6rem',
+                borderRadius: '20px',
+                border: '1px solid rgba(203, 213, 225, 0.85)',
+                boxShadow: '0 4px 20px rgba(0, 0, 0, 0.04)'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                  <div style={{
+                    width: '54px',
+                    height: '54px',
+                    borderRadius: '50%',
+                    background: 'linear-gradient(135deg, #0d9488 0%, #1e293b 100%)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#ffffff',
+                    fontSize: '1.5rem',
+                    boxShadow: '0 4px 12px rgba(13, 148, 136, 0.3)'
+                  }}>
+                    👤
+                  </div>
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <h2 style={{ margin: 0, fontSize: '1.45rem', color: '#0f172a', fontWeight: '800' }}>
+                        Your Account
+                      </h2>
+                      <span className="amazon-gold-badge">
+                        MEDORA PRIME ⚡
+                      </span>
+                    </div>
+                    <div style={{ fontSize: '0.82rem', color: '#64748b', marginTop: '3px' }}>
+                      {accountEditName} • {accountEditEmail} • Patient ID: #MED-88421
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  {activeAccountSection !== 'hub' && (
+                    <button
+                      onClick={() => setActiveAccountSection('hub')}
+                      style={{
+                        background: '#f1f5f9',
+                        border: '1px solid #cbd5e1',
+                        color: '#334155',
+                        padding: '0.6rem 1.1rem',
+                        borderRadius: '12px',
+                        fontWeight: '700',
+                        fontSize: '0.82rem',
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease'
+                      }}
+                    >
+                      ← All Account Settings
+                    </button>
+                  )}
+                  <button
+                    onClick={() => setActiveMainView('home')}
+                    style={{
+                      background: 'linear-gradient(135deg, #0d9488 0%, #0f766e 100%)',
+                      border: 'none',
+                      color: '#ffffff',
+                      padding: '0.6rem 1.3rem',
+                      borderRadius: '12px',
+                      fontWeight: '800',
+                      fontSize: '0.82rem',
+                      cursor: 'pointer',
+                      boxShadow: '0 4px 14px rgba(13, 148, 136, 0.25)'
+                    }}
+                  >
+                    🏪 Return to Store
+                  </button>
+                </div>
+              </div>
+
+              {/* 1. MAIN AMAZON ACCOUNT TILES GRID */}
+              {activeAccountSection === 'hub' && (
+                <div>
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fill, minmax(290px, 1fr))',
+                    gap: '1.25rem',
+                    marginBottom: '2rem'
+                  }}>
+                    {/* Tile 1: Your Orders */}
+                    <div
+                      className="amazon-account-tile"
+                      onClick={() => setActiveAccountSection('orders')}
+                    >
+                      <div className="amazon-account-tile-icon">📦</div>
+                      <div>
+                        <h4 style={{ margin: '0 0 4px 0', fontSize: '1.05rem', color: '#0f172a', fontWeight: '800' }}>
+                          Your Orders
+                        </h4>
+                        <p style={{ margin: 0, fontSize: '0.82rem', color: '#64748b', lineHeight: '1.4' }}>
+                          Track active deliveries, view receipt history, or buy medicines again.
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Tile 2: Login & Security */}
+                    <div
+                      className="amazon-account-tile"
+                      onClick={() => setActiveAccountSection('security')}
+                    >
+                      <div className="amazon-account-tile-icon">🔒</div>
+                      <div>
+                        <h4 style={{ margin: '0 0 4px 0', fontSize: '1.05rem', color: '#0f172a', fontWeight: '800' }}>
+                          Login & Security
+                        </h4>
+                        <p style={{ margin: 0, fontSize: '0.82rem', color: '#64748b', lineHeight: '1.4' }}>
+                          Edit name, mobile number, email, and update account password.
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Tile 3: Prime / Medora Express */}
+                    <div
+                      className="amazon-account-tile"
+                      onClick={() => setActiveAccountSection('prime')}
+                    >
+                      <div className="amazon-account-tile-icon">⚡</div>
+                      <div>
+                        <h4 style={{ margin: '0 0 4px 0', fontSize: '1.05rem', color: '#0f172a', fontWeight: '800' }}>
+                          Medora Prime Express
+                        </h4>
+                        <p style={{ margin: 0, fontSize: '0.82rem', color: '#64748b', lineHeight: '1.4' }}>
+                          Manage 10-minute medicine delivery perks, ₹0 delivery fee benefits.
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Tile 4: Your Addresses */}
+                    <div
+                      className="amazon-account-tile"
+                      onClick={() => setActiveAccountSection('addresses')}
+                    >
+                      <div className="amazon-account-tile-icon">📍</div>
+                      <div>
+                        <h4 style={{ margin: '0 0 4px 0', fontSize: '1.05rem', color: '#0f172a', fontWeight: '800' }}>
+                          Your Addresses
+                        </h4>
+                        <p style={{ margin: 0, fontSize: '0.82rem', color: '#64748b', lineHeight: '1.4' }}>
+                          Edit delivery addresses, GPS pin locations, and apartment numbers.
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Tile 5: Payment Options & UPI */}
+                    <div
+                      className="amazon-account-tile"
+                      onClick={() => setActiveAccountSection('payments')}
+                    >
+                      <div className="amazon-account-tile-icon">💳</div>
+                      <div>
+                        <h4 style={{ margin: '0 0 4px 0', fontSize: '1.05rem', color: '#0f172a', fontWeight: '800' }}>
+                          Payment Options & UPI
+                        </h4>
+                        <p style={{ margin: 0, fontSize: '0.82rem', color: '#64748b', lineHeight: '1.4' }}>
+                          Manage saved UPI IDs, credit/debit cards, and payment preferences.
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Tile 6: Your Prescriptions & Rx */}
+                    <div
+                      className="amazon-account-tile"
+                      onClick={() => setActiveAccountSection('prescriptions')}
+                    >
+                      <div className="amazon-account-tile-icon">📄</div>
+                      <div>
+                        <h4 style={{ margin: '0 0 4px 0', fontSize: '1.05rem', color: '#0f172a', fontWeight: '800' }}>
+                          Your Prescriptions & Rx
+                        </h4>
+                        <p style={{ margin: 0, fontSize: '0.82rem', color: '#64748b', lineHeight: '1.4' }}>
+                          Access Gemini AI scanned handwritten prescriptions & OPD records.
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Tile 7: Family Health Profiles */}
+                    <div
+                      className="amazon-account-tile"
+                      onClick={() => setActiveAccountSection('family')}
+                    >
+                      <div className="amazon-account-tile-icon">👨‍👩‍👧</div>
+                      <div>
+                        <h4 style={{ margin: '0 0 4px 0', fontSize: '1.05rem', color: '#0f172a', fontWeight: '800' }}>
+                          Family Health Profiles
+                        </h4>
+                        <p style={{ margin: 0, fontSize: '0.82rem', color: '#64748b', lineHeight: '1.4' }}>
+                          Manage medical profiles for parents & family (Allergies, Blood Group).
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Tile 8: Customer Service & AI Doctor */}
+                    <div
+                      className="amazon-account-tile"
+                      onClick={() => setActiveAccountSection('support')}
+                    >
+                      <div className="amazon-account-tile-icon">🩺</div>
+                      <div>
+                        <h4 style={{ margin: '0 0 4px 0', fontSize: '1.05rem', color: '#0f172a', fontWeight: '800' }}>
+                          Customer Service / AI Doctor
+                        </h4>
+                        <p style={{ margin: 0, fontSize: '0.82rem', color: '#64748b', lineHeight: '1.4' }}>
+                          Instant 24/7 Clinical AI Doctor chat, dosage guidance & order help.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* 2. SUBVIEW: YOUR ORDERS */}
+              {activeAccountSection === 'orders' && (
+                <div className="metallic-card" style={{ padding: '2rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '1rem' }}>
+                    <div>
+                      <h3 style={{ margin: 0, color: '#0f172a', fontSize: '1.3rem' }}>Your Orders ({activeOrders.length})</h3>
+                      <p style={{ margin: '4px 0 0 0', fontSize: '0.82rem', color: '#64748b' }}>Track active dispatches or review past pharmacy invoices</p>
+                    </div>
+                    <button
+                      onClick={() => setIsTrackingOpen(true)}
+                      style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '6px 14px', borderRadius: '8px', fontWeight: '700', fontSize: '0.8rem', cursor: 'pointer' }}
+                    >
+                      Live Tracking Modal 🛵
+                    </button>
+                  </div>
+
+                  {activeOrders.length === 0 ? (
+                    <div style={{ textAlign: 'center', padding: '3rem 0', color: '#64748b' }}>
+                      <span style={{ fontSize: '2.5rem', display: 'block', marginBottom: '0.75rem' }}>📦</span>
+                      <p style={{ fontWeight: '700', color: '#1e293b' }}>No recent orders placed</p>
+                      <p style={{ fontSize: '0.85rem' }}>Search for medicines and checkout to initiate your first order!</p>
+                      <button
+                        onClick={() => setActiveMainView('home')}
+                        className="btn-primary"
+                        style={{ marginTop: '1rem', padding: '8px 18px', fontSize: '0.85rem' }}
+                      >
+                        Start Shopping Medicines
+                      </button>
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                      {activeOrders.map(order => (
+                        <div key={order.id} style={{ border: '1px solid #cbd5e1', borderRadius: '14px', padding: '1.25rem', background: '#ffffff' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #f1f5f9', paddingBottom: '0.75rem', marginBottom: '0.85rem' }}>
+                            <div>
+                              <strong style={{ fontSize: '1rem', color: '#0f172a' }}>Order #{order.id}</strong>
+                              <span style={{ fontSize: '0.78rem', color: '#64748b', marginLeft: '12px' }}>
+                                Fulfilling Pharmacy: <strong>{order.pharmacy_id}</strong>
+                              </span>
+                            </div>
+                            <span style={{
+                              padding: '4px 12px',
+                              borderRadius: '99px',
+                              fontSize: '0.75rem',
+                              fontWeight: '800',
+                              background: order.status === 'delivered' ? '#dcfce7' : order.status === 'out_for_delivery' ? '#fef3c7' : '#ccfbf1',
+                              color: order.status === 'delivered' ? '#15803d' : order.status === 'out_for_delivery' ? '#b45309' : '#0f766e'
+                            }}>
+                              {order.status?.replace(/_/g, ' ').toUpperCase()}
+                            </span>
+                          </div>
+                          
+                          <div style={{ fontSize: '0.85rem', color: '#334155', marginBottom: '0.75rem' }}>
+                            <strong>Items:</strong> {Array.isArray(order.items) ? order.items.map(i => `${i.quantity || 1}x ${i.brand_name || i.name}`).join(', ') : order.items}
+                          </div>
+
+                          <TrackingBar status={order.status} />
+
+                          {/* Rider Doorstep QR on active order */}
+                          {(order.rider_qr_image || (typeof window !== 'undefined' && localStorage.getItem(`medora_order_qr_${order.id}`))) && (
+                            <div style={{ marginTop: '1rem', padding: '0.85rem', background: '#f8fafc', border: '1px dashed #0d9488', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                              <img
+                                src={order.rider_qr_image || (typeof window !== 'undefined' && localStorage.getItem(`medora_order_qr_${order.id}`))}
+                                alt="Rider Doorstep QR"
+                                style={{ width: '80px', height: '80px', objectFit: 'contain', background: '#fff', padding: '4px', borderRadius: '8px', border: '1px solid #cbd5e1' }}
+                              />
+                              <div>
+                                <strong style={{ fontSize: '0.85rem', color: '#0f172a', display: 'block' }}>🛵 Contactless Doorstep UPI QR Shared by Rider</strong>
+                                <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Scan upon rider arrival using GPay, PhonePe, Paytm or any UPI App.</span>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* 3. SUBVIEW: LOGIN & SECURITY */}
+              {activeAccountSection === 'security' && (
+                <div className="metallic-card" style={{ padding: '2rem', maxWidth: '640px' }}>
+                  <h3 style={{ margin: '0 0 0.5rem 0', color: '#0f172a', fontSize: '1.3rem' }}>Login & Security</h3>
+                  <p style={{ margin: '0 0 1.5rem 0', fontSize: '0.82rem', color: '#64748b' }}>Update your personal credentials and contact methods.</p>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                    <div>
+                      <label style={{ fontSize: '0.82rem', fontWeight: '700', color: '#334155', display: 'block', marginBottom: '4px' }}>Name</label>
+                      <input
+                        type="text"
+                        value={accountEditName}
+                        onChange={(e) => setAccountEditName(e.target.value)}
+                        style={{ width: '100%', padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.9rem', outline: 'none' }}
+                      />
+                    </div>
+
+                    <div>
+                      <label style={{ fontSize: '0.82rem', fontWeight: '700', color: '#334155', display: 'block', marginBottom: '4px' }}>Mobile Phone Number</label>
+                      <input
+                        type="text"
+                        value={accountEditPhone}
+                        onChange={(e) => setAccountEditPhone(e.target.value)}
+                        style={{ width: '100%', padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.9rem', outline: 'none' }}
+                      />
+                    </div>
+
+                    <div>
+                      <label style={{ fontSize: '0.82rem', fontWeight: '700', color: '#334155', display: 'block', marginBottom: '4px' }}>Email Address</label>
+                      <input
+                        type="email"
+                        value={accountEditEmail}
+                        onChange={(e) => setAccountEditEmail(e.target.value)}
+                        style={{ width: '100%', padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.9rem', outline: 'none' }}
+                      />
+                    </div>
+
+                    <div>
+                      <label style={{ fontSize: '0.82rem', fontWeight: '700', color: '#334155', display: 'block', marginBottom: '4px' }}>New Password</label>
+                      <input
+                        type="password"
+                        placeholder="Leave blank to keep unchanged"
+                        value={accountNewPassword}
+                        onChange={(e) => setAccountNewPassword(e.target.value)}
+                        style={{ width: '100%', padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.9rem', outline: 'none' }}
+                      />
+                    </div>
+
+                    <div style={{ marginTop: '0.5rem', display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                      <button
+                        onClick={() => {
+                          const updatedUser = { ...activeUser, name: accountEditName, email: accountEditEmail };
+                          setActiveUser(updatedUser);
+                          try {
+                            localStorage.setItem('medora_active_user', JSON.stringify(updatedUser));
+                          } catch (e) {}
+                          showToast('Login & Security credentials updated successfully!', '🔒');
+                          setActiveAccountSection('hub');
+                        }}
+                        className="btn-primary"
+                        style={{ padding: '10px 24px', fontWeight: '800', fontSize: '0.88rem' }}
+                      >
+                        Save Changes
+                      </button>
+                      <button
+                        onClick={() => setActiveAccountSection('hub')}
+                        style={{ background: 'transparent', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: '0.85rem' }}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* 4. SUBVIEW: PRIME / MEDORA EXPRESS */}
+              {activeAccountSection === 'prime' && (
+                <div className="metallic-card" style={{ padding: '2rem', maxWidth: '700px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '1.25rem' }}>
+                    <div style={{ width: '50px', height: '50px', borderRadius: '12px', background: '#0d9488', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.75rem', color: '#fff' }}>
+                      ⚡
+                    </div>
+                    <div>
+                      <h3 style={{ margin: 0, color: '#0f172a', fontSize: '1.4rem' }}>Medora Prime Express Membership</h3>
+                      <span className="amazon-gold-badge" style={{ marginTop: '4px' }}>ACTIVE • RENEWS OCT 2027</span>
+                    </div>
+                  </div>
+
+                  <p style={{ fontSize: '0.88rem', color: '#475569', lineHeight: '1.5', margin: '0 0 1.5rem 0' }}>
+                    As a Medora Prime member, you enjoy guaranteed 10-15 minute emergency medicine dispatch, ₹0 delivery fee on all orders from local pharmacies, and priority prescription OCR validation.
+                  </p>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
+                    <div style={{ padding: '1rem', background: '#f0fdfa', borderRadius: '12px', border: '1px solid #ccfbf1' }}>
+                      <strong style={{ color: '#0d9488', display: 'block', fontSize: '0.9rem' }}>⚡ 10-Minute Guarantee</strong>
+                      <span style={{ fontSize: '0.78rem', color: '#64748b' }}>Automated priority rider assignment at zero surcharge</span>
+                    </div>
+                    <div style={{ padding: '1rem', background: '#f0fdfa', borderRadius: '12px', border: '1px solid #ccfbf1' }}>
+                      <strong style={{ color: '#0d9488', display: 'block', fontSize: '0.9rem' }}>💸 Free Delivery Always</strong>
+                      <span style={{ fontSize: '0.78rem', color: '#64748b' }}>No minimum cart value required across any partner chemist</span>
+                    </div>
+                    <div style={{ padding: '1rem', background: '#f0fdfa', borderRadius: '12px', border: '1px solid #ccfbf1' }}>
+                      <strong style={{ color: '#0d9488', display: 'block', fontSize: '0.9rem' }}>🛡️ AI Drug Interaction Safety</strong>
+                      <span style={{ fontSize: '0.78rem', color: '#64748b' }}>Automated clinical hazard cross-examination at checkout</span>
+                    </div>
+                    <div style={{ padding: '1rem', background: '#f0fdfa', borderRadius: '12px', border: '1px solid #ccfbf1' }}>
+                      <strong style={{ color: '#0d9488', display: 'block', fontSize: '0.9rem' }}>🩺 24/7 AI Doctor Access</strong>
+                      <span style={{ fontSize: '0.78rem', color: '#64748b' }}>Unlimited clinical triage and OTC consultations</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* 5. SUBVIEW: YOUR ADDRESSES */}
+              {activeAccountSection === 'addresses' && (
+                <div className="metallic-card" style={{ padding: '2rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                    <div>
+                      <h3 style={{ margin: 0, color: '#0f172a', fontSize: '1.3rem' }}>Your Addresses</h3>
+                      <p style={{ margin: '4px 0 0 0', fontSize: '0.82rem', color: '#64748b' }}>Manage your delivery locations and default home pin</p>
+                    </div>
+                    <button
+                      onClick={() => setIsAddressDrawerOpen(true)}
+                      className="btn-primary"
+                      style={{ padding: '8px 16px', fontSize: '0.82rem', fontWeight: '800' }}
+                    >
+                      + Add New Address
+                    </button>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1.25rem' }}>
+                    {addresses.map((addr) => {
+                      const isSelected = selectedAddress?.id === addr.id;
+                      return (
+                        <div
+                          key={addr.id}
+                          onClick={() => {
+                            handleSelectAddress(addr);
+                            showToast(`Default address set to ${addr.tag}`, '📍');
+                          }}
+                          style={{
+                            border: isSelected ? '2px solid var(--primary)' : '1px solid #cbd5e1',
+                            borderRadius: '14px',
+                            padding: '1.25rem',
+                            background: isSelected ? '#f0fdfa' : '#ffffff',
+                            cursor: 'pointer',
+                            position: 'relative'
+                          }}
+                        >
+                          {isSelected && (
+                            <span style={{ position: 'absolute', top: '12px', right: '12px', background: 'var(--primary)', color: '#fff', fontSize: '0.68rem', fontWeight: '800', padding: '2px 8px', borderRadius: '4px' }}>
+                              DEFAULT
+                            </span>
+                          )}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                            <span style={{ fontSize: '1.2rem' }}>{addr.icon || '📍'}</span>
+                            <strong style={{ fontSize: '0.95rem', color: '#0f172a' }}>{addr.tag}</strong>
+                          </div>
+                          <div style={{ fontSize: '0.85rem', color: '#334155', lineHeight: '1.4' }}>
+                            {addr.houseNo}, {addr.area}
+                          </div>
+                          <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '6px' }}>
+                            👤 {addr.receiverName} • 📞 {addr.receiverPhone}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* 6. SUBVIEW: PAYMENT OPTIONS & UPI */}
+              {activeAccountSection === 'payments' && (
+                <div className="metallic-card" style={{ padding: '2rem', maxWidth: '680px' }}>
+                  <h3 style={{ margin: '0 0 0.5rem 0', color: '#0f172a', fontSize: '1.3rem' }}>Payment Options & UPI</h3>
+                  <p style={{ margin: '0 0 1.5rem 0', fontSize: '0.82rem', color: '#64748b' }}>Manage your linked UPI VPA handles and payment preferences</p>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '1.5rem' }}>
+                    {savedUpiIds.map(upi => (
+                      <div key={upi.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem', background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '12px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <span style={{ fontSize: '1.4rem' }}>📱</span>
+                          <div>
+                            <strong style={{ fontSize: '0.92rem', color: '#0f172a', display: 'block' }}>{upi.vpa}</strong>
+                            <span style={{ fontSize: '0.75rem', color: '#64748b' }}>{upi.bank}</span>
+                          </div>
+                        </div>
+                        {upi.isDefault ? (
+                          <span style={{ background: '#dcfce7', color: '#16a34a', fontWeight: '800', fontSize: '0.72rem', padding: '3px 8px', borderRadius: '4px' }}>
+                            PRIMARY UPI
+                          </span>
+                        ) : (
+                          <button
+                            onClick={() => {
+                              setSavedUpiIds(prev => prev.map(u => ({ ...u, isDefault: u.id === upi.id })));
+                              showToast(`Set ${upi.vpa} as primary UPI`, '💳');
+                            }}
+                            style={{ background: '#ffffff', border: '1px solid #cbd5e1', padding: '4px 10px', borderRadius: '6px', fontSize: '0.75rem', cursor: 'pointer' }}
+                          >
+                            Set Primary
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+
+                  <div style={{ padding: '1rem', background: '#f0fdfa', border: '1px solid #ccfbf1', borderRadius: '12px' }}>
+                    <strong style={{ fontSize: '0.85rem', color: '#0d9488', display: 'block', marginBottom: '4px' }}>
+                      ✓ Doorstep Contactless UPI Supported
+                    </strong>
+                    <span style={{ fontSize: '0.78rem', color: '#64748b' }}>
+                      When delivery partners arrive at your door, they present their live dynamic UPI QR code. You can also pay via Soundbox POS machine.
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {/* 7. SUBVIEW: PRESCRIPTIONS */}
+              {activeAccountSection === 'prescriptions' && (
+                <div className="metallic-card" style={{ padding: '2rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                    <div>
+                      <h3 style={{ margin: 0, color: '#0f172a', fontSize: '1.3rem' }}>Your Prescriptions & Rx</h3>
+                      <p style={{ margin: '4px 0 0 0', fontSize: '0.82rem', color: '#64748b' }}>Doctor prescriptions parsed via Gemini Vision AI</p>
+                    </div>
+                    <button
+                      onClick={() => setIsOcrOpen(true)}
+                      className="btn-primary"
+                      style={{ padding: '8px 16px', fontSize: '0.82rem', fontWeight: '800' }}
+                    >
+                      + Upload New Prescription
+                    </button>
+                  </div>
+
+                  {uploadedPrescriptionId ? (
+                    <div style={{ border: '1px solid #cbd5e1', borderRadius: '14px', padding: '1.25rem', background: '#ffffff' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                        <strong style={{ color: '#0f172a' }}>Prescription #{uploadedPrescriptionId}</strong>
+                        <span style={{ background: '#dcfce7', color: '#16a34a', fontWeight: '800', fontSize: '0.72rem', padding: '3px 8px', borderRadius: '4px' }}>
+                          ✓ DIGITALLY VERIFIED
+                        </span>
+                      </div>
+                      <p style={{ fontSize: '0.82rem', color: '#64748b', margin: 0 }}>
+                        Deciphered by Google Gemini Vision AI. Prescribed medicines automatically mapped to local inventory.
+                      </p>
+                    </div>
+                  ) : (
+                    <div style={{ textAlign: 'center', padding: '3rem 0', color: '#64748b' }}>
+                      <span style={{ fontSize: '2.5rem', display: 'block', marginBottom: '0.75rem' }}>📄</span>
+                      <p style={{ fontWeight: '700', color: '#1e293b' }}>No prescriptions uploaded yet</p>
+                      <p style={{ fontSize: '0.85rem' }}>Upload doctor handwritten slips to automatically order prescribed drugs!</p>
+                      <button
+                        onClick={() => setIsOcrOpen(true)}
+                        className="btn-primary"
+                        style={{ marginTop: '1rem', padding: '8px 18px', fontSize: '0.85rem' }}
+                      >
+                        Upload Doctor Prescription
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* 8. SUBVIEW: FAMILY HEALTH PROFILES */}
+              {activeAccountSection === 'family' && (
+                <div className="metallic-card" style={{ padding: '2rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                    <div>
+                      <h3 style={{ margin: 0, color: '#0f172a', fontSize: '1.3rem' }}>Family Health Profiles</h3>
+                      <p style={{ margin: '4px 0 0 0', fontSize: '0.82rem', color: '#64748b' }}>Store chronic conditions and drug allergies for safe medicine dispatch</p>
+                    </div>
+                    <button
+                      onClick={() => {
+                        const newName = prompt("Enter family member name (e.g. Grandma, Sister):");
+                        if (newName) {
+                          setFamilyProfiles(prev => [
+                            ...prev,
+                            { id: `fam_${Date.now()}`, name: newName, age: 30, relation: 'Family', blood: 'B+', allergies: 'None', conditions: 'None' }
+                          ]);
+                          showToast(`Added ${newName} to family profiles`, '👨‍👩‍👧');
+                        }
+                      }}
+                      className="btn-primary"
+                      style={{ padding: '8px 16px', fontSize: '0.82rem', fontWeight: '800' }}
+                    >
+                      + Add Family Member
+                    </button>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1.25rem' }}>
+                    {familyProfiles.map(member => (
+                      <div key={member.id} style={{ border: '1px solid #cbd5e1', borderRadius: '14px', padding: '1.25rem', background: '#ffffff' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
+                          <strong style={{ fontSize: '1rem', color: '#0f172a' }}>{member.name}</strong>
+                          <span style={{ background: '#f1f5f9', color: '#475569', fontSize: '0.72rem', padding: '2px 8px', borderRadius: '4px', fontWeight: '700' }}>
+                            {member.blood}
+                          </span>
+                        </div>
+                        <div style={{ fontSize: '0.8rem', color: '#334155', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                          <div><strong>Age:</strong> {member.age} yrs • <strong>Relation:</strong> {member.relation}</div>
+                          <div><strong style={{ color: '#dc2626' }}>Allergies:</strong> {member.allergies}</div>
+                          <div><strong style={{ color: '#0284c7' }}>Conditions:</strong> {member.conditions}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* 9. SUBVIEW: CUSTOMER SERVICE / AI DOCTOR */}
+              {activeAccountSection === 'support' && (
+                <div className="metallic-card" style={{ padding: '2rem', maxWidth: '640px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '1.25rem' }}>
+                    <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: '#0d9488', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.5rem', color: '#fff' }}>
+                      🩺
+                    </div>
+                    <div>
+                      <h3 style={{ margin: 0, color: '#0f172a', fontSize: '1.3rem' }}>24/7 Clinical AI Doctor Support</h3>
+                      <span style={{ fontSize: '0.78rem', color: '#16a34a', fontWeight: '700' }}>● ONLINE & READY TO CONSULT</span>
+                    </div>
+                  </div>
+
+                  <p style={{ fontSize: '0.88rem', color: '#475569', lineHeight: '1.5', margin: '0 0 1.5rem 0' }}>
+                    Have questions about dosages, medicine interactions, side effects, or order delivery? MEDORA's AI Virtual Doctor is available 24/7 to provide instant medical guidance and inventory assistance.
+                  </p>
+
+                  <button
+                    onClick={() => setIsChatOpen(true)}
+                    className="btn-primary"
+                    style={{ padding: '12px 24px', fontSize: '0.95rem', fontWeight: '800', width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+                  >
+                    <span>💬</span>
+                    <span>Launch AI Virtual Doctor Consultation</span>
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* INSTAMART QUICK COMMERCE MEDICINE SHELF (WHEN ON HOME VIEW AND NO SEARCH QUERY) */}
           {activeMainView === 'home' && searchResults.length === 0 && (
             <div style={{ marginTop: '2.5rem', marginBottom: '3.5rem', width: '100%', textAlign: 'left' }}>
@@ -3755,7 +4715,8 @@ export default function Home() {
           {/* Amazon/Instamart-style Medicine Search Results */}
           {searchResults.length > 0 && (
             <div id="search-results-section" className="animate-fade-in" style={{ width: '100%', marginBottom: '3.5rem', textAlign: 'left' }}>
-              {/* Section Header with Category Tabs */}
+              
+              {/* Amazon Results Top Bar */}
               <div style={{
                 display: 'flex',
                 justifyContent: 'space-between',
@@ -3763,43 +4724,48 @@ export default function Home() {
                 flexWrap: 'wrap',
                 gap: '1rem',
                 marginBottom: '1.25rem',
-                borderBottom: '2px solid rgba(13, 148, 136, 0.15)',
-                paddingBottom: '0.85rem'
+                background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
+                padding: '0.9rem 1.4rem',
+                borderRadius: '16px',
+                border: '1px solid rgba(203, 213, 225, 0.85)',
+                boxShadow: '0 2px 10px rgba(0, 0, 0, 0.03)'
               }}>
                 <div>
-                  <h3 style={{ margin: 0, color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '0.6rem', fontSize: '1.35rem', fontWeight: '800' }}>
-                    <span>📦</span> Matched Catalog Products ({searchResults.length})
-                  </h3>
-                  {searchQuery && (
-                    <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '3px' }}>
-                      Showing verified inventory for "<strong>{searchQuery}</strong>" near {selectedAddress?.area || 'your location'}
-                    </div>
-                  )}
+                  <div style={{ fontSize: '0.92rem', color: '#0f172a', fontWeight: '700' }}>
+                    Results for <span style={{ color: '#c45500', fontWeight: '800' }}>"{searchQuery}"</span>
+                  </div>
+                  <span style={{ fontSize: '0.76rem', color: '#64748b' }}>
+                    Check each product page for other buying options and fulfilling partner pharmacies.
+                  </span>
                 </div>
 
-                {/* Filter Pills & Clear Button */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                  {['All', 'Tablets & Capsules', 'Syrups & Liquids', 'Fast Dispatch (10m)'].map(tab => (
-                    <button
-                      key={tab}
-                      type="button"
-                      onClick={() => setSearchCategoryFilter(tab)}
+                {/* Right: Amazon Sort Dropdown & Clear */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', color: '#334155' }}>
+                    <span style={{ fontWeight: '600' }}>Sort by:</span>
+                    <select
+                      value={amazonSortBy}
+                      onChange={(e) => setAmazonSortBy(e.target.value)}
                       style={{
-                        padding: '6px 14px',
-                        borderRadius: '99px',
-                        border: searchCategoryFilter === tab ? '1.5px solid var(--primary)' : '1px solid #cbd5e1',
-                        background: searchCategoryFilter === tab ? 'linear-gradient(135deg, #0d9488 0%, #059669 100%)' : '#ffffff',
-                        color: searchCategoryFilter === tab ? '#ffffff' : '#475569',
-                        fontWeight: '700',
+                        background: '#ffffff',
+                        border: '1px solid #cbd5e1',
+                        borderRadius: '8px',
+                        padding: '6px 10px',
                         fontSize: '0.78rem',
+                        fontWeight: '700',
+                        color: '#0f172a',
                         cursor: 'pointer',
-                        transition: 'all 0.15s ease',
-                        boxShadow: searchCategoryFilter === tab ? '0 2px 8px rgba(13, 148, 136, 0.25)' : 'none'
+                        outline: 'none',
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
                       }}
                     >
-                      {tab}
-                    </button>
-                  ))}
+                      <option value="featured">Featured</option>
+                      <option value="price_asc">Price: Low to High</option>
+                      <option value="price_desc">Price: High to Low</option>
+                      <option value="rating">Avg. Customer Review</option>
+                      <option value="fastest">Fastest Delivery (Express 10m)</option>
+                    </select>
+                  </div>
 
                   <button
                     type="button"
@@ -3808,312 +4774,433 @@ export default function Home() {
                       setSearchResults([]);
                       setMultiCompositionSplit(null);
                       setShowSuggestions(false);
+                      setFilterPrimeOnly(false);
+                      setFilterMinRating(0);
+                      setFilterPriceBracket('all');
+                      setFilterDiscountOnly(false);
                     }}
                     style={{
-                      padding: '6px 12px',
-                      borderRadius: '99px',
+                      padding: '5px 12px',
+                      borderRadius: '8px',
                       border: '1px solid #fecaca',
                       background: '#fff5f5',
                       color: '#dc2626',
                       fontWeight: '700',
-                      fontSize: '0.78rem',
-                      cursor: 'pointer',
-                      transition: 'all 0.15s ease'
+                      fontSize: '0.76rem',
+                      cursor: 'pointer'
                     }}
-                    title="Clear search results"
                   >
                     ✕ Clear
                   </button>
                 </div>
               </div>
 
-              {/* Grid of Results */}
-              {(() => {
-                const filtered = searchResults.filter(med => {
-                  if (searchCategoryFilter === 'All') return true;
-                  const form = `${med.dosage_form || ''} ${med.dosage || ''} ${med.form || ''} ${med.category || ''}`.toLowerCase();
-                  if (searchCategoryFilter === 'Tablets & Capsules') {
-                    return form.includes('tab') || form.includes('cap') || form.includes('pill');
-                  }
-                  if (searchCategoryFilter === 'Syrups & Liquids') {
-                    return form.includes('syr') || form.includes('liq') || form.includes('susp') || form.includes('drop');
-                  }
-                  if (searchCategoryFilter === 'Fast Dispatch (10m)') {
-                    return med.instamart?.nearest_pharmacy != null;
-                  }
-                  return true;
-                });
-
-                if (filtered.length === 0) {
-                  return (
-                    <div style={{
-                      padding: '2.5rem',
-                      textAlign: 'center',
-                      background: '#ffffff',
-                      borderRadius: '16px',
-                      border: '1px solid #e2e8f0',
-                      color: 'var(--text-muted)'
-                    }}>
-                      <span style={{ fontSize: '2rem', display: 'block', marginBottom: '8px' }}>🔍</span>
-                      No medicines match the "<strong>{searchCategoryFilter}</strong>" filter.<br />
-                      <button
-                        type="button"
-                        onClick={() => setSearchCategoryFilter('All')}
-                        style={{
-                          marginTop: '10px',
-                          background: 'var(--primary)',
-                          color: '#ffffff',
-                          border: 'none',
-                          padding: '6px 14px',
-                          borderRadius: '8px',
-                          fontWeight: '700',
-                          fontSize: '0.8rem',
-                          cursor: 'pointer'
-                        }}
-                      >
-                        Show All {searchResults.length} Products
-                      </button>
+              {/* Amazon 2-Column Layout: Sidebar Filters + Products Grid */}
+              <div style={{ display: 'flex', gap: '1.75rem', alignItems: 'flex-start' }}>
+                
+                {/* LEFT SIDEBAR: AMAZON FILTERS */}
+                <aside style={{
+                  width: '240px',
+                  flexShrink: 0,
+                  background: 'linear-gradient(145deg, #ffffff 0%, #f8fafc 100%)',
+                  border: '1px solid rgba(203, 213, 225, 0.85)',
+                  borderRadius: '16px',
+                  padding: '1.25rem',
+                  boxShadow: '0 2px 8px rgba(0, 0, 0, 0.03)'
+                }}>
+                  {/* Delivery Filter */}
+                  <div style={{ marginBottom: '1.25rem', paddingBottom: '1rem', borderBottom: '1px solid #e2e8f0' }}>
+                    <div style={{ fontWeight: '800', fontSize: '0.85rem', color: '#0f172a', marginBottom: '8px' }}>
+                      Delivery Day
                     </div>
-                  );
-                }
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.8rem', color: '#334155', cursor: 'pointer' }}>
+                      <input
+                        type="checkbox"
+                        checked={filterPrimeOnly}
+                        onChange={(e) => setFilterPrimeOnly(e.target.checked)}
+                        style={{ accentColor: '#0d9488', cursor: 'pointer' }}
+                      />
+                      <span className="amazon-gold-badge" style={{ fontSize: '0.66rem', padding: '2px 6px' }}>
+                        ⚡ Prime Express
+                      </span>
+                    </label>
+                    <span style={{ fontSize: '0.72rem', color: '#64748b', display: 'block', marginTop: '4px', marginLeft: '22px' }}>
+                      Free 10-15 min dispatch
+                    </span>
+                  </div>
 
-                return (
-                  <div style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))',
-                    gap: '1.5rem',
-                    width: '100%'
-                  }}>
-                    {filtered.map((med, idx) => {
-                      const cartQty = getItemCartCount(med.medicine_id);
-                      const inCart = cartQty > 0;
-                      const formStr = (med.dosage_form || med.dosage || med.form || '').toLowerCase();
-                      const formIcon = formStr.includes('syr') || formStr.includes('liq') ? '🧴' : formStr.includes('drop') ? '💧' : '💊';
-
-                      return (
-                        <div 
-                          key={idx} 
-                          className="glass-panel"
-                          onClick={() => setSelectedMedicineDetail(med)}
+                  {/* Department / Category Filter */}
+                  <div style={{ marginBottom: '1.25rem', paddingBottom: '1rem', borderBottom: '1px solid #e2e8f0' }}>
+                    <div style={{ fontWeight: '800', fontSize: '0.85rem', color: '#0f172a', marginBottom: '8px' }}>
+                      Department
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '0.8rem' }}>
+                      {['All', 'Tablets & Capsules', 'Syrups & Liquids', 'Fast Dispatch (10m)'].map(cat => (
+                        <div
+                          key={cat}
+                          onClick={() => setSearchCategoryFilter(cat)}
                           style={{
-                            padding: '1.4rem',
-                            borderRadius: '20px',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            justifyContent: 'space-between',
-                            border: '1px solid rgba(226, 232, 240, 0.9)',
-                            background: '#ffffff',
-                            transition: 'all 0.25s cubic-bezier(0.25, 0.8, 0.25, 1)',
-                            position: 'relative',
-                            overflow: 'hidden',
                             cursor: 'pointer',
-                            boxShadow: '0 4px 18px rgba(0, 0, 0, 0.04)'
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.transform = 'translateY(-5px)';
-                            e.currentTarget.style.boxShadow = '0 14px 30px rgba(13, 148, 136, 0.14)';
-                            e.currentTarget.style.borderColor = 'var(--primary)';
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.transform = 'none';
-                            e.currentTarget.style.boxShadow = '0 4px 18px rgba(0, 0, 0, 0.04)';
-                            e.currentTarget.style.borderColor = 'rgba(226, 232, 240, 0.9)';
+                            color: searchCategoryFilter === cat ? '#0d9488' : '#475569',
+                            fontWeight: searchCategoryFilter === cat ? '800' : '500',
+                            padding: '3px 6px',
+                            borderRadius: '6px',
+                            background: searchCategoryFilter === cat ? 'rgba(13, 148, 136, 0.08)' : 'transparent',
+                            transition: 'all 0.15s ease'
                           }}
                         >
-                          <div>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.75rem' }}>
-                              <span style={{
-                                fontSize: '0.68rem',
-                                background: 'rgba(13, 148, 136, 0.1)',
-                                border: '1px solid rgba(13, 148, 136, 0.25)',
-                                padding: '2px 8px',
-                                borderRadius: '6px',
-                                color: 'var(--primary)',
-                                textTransform: 'uppercase',
-                                fontWeight: '800',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '3px'
-                              }}>
-                                <span>{formIcon}</span>
-                                <span>{med.category || 'Prescription'}</span>
-                              </span>
-                              <span style={{ fontSize: '0.76rem', color: 'var(--text-muted)', fontWeight: '700' }}>{med.dosage}</span>
-                            </div>
-                            <h4 style={{ margin: '0 0 6px 0', fontSize: '1.15rem', color: 'var(--text-main)', fontWeight: '800', lineHeight: '1.3' }}>
-                              {highlightMatch(med.brand_name, searchQuery)}
-                            </h4>
-                            <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', margin: '6px 0 0 0', lineHeight: '1.45' }}>
-                              <span style={{ display: 'block', marginBottom: '3px' }}><strong>Salt:</strong> {highlightMatch(med.generic_name, searchQuery)}</span>
-                              {med.manufacturer && <span><strong>Mfg:</strong> {med.manufacturer}</span>}
-                            </p>
+                          {searchCategoryFilter === cat ? '▸ ' : ''}{cat}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
 
-                            {/* Compound Match Note */}
-                            {med.compound_note && (
-                              <div style={{
-                                fontSize: '0.72rem',
-                                color: '#0369a1',
-                                background: '#f0f9ff',
-                                border: '1px solid #bae6fd',
-                                padding: '3px 8px',
-                                borderRadius: '6px',
-                                marginTop: '6px'
-                              }}>
-                                💡 {med.compound_note}
-                              </div>
-                            )}
+                  {/* Customer Review Filter */}
+                  <div style={{ marginBottom: '1.25rem', paddingBottom: '1rem', borderBottom: '1px solid #e2e8f0' }}>
+                    <div style={{ fontWeight: '800', fontSize: '0.85rem', color: '#0f172a', marginBottom: '8px' }}>
+                      Customer Reviews
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '0.78rem' }}>
+                      <div
+                        onClick={() => setFilterMinRating(prev => prev === 4 ? 0 : 4)}
+                        style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', color: filterMinRating === 4 ? '#c45500' : '#475569', fontWeight: filterMinRating === 4 ? '800' : 'normal' }}
+                      >
+                        <span style={{ color: '#e47911' }}>★★★★☆</span> & Up
+                      </div>
+                      <div
+                        onClick={() => setFilterMinRating(prev => prev === 3 ? 0 : 3)}
+                        style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', color: filterMinRating === 3 ? '#c45500' : '#475569', fontWeight: filterMinRating === 3 ? '800' : 'normal' }}
+                      >
+                        <span style={{ color: '#e47911' }}>★★★☆☆</span> & Up
+                      </div>
+                      {filterMinRating > 0 && (
+                        <span
+                          onClick={() => setFilterMinRating(0)}
+                          style={{ fontSize: '0.72rem', color: '#0284c7', cursor: 'pointer', textDecoration: 'underline', marginTop: '2px' }}
+                        >
+                          Clear rating filter
+                        </span>
+                      )}
+                    </div>
+                  </div>
 
-                            {/* Instamart Faster Delivery Possible Badge */}
-                            {med.instamart?.nearest_pharmacy ? (
-                              <div style={{
-                                background: '#fff7ed',
-                                border: '1px solid rgba(255, 107, 0, 0.25)',
-                                borderRadius: '10px',
-                                padding: '7px 10px',
-                                marginTop: '0.8rem',
+                  {/* Price Bracket Filter */}
+                  <div style={{ marginBottom: '1.25rem', paddingBottom: '1rem', borderBottom: '1px solid #e2e8f0' }}>
+                    <div style={{ fontWeight: '800', fontSize: '0.85rem', color: '#0f172a', marginBottom: '8px' }}>
+                      Price
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '0.8rem', color: '#475569' }}>
+                      {[
+                        { key: 'all', label: 'All Prices' },
+                        { key: 'under50', label: 'Under ₹50' },
+                        { key: '50to100', label: '₹50 to ₹100' },
+                        { key: '100to250', label: '₹100 to ₹250' },
+                        { key: 'above250', label: 'Over ₹250' },
+                      ].map(p => (
+                        <div
+                          key={p.key}
+                          onClick={() => setFilterPriceBracket(p.key)}
+                          style={{
+                            cursor: 'pointer',
+                            color: filterPriceBracket === p.key ? '#0d9488' : 'inherit',
+                            fontWeight: filterPriceBracket === p.key ? '800' : '500'
+                          }}
+                        >
+                          {filterPriceBracket === p.key ? '● ' : '○ '}{p.label}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Discount Filter */}
+                  <div>
+                    <div style={{ fontWeight: '800', fontSize: '0.85rem', color: '#0f172a', marginBottom: '8px' }}>
+                      Discount
+                    </div>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.8rem', color: '#334155', cursor: 'pointer' }}>
+                      <input
+                        type="checkbox"
+                        checked={filterDiscountOnly}
+                        onChange={(e) => setFilterDiscountOnly(e.target.checked)}
+                        style={{ accentColor: '#0d9488', cursor: 'pointer' }}
+                      />
+                      <span>10% Off or more</span>
+                    </label>
+                  </div>
+                </aside>
+
+                {/* RIGHT COLUMN: AMAZON PRODUCTS GRID */}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  {(() => {
+                    let list = [...searchResults];
+
+                    if (searchCategoryFilter !== 'All') {
+                      list = list.filter(med => {
+                        const form = `${med.dosage_form || ''} ${med.dosage || ''} ${med.form || ''} ${med.category || ''}`.toLowerCase();
+                        if (searchCategoryFilter === 'Tablets & Capsules') return form.includes('tab') || form.includes('cap') || form.includes('pill');
+                        if (searchCategoryFilter === 'Syrups & Liquids') return form.includes('syr') || form.includes('liq') || form.includes('susp') || form.includes('drop');
+                        if (searchCategoryFilter === 'Fast Dispatch (10m)') return med.instamart?.nearest_pharmacy != null;
+                        return true;
+                      });
+                    }
+
+                    if (filterPrimeOnly) {
+                      list = list.filter(med => med.instamart?.nearest_pharmacy != null || parseFloat(med.price_mrp || 0) > 30);
+                    }
+
+                    if (filterMinRating > 0) {
+                      list = list.filter(med => (parseFloat(med.rating || 4.5) >= filterMinRating));
+                    }
+
+                    if (filterPriceBracket === 'under50') {
+                      list = list.filter(med => parseFloat(med.price_mrp || 0) < 50);
+                    } else if (filterPriceBracket === '50to100') {
+                      list = list.filter(med => {
+                        const p = parseFloat(med.price_mrp || 0);
+                        return p >= 50 && p <= 100;
+                      });
+                    } else if (filterPriceBracket === '100to250') {
+                      list = list.filter(med => {
+                        const p = parseFloat(med.price_mrp || 0);
+                        return p >= 100 && p <= 250;
+                      });
+                    } else if (filterPriceBracket === 'above250') {
+                      list = list.filter(med => parseFloat(med.price_mrp || 0) > 250);
+                    }
+
+                    if (filterDiscountOnly) {
+                      list = list.filter(med => parseFloat(med.discount_pct || 15) >= 10);
+                    }
+
+                    if (amazonSortBy === 'price_asc') {
+                      list.sort((a, b) => parseFloat(a.price_mrp || 0) - parseFloat(b.price_mrp || 0));
+                    } else if (amazonSortBy === 'price_desc') {
+                      list.sort((a, b) => parseFloat(b.price_mrp || 0) - parseFloat(a.price_mrp || 0));
+                    } else if (amazonSortBy === 'rating') {
+                      list.sort((a, b) => (b.rating || 4.8) - (a.rating || 4.5));
+                    } else if (amazonSortBy === 'fastest') {
+                      list.sort((a, b) => (a.instamart ? -1 : 1));
+                    }
+
+                    if (list.length === 0) {
+                      return (
+                        <div style={{
+                          padding: '3rem',
+                          textAlign: 'center',
+                          background: '#ffffff',
+                          borderRadius: '16px',
+                          border: '1px solid #e2e8f0',
+                          color: '#64748b'
+                        }}>
+                          <span style={{ fontSize: '2.5rem', display: 'block', marginBottom: '8px' }}>🔍</span>
+                          <strong style={{ color: '#0f172a', fontSize: '1rem', display: 'block' }}>No matching medicines found for selected filters</strong>
+                          <span style={{ fontSize: '0.85rem' }}>Try clearing your active filters to see all available inventory.</span>
+                          <div style={{ marginTop: '12px' }}>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSearchCategoryFilter('All');
+                                setFilterPrimeOnly(false);
+                                setFilterMinRating(0);
+                                setFilterPriceBracket('all');
+                                setFilterDiscountOnly(false);
+                              }}
+                              className="btn-primary"
+                              style={{ padding: '6px 16px', fontSize: '0.82rem' }}
+                            >
+                              Reset All Filters
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <div style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+                        gap: '1.25rem',
+                        width: '100%'
+                      }}>
+                        {list.map((med, idx) => {
+                          const cartQty = getItemCartCount(med.medicine_id);
+                          const inCart = cartQty > 0;
+                          const formStr = (med.dosage_form || med.dosage || med.form || '').toLowerCase();
+                          const formIcon = formStr.includes('syr') || formStr.includes('liq') ? '🧴' : formStr.includes('drop') ? '💧' : '💊';
+                          const isBestSeller = idx === 0;
+                          const isAmazonChoice = idx === 1;
+
+                          return (
+                            <div
+                              key={med.medicine_id || idx}
+                              className="metallic-silver-panel"
+                              style={{
+                                padding: '1.4rem',
+                                borderRadius: '18px',
                                 display: 'flex',
                                 flexDirection: 'column',
-                                gap: '2px'
-                              }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                                  <span style={{ fontSize: '0.9rem' }}>⚡</span>
-                                  <span style={{ fontSize: '0.74rem', color: '#c2410c', fontWeight: '800' }}>
-                                    Faster delivery in {med.instamart.nearest_pharmacy.delivery_time}
+                                justifyContent: 'space-between',
+                                cursor: 'pointer'
+                              }}
+                              onClick={() => setSelectedMedicineDetail(med)}
+                            >
+                              <div>
+                                {/* Amazon Badge Header */}
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', minHeight: '26px' }}>
+                                  {isBestSeller ? (
+                                    <span className="amazon-gold-badge">
+                                      #1 Best Seller
+                                    </span>
+                                  ) : isAmazonChoice ? (
+                                    <span className="amazon-choice-badge">
+                                      MEDORA's Choice
+                                    </span>
+                                  ) : (
+                                    <span style={{
+                                      fontSize: '0.68rem',
+                                      background: 'rgba(13, 148, 136, 0.1)',
+                                      border: '1px solid rgba(13, 148, 136, 0.25)',
+                                      padding: '2px 8px',
+                                      borderRadius: '6px',
+                                      color: 'var(--primary)',
+                                      fontWeight: '800'
+                                    }}>
+                                      {formIcon} {med.category || 'Prescription'}
+                                    </span>
+                                  )}
+                                  <span style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: '700' }}>
+                                    {med.dosage}
                                   </span>
                                 </div>
-                                <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>
-                                  At {med.instamart.nearest_pharmacy.pharmacy_name} ({med.instamart.nearest_pharmacy.distance_km} km • {med.instamart.nearest_pharmacy.quantity} in stock)
+
+                                {/* Product Name */}
+                                <h4 style={{ margin: '0 0 4px 0', fontSize: '1.12rem', color: '#0f172a', fontWeight: '800', lineHeight: '1.3' }}>
+                                  {highlightMatch(med.brand_name, searchQuery)}
+                                </h4>
+
+                                {/* Salt & Mfg */}
+                                <div style={{ fontSize: '0.78rem', color: '#64748b', lineHeight: '1.45', marginBottom: '8px' }}>
+                                  <span style={{ display: 'block' }}><strong>Salt:</strong> {highlightMatch(med.generic_name, searchQuery)}</span>
+                                  {med.manufacturer && <span style={{ display: 'block', fontSize: '0.72rem' }}><strong>Mfg:</strong> {med.manufacturer}</span>}
                                 </div>
-                              </div>
-                            ) : (
-                              <div style={{
-                                background: '#f8fafc',
-                                border: '1px solid #e2e8f0',
-                                borderRadius: '8px',
-                                padding: '6px 10px',
-                                marginTop: '0.8rem',
-                                fontSize: '0.72rem',
-                                color: 'var(--text-muted)'
-                              }}>
-                                ⚡ Standard 15-25 min delivery from local warehouse
-                              </div>
-                            )}
-                          </div>
 
-                          <div style={{ marginTop: '1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid rgba(226, 232, 240, 0.8)', paddingTop: '0.85rem' }}>
-                            <div>
-                              <span style={{ fontSize: '1.25rem', fontWeight: '800', color: 'var(--primary)' }}>₹{med.price_mrp}</span>
-                              <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', display: 'block' }}>MRP incl. taxes</span>
-                            </div>
+                                {/* Star Reviews */}
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '0.75rem' }}>
+                                  <span style={{ color: '#e47911', fontSize: '0.85rem', letterSpacing: '1px' }}>★★★★★</span>
+                                  <span style={{ fontSize: '0.78rem', fontWeight: '800', color: '#007185' }}>4.8</span>
+                                  <span style={{ fontSize: '0.72rem', color: '#64748b' }}>({med.reviews_count || (540 + idx * 80)})</span>
+                                </div>
 
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                              {inCart ? (
-                                <div 
-                                  onClick={(e) => e.stopPropagation()}
-                                  style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '6px',
-                                    background: '#f0fdf4',
-                                    border: '1.5px solid #16a34a',
-                                    borderRadius: '10px',
-                                    padding: '3px 8px'
-                                  }}
-                                >
-                                  <button
-                                    type="button"
-                                    onClick={() => handleUpdateItemQuantity(med, -1)}
-                                    style={{
-                                      background: 'transparent',
-                                      border: 'none',
-                                      color: '#16a34a',
-                                      fontSize: '1.1rem',
-                                      fontWeight: '800',
-                                      cursor: 'pointer',
-                                      padding: '0 4px'
-                                    }}
-                                    title="Decrease quantity"
-                                  >
-                                    −
-                                  </button>
-                                  <span style={{ fontWeight: '800', fontSize: '0.85rem', color: '#16a34a', minWidth: '18px', textAlign: 'center' }}>
-                                    {cartQty}
+                                {/* Pricing Section with Amazon Style MRP Strikethrough */}
+                                <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginBottom: '6px' }}>
+                                  <span style={{ fontSize: '1.35rem', fontWeight: '900', color: '#0f172a' }}>
+                                    ₹{med.price_mrp}
                                   </span>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleUpdateItemQuantity(med, 1)}
-                                    style={{
-                                      background: 'transparent',
-                                      border: 'none',
-                                      color: '#16a34a',
-                                      fontSize: '1.1rem',
-                                      fontWeight: '800',
-                                      cursor: 'pointer',
-                                      padding: '0 4px'
-                                    }}
-                                    title="Increase quantity"
-                                  >
-                                    +
-                                  </button>
+                                  <span style={{ fontSize: '0.78rem', color: '#64748b', textDecoration: 'line-through' }}>
+                                    M.R.P.: ₹{(parseFloat(med.price_mrp || 40) * 1.15).toFixed(0)}
+                                  </span>
+                                  <span style={{ fontSize: '0.74rem', color: '#cc0c39', fontWeight: '800' }}>
+                                    (15% off)
+                                  </span>
                                 </div>
-                              ) : (
+
+                                {/* Prime Delivery Badge */}
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.76rem', color: '#007185', fontWeight: '700', marginBottom: '8px' }}>
+                                  <span className="amazon-gold-badge" style={{ fontSize: '0.62rem', padding: '1px 5px' }}>⚡ Prime</span>
+                                  <span>FREE delivery <strong>Today in 10-15 mins</strong></span>
+                                </div>
+
+                                {/* Local Pharmacy Availability */}
+                                <div style={{ fontSize: '0.72rem', color: '#15803d', fontWeight: '700', background: '#f0fdf4', padding: '4px 8px', borderRadius: '6px', border: '1px solid #bbf7d0', display: 'inline-block' }}>
+                                  ✓ Available across 4 local pharmacies
+                                </div>
+                              </div>
+
+                              {/* Multi-Shop Picker Trigger Buttons */}
+                              <div style={{ marginTop: '1.25rem', display: 'flex', gap: '8px', alignItems: 'center', borderTop: '1px solid rgba(203, 213, 225, 0.6)', paddingTop: '0.85rem' }}>
                                 <button
                                   type="button"
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    handleUpdateItemQuantity(med, 1);
+                                    setSelectedMedicineForShopPicker(med);
                                   }}
                                   className="btn-primary"
-                                  style={{ padding: '0.55rem 0.95rem', fontSize: '0.78rem', borderRadius: '10px', fontWeight: '800' }}
+                                  style={{
+                                    flex: 1,
+                                    padding: '0.65rem 0.8rem',
+                                    fontSize: '0.8rem',
+                                    borderRadius: '12px',
+                                    fontWeight: '800',
+                                    background: inCart ? 'linear-gradient(135deg, #15803d 0%, #166534 100%)' : 'linear-gradient(135deg, #0d9488 0%, #0f766e 100%)',
+                                    boxShadow: '0 4px 12px rgba(13, 148, 136, 0.25)',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: '6px'
+                                  }}
+                                  title="Compare shop prices & select fulfilling pharmacy"
                                 >
-                                  + Cart
+                                  <span>🏪</span>
+                                  <span>{inCart ? `In Cart (${cartQty}) • Choose Shop` : '+ Add to Cart'}</span>
                                 </button>
-                              )}
 
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleBuyNow(med);
-                                }}
-                                style={{
-                                  background: 'linear-gradient(180deg, #ffa41c 0%, #ff8f00 100%)',
-                                  color: '#0f1111',
-                                  border: '1px solid #ff8f00',
-                                  padding: '0.55rem 1rem',
-                                  borderRadius: '10px',
-                                  fontWeight: '800',
-                                  fontSize: '0.78rem',
-                                  cursor: 'pointer',
-                                  boxShadow: '0 2px 6px rgba(255, 143, 0, 0.28)',
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  gap: '4px',
-                                  whiteSpace: 'nowrap'
-                                }}
-                                title="1-Click Instant Checkout"
-                              >
-                                <span>⚡</span>
-                                <span>Buy Now</span>
-                              </button>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setSelectedMedicineForShopPicker(med);
+                                  }}
+                                  style={{
+                                    background: 'linear-gradient(180deg, #ffa41c 0%, #ff8f00 100%)',
+                                    color: '#0f1111',
+                                    border: '1px solid #ff8f00',
+                                    padding: '0.65rem 0.9rem',
+                                    borderRadius: '12px',
+                                    fontWeight: '800',
+                                    fontSize: '0.8rem',
+                                    cursor: 'pointer',
+                                    boxShadow: '0 2px 8px rgba(255, 143, 0, 0.3)',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '4px',
+                                    whiteSpace: 'nowrap'
+                                  }}
+                                  title="Select pharmacy and buy immediately"
+                                >
+                                  <span>⚡ Buy</span>
+                                </button>
+                              </div>
                             </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                );
-              })()}
+                          );
+                        })}
+                      </div>
+                    );
+                  })()}
+                </div>
+              </div>
 
               {cart.length > 0 && (
-                <div style={{ marginTop: '2rem', textAlign: 'center' }}>
-                  <a 
-                    href="/cart"
+                <div style={{ marginTop: '2.5rem', textAlign: 'center' }}>
+                  <button
+                    onClick={() => {
+                      setIsCartOpen(true);
+                      setPaymentStep('cart');
+                    }}
                     className="btn-primary"
-                    style={{ background: 'var(--primary)', padding: '0.85rem 2.2rem', textDecoration: 'none', fontWeight: 'bold', display: 'inline-flex', alignItems: 'center', gap: '0.5rem', borderRadius: '14px' }}
+                    style={{
+                      background: 'linear-gradient(135deg, #0d9488 0%, #059669 100%)',
+                      padding: '0.9rem 2.5rem',
+                      fontWeight: '800',
+                      fontSize: '0.95rem',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.6rem',
+                      borderRadius: '16px',
+                      boxShadow: '0 6px 20px rgba(13, 148, 136, 0.35)'
+                    }}
                   >
-                    <span>Proceed to Cart ({cart.length} {cart.length === 1 ? 'item' : 'items'}) 🛒</span>
-                  </a>
+                    <span>Proceed to Cart & Checkout ({cart.length} {cart.length === 1 ? 'medicine' : 'medicines'}) 🛒</span>
+                  </button>
                 </div>
               )}
             </div>
@@ -4181,6 +5268,40 @@ export default function Home() {
                     🧾 {Array.isArray(order.items) ? order.items.map(i => `${i.quantity}x ${i.brand_name}`).join(', ') : order.items}
                   </p>
                   <TrackingBar status={order.status} />
+
+                  {/* Contactless Doorstep UPI QR Code selected by Rider */}
+                  {(order.rider_qr_image || (typeof window !== 'undefined' && localStorage.getItem(`medora_order_qr_${order.id}`))) && (
+                    <div style={{
+                      marginTop: '1.25rem',
+                      background: 'rgba(13, 148, 136, 0.08)',
+                      border: '1.5px dashed var(--primary)',
+                      borderRadius: '14px',
+                      padding: '1rem',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      textAlign: 'center',
+                      gap: '8px'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span style={{ fontSize: '1.2rem' }}>🛵</span>
+                        <strong style={{ color: 'var(--primary)', fontSize: '0.92rem' }}>Delivery Partner Doorstep Payment QR</strong>
+                      </div>
+                      <span style={{ fontSize: '0.76rem', color: 'var(--text-muted)' }}>
+                        Contactless Doorstep UPI ({order.rider_qr_type === 'live' ? 'Live Dynamic QR' : 'Main Registered QR'}) shared by your rider:
+                      </span>
+                      <div style={{ padding: '8px', background: '#ffffff', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.2)', boxShadow: '0 4px 14px rgba(0,0,0,0.2)' }}>
+                        <img
+                          src={order.rider_qr_image || (typeof window !== 'undefined' && localStorage.getItem(`medora_order_qr_${order.id}`))}
+                          alt="Rider Payment QR"
+                          style={{ width: '150px', height: '150px', objectFit: 'contain', display: 'block' }}
+                        />
+                      </div>
+                      <span style={{ fontSize: '0.74rem', color: 'var(--green)', fontWeight: 'bold' }}>
+                        ✓ Scan with any UPI app (GPay / PhonePe / Paytm / BHIM) upon doorstep arrival
+                      </span>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -5551,16 +6672,458 @@ export default function Home() {
               ) : (
                 <button
                   onClick={() => {
-                    handleUpdateItemQuantity(selectedMedicineDetail, 1);
+                    const current = selectedMedicineDetail;
+                    setSelectedMedicineDetail(null);
+                    setSelectedMedicineForShopPicker(current);
                   }}
                   className="btn-primary"
                   style={{ padding: '0.75rem 1.8rem', fontSize: '0.9rem', fontWeight: '800' }}
                 >
-                  + Add to Cart
+                  + Add to Cart (Choose Shop)
                 </button>
               )}
             </div>
           </div>
+        </div>
+      )}
+
+      {/* POPUP: MULTI-PHARMACY SHOP SELECTION WITH LIVE PRICES & +- BUTTONS */}
+      {selectedMedicineForShopPicker && (
+        <div
+          className="modal-overlay active"
+          onClick={() => setSelectedMedicineForShopPicker(null)}
+          style={{ zIndex: 2200 }}
+        >
+          <div
+            className="modal-content metallic-silver-panel"
+            style={{
+              padding: '1.75rem 2rem',
+              maxWidth: '680px',
+              width: '92%',
+              background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.98) 0%, rgba(248, 250, 252, 0.94) 100%)',
+              border: '1.5px solid rgba(203, 213, 225, 0.95)',
+              boxShadow: '0 24px 70px rgba(15, 23, 42, 0.22)',
+              borderRadius: '24px'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '1px solid #e2e8f0', paddingBottom: '1rem', marginBottom: '1.25rem' }}>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ fontSize: '1.4rem' }}>🏪</span>
+                  <h3 style={{ margin: 0, color: '#0f172a', fontSize: '1.3rem', fontWeight: '800' }}>
+                    Select Fulfilling Pharmacy & Price
+                  </h3>
+                </div>
+                <div style={{ fontSize: '0.85rem', color: '#64748b', marginTop: '4px' }}>
+                  For <strong style={{ color: '#0f172a' }}>{selectedMedicineForShopPicker.brand_name}</strong> {selectedMedicineForShopPicker.dosage && `(${selectedMedicineForShopPicker.dosage})`} • Salt: {selectedMedicineForShopPicker.generic_name}
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedMedicineForShopPicker(null)}
+                style={{ background: 'transparent', border: 'none', color: '#64748b', fontSize: '1.75rem', cursor: 'pointer', lineHeight: 1 }}
+              >
+                &times;
+              </button>
+            </div>
+
+            {/* Currently in Cart Summary */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f0fdfa', border: '1px solid #ccfbf1', padding: '0.65rem 1rem', borderRadius: '12px', marginBottom: '1.25rem' }}>
+              <span style={{ fontSize: '0.82rem', color: '#0f766e', fontWeight: '700' }}>
+                Total in your cart: <strong>{getItemCartCount(selectedMedicineForShopPicker.medicine_id)} {getItemCartCount(selectedMedicineForShopPicker.medicine_id) === 1 ? 'unit' : 'units'}</strong>
+              </span>
+              <span style={{ fontSize: '0.74rem', color: '#64748b' }}>
+                Pick whichever local store offers the best price or fastest dispatch
+              </span>
+            </div>
+
+            {/* List of 4 Local Partner Pharmacies */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem', maxHeight: '360px', overflowY: 'auto', paddingRight: '4px', marginBottom: '1.5rem' }}>
+              {getShopsForMedicine(selectedMedicineForShopPicker).map((shop) => {
+                const shopCartCount = cart.filter(i => i.medicine_id === selectedMedicineForShopPicker.medicine_id && i.pharmacy_id === shop.name).length;
+
+                return (
+                  <div
+                    key={shop.id}
+                    style={{
+                      border: shopCartCount > 0 ? '2px solid #0d9488' : '1px solid #cbd5e1',
+                      borderRadius: '16px',
+                      padding: '1.1rem 1.25rem',
+                      background: shopCartCount > 0 ? '#f0fdfa' : '#ffffff',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      gap: '1rem',
+                      transition: 'all 0.2s ease',
+                      boxShadow: '0 2px 8px rgba(0,0,0,0.03)'
+                    }}
+                  >
+                    {/* Left: Shop Details */}
+                    <div style={{ flex: 1 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '4px' }}>
+                        <strong style={{ fontSize: '0.98rem', color: '#0f172a' }}>{shop.name}</strong>
+                        <span style={{
+                          fontSize: '0.68rem',
+                          background: shop.badge.includes('Express') ? '#ccfbf1' : shop.badge.includes('Best Seller') ? '#fef3c7' : '#f1f5f9',
+                          color: shop.badge.includes('Express') ? '#0f766e' : shop.badge.includes('Best Seller') ? '#b45309' : '#334155',
+                          fontWeight: '800',
+                          padding: '2px 8px',
+                          borderRadius: '4px'
+                        }}>
+                          {shop.badge}
+                        </span>
+                      </div>
+                      
+                      <div style={{ fontSize: '0.78rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                        <span>📍 {shop.distance}</span>
+                        <span>⚡ {shop.deliveryTime}</span>
+                        <span>⭐ {shop.rating} ({shop.reviews})</span>
+                        <span style={{ color: '#16a34a', fontWeight: '700' }}>✓ {shop.stock} in stock</span>
+                      </div>
+                      <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: '2px' }}>
+                        {shop.address}
+                      </div>
+                    </div>
+
+                    {/* Right: Price & Stepper Button */}
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '6px', flexShrink: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px' }}>
+                        <span style={{ fontSize: '1.25rem', fontWeight: '900', color: '#0f172a' }}>
+                          ₹{shop.price}
+                        </span>
+                        {shop.discount !== 'M.R.P.' && (
+                          <span style={{ fontSize: '0.7rem', color: '#15803d', fontWeight: '800', background: '#dcfce7', padding: '1px 5px', borderRadius: '4px' }}>
+                            {shop.discount}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Stepper with +- buttons */}
+                      {shopCartCount > 0 ? (
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          background: '#ffffff',
+                          border: '1.5px solid #0d9488',
+                          borderRadius: '10px',
+                          padding: '3px 8px',
+                          boxShadow: '0 2px 6px rgba(13, 148, 136, 0.2)'
+                        }}>
+                          <button
+                            type="button"
+                            onClick={() => handleAddMedicineFromShop(selectedMedicineForShopPicker, shop, -1)}
+                            style={{ background: 'transparent', border: 'none', color: '#0d9488', fontSize: '1.1rem', fontWeight: '800', cursor: 'pointer', padding: '0 4px' }}
+                            title="Decrease quantity from this shop"
+                          >
+                            −
+                          </button>
+                          <span style={{ fontWeight: '800', fontSize: '0.88rem', color: '#0d9488', minWidth: '20px', textAlign: 'center' }}>
+                            {shopCartCount}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => handleAddMedicineFromShop(selectedMedicineForShopPicker, shop, 1)}
+                            style={{ background: 'transparent', border: 'none', color: '#0d9488', fontSize: '1.1rem', fontWeight: '800', cursor: 'pointer', padding: '0 4px' }}
+                            title="Increase quantity from this shop"
+                          >
+                            +
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            handleAddMedicineFromShop(selectedMedicineForShopPicker, shop, 1);
+                            showToast(`Added from ${shop.name} (₹${shop.price})`, '🛒');
+                          }}
+                          className="btn-primary"
+                          style={{
+                            padding: '6px 14px',
+                            fontSize: '0.78rem',
+                            fontWeight: '800',
+                            borderRadius: '10px',
+                            background: 'linear-gradient(135deg, #0d9488 0%, #0f766e 100%)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px'
+                          }}
+                        >
+                          <span>+ Add</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Modal Bottom Actions */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #e2e8f0', paddingTop: '1rem' }}>
+              <button
+                type="button"
+                onClick={() => setSelectedMedicineForShopPicker(null)}
+                style={{ background: 'transparent', border: 'none', color: '#64748b', fontSize: '0.82rem', fontWeight: '700', cursor: 'pointer' }}
+              >
+                ← Back to Catalog
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedMedicineForShopPicker(null);
+                  setIsCartOpen(true);
+                  setPaymentStep('cart');
+                }}
+                className="btn-primary"
+                style={{ padding: '8px 20px', fontSize: '0.85rem', fontWeight: '800', borderRadius: '12px' }}
+              >
+                View Cart & Checkout 🛒
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: AI CLINICAL DRUG-DRUG INTERACTION SAFETY ALERT */}
+      {aiInteractionModalOpen && aiInteractionReport && (
+        <div
+          className="modal-overlay active"
+          onClick={() => setAiInteractionModalOpen(false)}
+          style={{ zIndex: 2500 }}
+        >
+          <div
+            className="modal-content"
+            style={{
+              padding: '2rem',
+              maxWidth: '640px',
+              width: '92%',
+              background: '#ffffff',
+              border: aiInteractionReport.severity === 'CRITICAL' ? '2px solid #ef4444' : '2px solid #f59e0b',
+              borderRadius: '24px',
+              boxShadow: '0 25px 60px rgba(0, 0, 0, 0.3)'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Alert Header */}
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '14px', marginBottom: '1.25rem' }}>
+              <div style={{
+                width: '52px',
+                height: '52px',
+                borderRadius: '50%',
+                background: aiInteractionReport.severity === 'CRITICAL' ? '#fee2e2' : '#fef3c7',
+                color: aiInteractionReport.severity === 'CRITICAL' ? '#dc2626' : '#d97706',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '1.75rem',
+                flexShrink: 0
+              }}>
+                ⚠️
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <h3 style={{ margin: 0, color: aiInteractionReport.severity === 'CRITICAL' ? '#b91c1c' : '#b45309', fontSize: '1.3rem', fontWeight: '800' }}>
+                    Dangerous Drug Combination Detected!
+                  </h3>
+                  <span style={{
+                    background: aiInteractionReport.severity === 'CRITICAL' ? '#ef4444' : '#f59e0b',
+                    color: '#ffffff',
+                    fontSize: '0.68rem',
+                    fontWeight: '900',
+                    padding: '2px 8px',
+                    borderRadius: '99px',
+                    letterSpacing: '0.04em'
+                  }}>
+                    {aiInteractionReport.severity} HAZARD
+                  </span>
+                </div>
+                <p style={{ margin: '6px 0 0 0', fontSize: '0.82rem', color: '#475569', lineHeight: '1.4' }}>
+                  MEDORA's AI Clinical Pharmacist reviewed your cart and identified adverse drug-drug interactions that are dangerous if consumed together.
+                </p>
+              </div>
+            </div>
+
+            {/* List of Detected Clinical Alerts */}
+            <div style={{ maxHeight: '340px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '1.5rem', paddingRight: '4px' }}>
+              {aiInteractionReport.alerts.map((alert, idx) => (
+                <div
+                  key={idx}
+                  style={{
+                    padding: '1.1rem',
+                    borderRadius: '14px',
+                    background: alert.severity === 'CRITICAL' ? '#fff5f5' : '#fffbeb',
+                    border: alert.severity === 'CRITICAL' ? '1px solid #fecaca' : '1px solid #fde68a'
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                    <strong style={{ fontSize: '0.92rem', color: alert.severity === 'CRITICAL' ? '#991b1b' : '#92400e' }}>
+                      {alert.title}
+                    </strong>
+                    <span style={{ fontSize: '0.72rem', background: '#ffffff', border: '1px solid #cbd5e1', padding: '2px 8px', borderRadius: '4px', fontWeight: '700', color: '#334155' }}>
+                      {alert.medicine_a} ⚡ {alert.medicine_b}
+                    </span>
+                  </div>
+
+                  <p style={{ margin: '0 0 8px 0', fontSize: '0.8rem', color: '#334155', lineHeight: '1.45' }}>
+                    {alert.description}
+                  </p>
+
+                  <div style={{ fontSize: '0.78rem', color: '#0369a1', background: '#f0f9ff', padding: '6px 10px', borderRadius: '8px', border: '1px solid #bae6fd', marginBottom: '10px' }}>
+                    <strong>Clinical Direction:</strong> {alert.recommendation}
+                  </div>
+
+                  {/* 1-Click Quick Remove Conflicting Medicines */}
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const itemIndex = cart.findIndex(c => (c.brand_name || c.name || '').toLowerCase().includes(alert.medicine_a.toLowerCase()) || alert.medicine_a.toLowerCase().includes((c.brand_name || c.name || '').toLowerCase()));
+                        if (itemIndex >= 0) {
+                          removeFromCart(itemIndex);
+                          showToast(`Removed ${alert.medicine_a} from cart`, '🗑️');
+                          setAiInteractionModalOpen(false);
+                        }
+                      }}
+                      style={{
+                        background: '#fee2e2',
+                        border: '1px solid #fca5a5',
+                        color: '#b91c1c',
+                        padding: '5px 12px',
+                        borderRadius: '8px',
+                        fontWeight: '700',
+                        fontSize: '0.74rem',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      🗑️ Remove {alert.medicine_a}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const itemIndex = cart.findIndex(c => (c.brand_name || c.name || '').toLowerCase().includes(alert.medicine_b.toLowerCase()) || alert.medicine_b.toLowerCase().includes((c.brand_name || c.name || '').toLowerCase()));
+                        if (itemIndex >= 0) {
+                          removeFromCart(itemIndex);
+                          showToast(`Removed ${alert.medicine_b} from cart`, '🗑️');
+                          setAiInteractionModalOpen(false);
+                        }
+                      }}
+                      style={{
+                        background: '#fee2e2',
+                        border: '1px solid #fca5a5',
+                        color: '#b91c1c',
+                        padding: '5px 12px',
+                        borderRadius: '8px',
+                        fontWeight: '700',
+                        fontSize: '0.74rem',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      🗑️ Remove {alert.medicine_b}
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Action Footer */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #e2e8f0', paddingTop: '1rem' }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setAiInteractionModalOpen(false);
+                  setIsChatOpen(true);
+                }}
+                style={{
+                  background: '#f0fdfa',
+                  border: '1px solid #ccfbf1',
+                  color: '#0d9488',
+                  padding: '8px 16px',
+                  borderRadius: '10px',
+                  fontWeight: '700',
+                  fontSize: '0.82rem',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}
+              >
+                <span>🩺</span>
+                <span>Ask AI Doctor for Safe Alternative</span>
+              </button>
+
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button
+                  type="button"
+                  onClick={() => setAiInteractionModalOpen(false)}
+                  style={{
+                    background: '#f1f5f9',
+                    border: '1px solid #cbd5e1',
+                    color: '#334155',
+                    padding: '8px 16px',
+                    borderRadius: '10px',
+                    fontWeight: '700',
+                    fontSize: '0.82rem',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Review Cart
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (confirm("Proceeding with potentially hazardous drug combination. Do you confirm you have consulted a registered medical practitioner?")) {
+                      setAiInteractionModalOpen(false);
+                      setPaymentStep('payment');
+                      fetchPharmacyLiveTerminalQr();
+                    }
+                  }}
+                  style={{
+                    background: '#ef4444',
+                    border: 'none',
+                    color: '#ffffff',
+                    padding: '8px 16px',
+                    borderRadius: '10px',
+                    fontWeight: '800',
+                    fontSize: '0.82rem',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Acknowledge & Proceed
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* FLOATING SAFETY VERIFIED BADGE */}
+      {safetyVerifiedBanner && (
+        <div style={{
+          position: 'fixed',
+          top: '75px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          zIndex: 2600,
+          background: 'linear-gradient(135deg, #15803d 0%, #166534 100%)',
+          color: '#ffffff',
+          padding: '0.8rem 1.8rem',
+          borderRadius: '30px',
+          boxShadow: '0 10px 30px rgba(22, 101, 52, 0.4)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '10px',
+          fontSize: '0.88rem',
+          fontWeight: '800',
+          border: '1px solid #86efac',
+          animation: 'fadeInUp 0.3s ease-out'
+        }}>
+          <span style={{ fontSize: '1.2rem' }}>🛡️</span>
+          <span>AI Clinical Safety Check Passed: No Drug-Drug Interactions Detected!</span>
         </div>
       )}
 

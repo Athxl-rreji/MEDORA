@@ -399,3 +399,187 @@ async def chat_consultation(request: ChatRequest, mock_db: PrototypeDataStore = 
         confidence_score=conf_score,
         confidence_label=conf_label
     )
+
+
+# ─── AI DRUG-DRUG INTERACTION CHECKER AT CHECKOUT ────────────────────────────
+
+class DrugItem(BaseModel):
+    name: str
+    generic_name: Optional[str] = ""
+    dosage: Optional[str] = ""
+
+class InteractionCheckRequest(BaseModel):
+    medicines: List[DrugItem]
+
+class InteractionAlert(BaseModel):
+    medicine_a: str
+    medicine_b: str
+    severity: str  # "CRITICAL" | "MODERATE" | "WARNING"
+    title: str
+    description: str
+    recommendation: str
+
+class InteractionCheckResponse(BaseModel):
+    safe: bool
+    severity: str  # "SAFE" | "MODERATE" | "CRITICAL"
+    alerts: List[InteractionAlert]
+    summary: str
+
+
+@router.post("/check-interactions", response_model=InteractionCheckResponse)
+def check_drug_interactions(req: InteractionCheckRequest):
+    """
+    Analyzes medicines in the patient's cart at checkout to detect dangerous
+    drug-drug interactions, accidental duplicate dosing, and severe contraindications.
+    """
+    meds = req.medicines
+    if len(meds) < 2:
+        return InteractionCheckResponse(
+            safe=True,
+            severity="SAFE",
+            alerts=[],
+            summary="Single medicine in cart - no drug-drug combination conflicts detected."
+        )
+
+    alerts: List[InteractionAlert] = []
+
+    # Helper text extractor
+    def get_text(m: DrugItem) -> str:
+        return f"{m.name} {m.generic_name or ''} {m.dosage or ''}".lower()
+
+    # Pre-classify drugs
+    paracetamol_meds = []
+    nsaid_meds = []
+    antibiotic_meds = []
+    antacid_calcium_meds = []
+    sedative_antihistamine_meds = []
+    blood_thinner_meds = []
+    steroid_meds = []
+    ace_arb_meds = []
+    potassium_meds = []
+
+    for m in meds:
+        t = get_text(m)
+        if any(k in t for k in ["dolo", "crocin", "calpol", "pacimol", "paracetamol", "acetaminophen", "combiflam", "febrex"]):
+            paracetamol_meds.append(m)
+        if any(k in t for k in ["ibuprofen", "combiflam", "diclofenac", "voveran", "aceclofenac", "zerodol", "naproxen", "brufen", "ketorolac"]):
+            nsaid_meds.append(m)
+        if any(k in t for k in ["ciprofloxacin", "cipro", "azithromycin", "azithral", "azee", "doxycycline", "doxy", "levofloxacin", "norfloxacin", "augmentin", "amoxicillin", "cefixime"]):
+            antibiotic_meds.append(m)
+        if any(k in t for k in ["gelusil", "digene", "shelcal", "calcium", "antacid", "sucralfate", "aluminium", "magnesium hydroxide"]):
+            antacid_calcium_meds.append(m)
+        if any(k in t for k in ["cetirizine", "allegra", "fexofenadine", "atarax", "hydroxyzine", "benadryl", "pheniramine", "avil", "montelukast", "ascoril"]):
+            sedative_antihistamine_meds.append(m)
+        if any(k in t for k in ["aspirin", "ecospirin", "clopidogrel", "clopilet", "warfarin", "eliquis", "apixaban", "heparin"]):
+            blood_thinner_meds.append(m)
+        if any(k in t for k in ["prednisolone", "dexamethasone", "betnesol", "deflazacort", "medrol", "hydrocortisone"]):
+            steroid_meds.append(m)
+        if any(k in t for k in ["telmisartan", "telma", "losartan", "enalapril", "ramipril"]):
+            ace_arb_meds.append(m)
+        if any(k in t for k in ["potassium", "k-bind", "potcl"]):
+            potassium_meds.append(m)
+
+    # Rule 1: Duplicate Paracetamol Overdose Hazard
+    if len(paracetamol_meds) >= 2:
+        names = [m.name for m in paracetamol_meds]
+        alerts.append(InteractionAlert(
+            medicine_a=names[0],
+            medicine_b=names[1],
+            severity="CRITICAL",
+            title="⚠️ Duplicate Paracetamol Overdose Hazard",
+            description=f"Both '{names[0]}' and '{names[1]}' contain Paracetamol (Acetaminophen). Co-administering multiple Paracetamol formulations risks exceeding the safe hepatotoxic ceiling (2000-4000mg/day), carrying severe risk of acute toxic liver injury.",
+            recommendation=f"Remove one of the Paracetamol products ({names[0]} or {names[1]}) before completing checkout."
+        ))
+
+    # Rule 2: Dual NSAID / Bleeding & Gastric Ulcer Hazard
+    if len(nsaid_meds) >= 2:
+        names = [m.name for m in nsaid_meds]
+        alerts.append(InteractionAlert(
+            medicine_a=names[0],
+            medicine_b=names[1],
+            severity="CRITICAL",
+            title="⚠️ Dual NSAID Gastric Ulceration Hazard",
+            description=f"Taking '{names[0]}' concurrently with '{names[1]}' combines two potent non-steroidal anti-inflammatory drugs. This drastically increases the risk of severe gastric mucosal erosion, peptic ulcer perforation, and renal impairment.",
+            recommendation=f"Choose either '{names[0]}' or '{names[1]}'. Do not consume two NSAID pain relievers together."
+        ))
+
+    # Rule 3: Blood Thinner + NSAID Hemorrhage Risk
+    if blood_thinner_meds and nsaid_meds:
+        bt_name = blood_thinner_meds[0].name
+        nsaid_name = nsaid_meds[0].name
+        alerts.append(InteractionAlert(
+            medicine_a=bt_name,
+            medicine_b=nsaid_name,
+            severity="CRITICAL",
+            title="🩸 Severe Internal Hemorrhage & Bleeding Risk",
+            description=f"Combining blood thinner / antiplatelet '{bt_name}' with NSAID '{nsaid_name}' impairs normal clotting mechanisms and damages mucosal protection, creating a severe risk of gastrointestinal or systemic bleeding.",
+            recommendation=f"Consult your doctor before taking '{nsaid_name}' with '{bt_name}'. Paracetamol (e.g. Dolo 650) is generally the preferred alternative for pain relief."
+        ))
+
+    # Rule 4: Antibiotic + Antacid / Calcium Chelation Inactivation
+    if antibiotic_meds and antacid_calcium_meds:
+        ab_name = antibiotic_meds[0].name
+        ant_name = antacid_calcium_meds[0].name
+        alerts.append(InteractionAlert(
+            medicine_a=ab_name,
+            medicine_b=ant_name,
+            severity="MODERATE",
+            title="⚠️ Antibiotic Inactivation by Antacid / Minerals",
+            description=f"Metal cations (Calcium, Magnesium, Aluminium) in '{ant_name}' chelate and bind with '{ab_name}' in the digestive tract, preventing antibiotic absorption and causing treatment failure.",
+            recommendation=f"Maintain a minimum 2 to 3 hour gap between taking '{ab_name}' and '{ant_name}'."
+        ))
+
+    # Rule 5: Steroid + NSAID Synergistic Ulceration
+    if steroid_meds and nsaid_meds:
+        st_name = steroid_meds[0].name
+        nsaid_name = nsaid_meds[0].name
+        alerts.append(InteractionAlert(
+            medicine_a=st_name,
+            medicine_b=nsaid_name,
+            severity="CRITICAL",
+            title="⚠️ Synergistic Peptic Ulceration & Perforation",
+            description=f"Corticosteroid '{st_name}' combined with NSAID '{nsaid_name}' produces a 4x to 15x multiplied risk of acute upper gastrointestinal ulceration and hemorrhage.",
+            recommendation="Do not combine steroids with NSAIDs without explicit physician supervision and proton-pump inhibitor (e.g. Pantocid 40) co-prescription."
+        ))
+
+    # Rule 6: Dual Sedative / Antihistamine CNS Depression
+    if len(sedative_antihistamine_meds) >= 2:
+        names = [m.name for m in sedative_antihistamine_meds]
+        alerts.append(InteractionAlert(
+            medicine_a=names[0],
+            medicine_b=names[1],
+            severity="MODERATE",
+            title="💤 Additive Sedation & CNS Depression",
+            description=f"Combining '{names[0]}' with '{names[1]}' produces additive antihistaminic CNS suppression, causing marked drowsiness, slowed reflexes, and impaired psychomotor coordination.",
+            recommendation=f"Avoid combining multiple anti-allergic or cough preparations together. Do not drive or operate machinery."
+        ))
+
+    # Rule 7: ACE-Inhibitor / ARB + Potassium Hyperkalemia
+    if ace_arb_meds and potassium_meds:
+        ace_name = ace_arb_meds[0].name
+        pot_name = potassium_meds[0].name
+        alerts.append(InteractionAlert(
+            medicine_a=ace_name,
+            medicine_b=pot_name,
+            severity="CRITICAL",
+            title="❤️ Life-Threatening Hyperkalemia Risk",
+            description=f"Blood pressure medication '{ace_name}' reduces renal excretion of potassium. Combining with '{pot_name}' can cause acute hyperkalemia and lethal cardiac dysrhythmias.",
+            recommendation=f"Do not take potassium supplements with '{ace_name}' unless expressly directed by your cardiologist with serum electrolyte monitoring."
+        ))
+
+    if alerts:
+        has_critical = any(a.severity == "CRITICAL" for a in alerts)
+        overall_severity = "CRITICAL" if has_critical else "MODERATE"
+        return InteractionCheckResponse(
+            safe=False,
+            severity=overall_severity,
+            alerts=alerts,
+            summary=f"Detected {len(alerts)} clinically significant drug-drug interaction(s). Please review safety advisories before proceeding."
+        )
+
+    return InteractionCheckResponse(
+        safe=True,
+        severity="SAFE",
+        alerts=[],
+        summary="All medicines in cart reviewed. No dangerous drug-drug interactions or duplicate dosing detected."
+    )

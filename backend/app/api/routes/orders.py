@@ -180,3 +180,43 @@ def update_order_status(
         if not updated:
             raise HTTPException(status_code=404, detail="Order not found")
         return {"status": "success", "order": updated}
+
+
+class OrderRiderQrUpdate(BaseModel):
+    rider_qr_image: str
+    rider_qr_type: str = "main"  # "main" | "live"
+    rider_name: Optional[str] = "Delivery Partner"
+    rider_upi_id: Optional[str] = None
+
+
+@router.put("/{order_id}/rider-qr")
+def update_order_rider_qr(
+    order_id: str,
+    payload: OrderRiderQrUpdate,
+    mock_db: PrototypeDataStore = Depends(get_datastore)
+):
+    """
+    Rider selects either their registered main QR or uploads a live dynamic QR
+    for doorstep UPI payment collection by the customer.
+    """
+    order = mock_db.orders.get(order_id)
+    if not order:
+        # Check by lowercase or ID match
+        for oid, o in mock_db.orders.items():
+            if oid.lower() == order_id.lower() or o.get("id", "").lower() == order_id.lower():
+                order = o
+                break
+
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    order["rider_qr_image"] = payload.rider_qr_image
+    order["rider_qr_type"] = payload.rider_qr_type
+    order["rider_name"] = payload.rider_name
+    if payload.rider_upi_id:
+        order["rider_upi_id"] = payload.rider_upi_id
+
+    mock_db.save_orders()
+    logger.info(f"Updated rider payment QR ({payload.rider_qr_type}) for order {order_id}")
+    return {"status": "success", "order": order}
+

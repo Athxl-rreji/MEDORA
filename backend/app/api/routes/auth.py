@@ -72,6 +72,7 @@ class PartnerRequest(BaseModel):
     delivery_zone: Optional[str] = None
     shift_preference: Optional[str] = None
     rider_upi_id: Optional[str] = None
+    rider_upi_qr: Optional[str] = None
     shop_upi_id: Optional[str] = None
     shop_upi_qr: Optional[str] = None
 
@@ -235,6 +236,7 @@ def partner_request(
         "delivery_zone": payload.delivery_zone,
         "shift_preference": payload.shift_preference,
         "rider_upi_id": payload.rider_upi_id,
+        "rider_upi_qr": payload.rider_upi_qr,
         "shop_upi_id": payload.shop_upi_id,
         "shop_upi_qr": payload.shop_upi_qr
     }
