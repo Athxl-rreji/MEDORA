@@ -7,7 +7,15 @@
 export const CLOUD_BACKEND_URL = 'https://medora-backend-4q9x.onrender.com';
 
 export const getApiUrl = () => {
-  const envApi = process.env.NEXT_PUBLIC_API_URL;
+  let envApi = process.env.NEXT_PUBLIC_API_URL;
+
+  // IMPORTANT: The backend is exclusively hosted on Render (FastAPI/Python).
+  // Any stale or failed Vercel backend URL (e.g. backend-three-kappa-38.vercel.app or any *.vercel.app)
+  // is invalid and MUST be replaced with the live Render backend URL.
+  if (envApi && (envApi.includes('vercel.app') || envApi.includes('backend-three-kappa') || envApi.includes('backend-'))) {
+    envApi = CLOUD_BACKEND_URL;
+  }
+
   const isEnvLocal = !envApi || envApi.includes('localhost') || envApi.includes('127.0.0.1');
 
   if (typeof window !== 'undefined' && window.location?.hostname) {
@@ -20,7 +28,10 @@ export const getApiUrl = () => {
 
     // 1. If running on Vercel or any public domain name (e.g. *.vercel.app, *.app, etc.)
     if (host.includes('vercel.app') || (!isLocalhost && !isIpv4 && !isMdns)) {
-      return (!isEnvLocal && envApi) ? envApi.replace(/\/+$/, '') : CLOUD_BACKEND_URL;
+      if (!isEnvLocal && envApi && !envApi.includes('vercel.app')) {
+        return envApi.replace(/\/+$/, '');
+      }
+      return CLOUD_BACKEND_URL;
     }
 
     // 2. Wi-Fi / Hotspot LAN access from Mac / mobile device (e.g., 172.20.10.2:3000 -> 172.20.10.2:8000)
@@ -29,15 +40,15 @@ export const getApiUrl = () => {
     }
 
     // 3. Local laptop browser (localhost / 127.0.0.1)
-    return (!isEnvLocal && envApi) ? envApi.replace(/\/+$/, '') : 'http://localhost:8000';
+    return (!isEnvLocal && envApi && !envApi.includes('vercel.app')) ? envApi.replace(/\/+$/, '') : 'http://localhost:8000';
   }
 
   // Server-side rendering (SSR in Next.js / Vercel build time)
   if (process.env.VERCEL || process.env.NODE_ENV === 'production') {
-    return (!isEnvLocal && envApi) ? envApi.replace(/\/+$/, '') : CLOUD_BACKEND_URL;
+    return (!isEnvLocal && envApi && !envApi.includes('vercel.app')) ? envApi.replace(/\/+$/, '') : CLOUD_BACKEND_URL;
   }
 
-  return (envApi || 'http://localhost:8000').replace(/\/+$/, '');
+  return (!isEnvLocal && envApi && !envApi.includes('vercel.app')) ? envApi.replace(/\/+$/, '') : 'http://localhost:8000';
 };
 
 export const API = getApiUrl();
