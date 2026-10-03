@@ -43,9 +43,12 @@ def dispatch_email_message(
 ) -> bool:
     """
     Intelligent Multi-Strategy Email Dispatcher:
-    Strategy 1: HTTPS API Relay over Port 443 (Permitted through all cloud firewalls including Render free tier)
-    Strategy 2: Direct SMTP SSL on Port 465
-    Strategy 3: Direct SMTP TLS on Port 587
+    Strategy 1: Google Apps Script Webhook (Direct from medora2k26@gmail.com over HTTPS Port 443)
+    Strategy 2: Resend API (HTTPS Port 443)
+    Strategy 3: Brevo API (HTTPS Port 443)
+    Strategy 4: Vercel Next.js Gateway (HTTPS Port 443 with bypass support)
+    Strategy 5: Direct SMTP SSL on Port 465 (Localhost / Unrestricted VPS)
+    Strategy 6: Direct SMTP TLS on Port 587
     """
     server_host, configured_port, smtp_user, clean_password = get_smtp_config()
     recipients = [recipient_email]
@@ -55,10 +58,11 @@ def dispatch_email_message(
                 recipients.append(er)
 
     # -------------------------------------------------------------
-    # STRATEGY 1: HTTPS Web Relay (Port 443)
-    # Essential for cloud platforms like Render that block SMTP ports
+    # STRATEGY 1: Google Apps Script Webhook (Port 443 HTTPS)
+    # Direct dispatch from medora2k26@gmail.com with zero firewall or auth blocks
     # -------------------------------------------------------------
-    for relay_url in get_relay_urls():
+    gas_url = os.getenv("GOOGLE_APPS_SCRIPT_URL") or os.getenv("GMAIL_WEBHOOK_URL")
+    if gas_url and gas_url.startswith("https://script.google.com/"):
         try:
             payload = {
                 "to": recipient_email,
@@ -69,9 +73,102 @@ def dispatch_email_message(
             }
             req_data = json.dumps(payload).encode("utf-8")
             req = urllib.request.Request(
+                gas_url,
+                data=req_data,
+                headers={"Content-Type": "application/json"},
+                method="POST"
+            )
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                if resp.status in (200, 201, 302):
+                    logger.info(f"SUCCESS: Delivered email to {recipient_email} via Google Apps Script Webhook!")
+                    return True
+        except Exception as e_gas:
+            logger.warning(f"Google Apps Script Webhook dispatch failed: {e_gas}")
+
+    # -------------------------------------------------------------
+    # STRATEGY 2: Resend HTTP API (Port 443 HTTPS)
+    # -------------------------------------------------------------
+    resend_key = os.getenv("RESEND_API_KEY")
+    if resend_key and resend_key.startswith("re_"):
+        try:
+            payload = {
+                "from": f"{sender_name} <onboarding@resend.dev>",
+                "to": [recipient_email],
+                "subject": subject,
+                "html": html_content,
+                "text": plain_text or subject
+            }
+            req_data = json.dumps(payload).encode("utf-8")
+            req = urllib.request.Request(
+                "https://api.resend.com/emails",
+                data=req_data,
+                headers={
+                    "Content-Type": "application/json",
+                    "Authorization": f"Bearer {resend_key}"
+                },
+                method="POST"
+            )
+            with urllib.request.urlopen(req, timeout=8) as resp:
+                if resp.status in (200, 201):
+                    logger.info(f"SUCCESS: Delivered email to {recipient_email} via Resend API!")
+                    return True
+        except Exception as e_resend:
+            logger.warning(f"Resend API dispatch failed: {e_resend}")
+
+    # -------------------------------------------------------------
+    # STRATEGY 3: Brevo (Sendinblue) HTTP API (Port 443 HTTPS)
+    # -------------------------------------------------------------
+    brevo_key = os.getenv("BREVO_API_KEY")
+    if brevo_key:
+        try:
+            payload = {
+                "sender": {"name": sender_name, "email": smtp_user},
+                "to": [{"email": recipient_email}],
+                "subject": subject,
+                "htmlContent": html_content
+            }
+            req_data = json.dumps(payload).encode("utf-8")
+            req = urllib.request.Request(
+                "https://api.brevo.com/v3/smtp/email",
+                data=req_data,
+                headers={
+                    "Content-Type": "application/json",
+                    "api-key": brevo_key
+                },
+                method="POST"
+            )
+            with urllib.request.urlopen(req, timeout=8) as resp:
+                if resp.status in (200, 201):
+                    logger.info(f"SUCCESS: Delivered email to {recipient_email} via Brevo API!")
+                    return True
+        except Exception as e_brevo:
+            logger.warning(f"Brevo API dispatch failed: {e_brevo}")
+
+    # -------------------------------------------------------------
+    # STRATEGY 4: Vercel Next.js Gateway (Port 443 HTTPS)
+    # -------------------------------------------------------------
+    bypass_secret = os.getenv("VERCEL_AUTOMATION_BYPASS_SECRET", "")
+    for relay_url in get_relay_urls():
+        try:
+            payload = {
+                "to": recipient_email,
+                "subject": subject,
+                "html": html_content,
+                "text": plain_text or subject,
+                "from_name": sender_name
+            }
+            req_data = json.dumps(payload).encode("utf-8")
+            headers = {
+                "Content-Type": "application/json",
+                "User-Agent": "MEDORA-Backend-Relay/2.0"
+            }
+            if bypass_secret:
+                headers["x-vercel-protection-bypass"] = bypass_secret
+
+            req = urllib.request.Request(
                 relay_url,
                 data=req_data,
-                headers={"Content-Type": "application/json", "User-Agent": "MEDORA-Backend-Relay/2.0"},
+                headers=headers,
                 method="POST"
             )
             with urllib.request.urlopen(req, timeout=7) as resp:
@@ -79,7 +176,6 @@ def dispatch_email_message(
                     logger.info(f"SUCCESS: Delivered email to {recipient_email} via HTTPS Gateway ({relay_url})!")
                     return True
         except Exception as e:
-            # Continue to next candidate or fallback
             pass
 
     # -------------------------------------------------------------
