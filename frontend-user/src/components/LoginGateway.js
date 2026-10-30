@@ -1,6 +1,7 @@
 "use client";
 import React, { useState, useEffect } from 'react';
 import CartoonBootup from './CartoonBootup';
+import MedicalMatrixRain from './MedicalMatrixRain';
 import { API } from '../utils/apiConfig';
 import { detectDeviceLocation } from '../utils/gpsManager';
 
@@ -983,19 +984,29 @@ export default function LoginGateway({ onLoginSuccess }) {
       {showBootupToon && <CartoonBootup onComplete={() => setShowBootupToon(false)} />}
       <div style={{
         minHeight: '100vh',
+        position: 'relative',
+        overflow: 'hidden',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         padding: '1.5rem 0.85rem',
-        background: 'var(--bg-body)',
-        backgroundImage: 'radial-gradient(circle at 50% 30%, rgba(184, 247, 228, 0.14) 0%, transparent 60%)'
+        background: '#070a11'
       }}>
+        {/* Minimal Medical Matrix Rain Background (Falling Pills, Medicines & Medicine Bags) */}
+        <MedicalMatrixRain />
+
         <div className="glass-panel" style={{
+          position: 'relative',
+          zIndex: 2,
           width: '100%',
           maxWidth: '540px',
           padding: 'clamp(1.25rem, 4vw, 2.5rem)',
           borderRadius: '24px',
-          boxShadow: '0 20px 60px rgba(0, 0, 0, 0.08), 0 0 30px rgba(13, 148, 136, 0.1)'
+          background: 'rgba(18, 24, 38, 0.82)',
+          backdropFilter: 'blur(20px)',
+          WebkitBackdropFilter: 'blur(20px)',
+          border: '1px solid rgba(45, 212, 191, 0.25)',
+          boxShadow: '0 25px 60px rgba(0, 0, 0, 0.65), 0 0 35px rgba(13, 148, 136, 0.15)'
         }}>
           
           {/* Logo & Cartoon Quick Launch */}
