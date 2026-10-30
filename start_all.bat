@@ -35,12 +35,16 @@ echo [4/5] Launching Pharmacy Terminal (0.0.0.0:3001)...
 start "MEDORA Service - Pharmacy Web App" cmd /k "title MEDORA Service - Pharmacy Web App && cd /d "%ROOT_DIR%frontend-pharmacy" && npm run dev"
 
 :: 5. Launch Delivery Rider Dashboard on Port 3002
-echo [5/5] Launching Delivery Rider Dashboard (0.0.0.0:3002)...
+echo [5/6] Launching Delivery Rider Dashboard (0.0.0.0:3002)...
 start "MEDORA Service - Delivery Web App" cmd /k "title MEDORA Service - Delivery Web App && cd /d "%ROOT_DIR%frontend-delivery" && npm run dev"
+
+:: 6. Launch YouPI-PG UPI & COD Payment Gateway on Ports 6100 & 7000
+echo [6/6] Launching YouPI-PG Payment Gateway (0.0.0.0:6100 / 7000)...
+start "MEDORA Service - YouPI-PG Gateway" cmd /k "title MEDORA Service - YouPI-PG Gateway && cd /d "%ROOT_DIR%youpi-pg" && npm run dev"
 
 echo.
 echo ===================================================================
-echo   All 5 MEDORA microservices launched in separate terminals!
+echo   All 6 MEDORA microservices launched in separate terminals!
 echo ===================================================================
 echo.
 echo   [THIS LAPTOP ACCESS]
@@ -49,6 +53,8 @@ echo   * Patient & Admin:      http://localhost:3000
 echo   * Pharmacy Terminal:    http://localhost:3001
 echo   * Delivery Console:     http://localhost:3002
 echo   * Backend API:          http://localhost:8000 (Swagger: /docs)
+echo   * YouPI-PG Portal:      http://localhost:7000
+echo   * YouPI-PG Core API:    http://localhost:6100
 echo.
 echo   [MAC, IPHONE, ANDROID, TABLET ACCESS (SAME WI-FI)]
 echo   --------------------------------------------------

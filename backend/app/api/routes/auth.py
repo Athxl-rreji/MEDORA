@@ -198,11 +198,16 @@ def reset_password(
     """
     Verifies 6-digit OTP and resets user password.
     """
-    is_valid, msg = mock_db.verify_otp(payload.email, payload.otp)
+    email_clean = payload.email.strip()
+    is_valid, msg = mock_db.verify_otp(email_clean, payload.otp.strip())
     if not is_valid:
         raise HTTPException(status_code=400, detail=msg)
     
-    success = mock_db.update_password(payload.email, payload.new_password)
+    try:
+        success = mock_db.update_password(email_clean, payload.new_password.strip())
+    except ValueError as val_err:
+        raise HTTPException(status_code=400, detail=str(val_err))
+
     if not success:
         raise HTTPException(status_code=404, detail="User account not found.")
     

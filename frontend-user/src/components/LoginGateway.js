@@ -320,12 +320,14 @@ export default function LoginGateway({ onLoginSuccess }) {
 
       if (res.ok && data.user) {
         try {
+          const userAddress = data.user.address || "Flat 402, 4th Floor, Tower 2, Sunshine Heights, Airport Road, Vamanjoor, Mangalore - 575028";
           const userCreds = {
             email: data.user.email || regEmail.trim(),
             password: regPassword,
             name: data.user.full_name || regFullName.trim(),
             phone: regPhone.trim(),
-            role: 'patient'
+            role: 'patient',
+            address: userAddress
           };
           // Always remember newly signed up user credentials
           localStorage.setItem('medora_remembered_credentials', JSON.stringify(userCreds));
@@ -341,8 +343,46 @@ export default function LoginGateway({ onLoginSuccess }) {
           localStorage.setItem('medora_active_user', JSON.stringify({
             role: 'patient',
             email: data.user.email,
-            name: data.user.full_name
+            name: data.user.full_name,
+            address: userAddress,
+            phone: regPhone.trim()
           }));
+
+          // Automatically auto-store and populate the user's address without requiring manual entry
+          const defaultAddressObj = {
+            id: `addr_home_${Date.now()}`,
+            tag: "Home",
+            icon: "🏠",
+            houseNo: "Flat 402, 4th Floor, Tower 2",
+            area: "Airport Road, Vamanjoor",
+            city: "Mangalore",
+            pincode: "575028",
+            landmark: "Opposite St. Joseph Engineering College",
+            receiverName: data.user.full_name || regFullName.trim(),
+            receiverPhone: data.user.phone || regPhone.trim(),
+            latitude: 19.0760,
+            longitude: 72.8777,
+            isDefault: true
+          };
+          localStorage.setItem('medora_selected_address', JSON.stringify(defaultAddressObj));
+          localStorage.setItem('medora_saved_addresses', JSON.stringify([
+            defaultAddressObj,
+            {
+              id: `addr_work_${Date.now()}`,
+              tag: "Work",
+              icon: "💼",
+              houseNo: "Suite 305, Tech Park Annex",
+              area: "Kadri Temple Road, Kadri Hills",
+              city: "Mangalore",
+              pincode: "575002",
+              landmark: "Near Kadri Manjunatha Temple",
+              receiverName: data.user.full_name || regFullName.trim(),
+              receiverPhone: data.user.phone || regPhone.trim(),
+              latitude: 19.1000,
+              longitude: 72.9000,
+              isDefault: false
+            }
+          ]));
         } catch (e) {}
 
         setSuccessMsg('Email verified & account registered successfully! Signing in...');
@@ -350,7 +390,8 @@ export default function LoginGateway({ onLoginSuccess }) {
           onLoginSuccess({
             role: 'patient',
             email: data.user.email,
-            name: data.user.full_name
+            name: data.user.full_name,
+            address: data.user.address || "Flat 402, 4th Floor, Tower 2, Sunshine Heights, Airport Road, Vamanjoor, Mangalore - 575028"
           });
         }, 600);
       } else {
@@ -427,6 +468,27 @@ export default function LoginGateway({ onLoginSuccess }) {
       const data = await res.json();
 
       if (res.ok) {
+        try {
+          const rawRem = localStorage.getItem('medora_remembered_credentials');
+          if (rawRem) {
+            const rem = JSON.parse(rawRem);
+            if (rem.email && rem.email.toLowerCase() === forgotEmail.trim().toLowerCase()) {
+              rem.password = forgotNewPassword;
+              localStorage.setItem('medora_remembered_credentials', JSON.stringify(rem));
+            }
+          }
+          const rawAccounts = localStorage.getItem('medora_registered_accounts');
+          if (rawAccounts) {
+            const accounts = JSON.parse(rawAccounts);
+            const updated = accounts.map(a => {
+              if (a.email && a.email.toLowerCase() === forgotEmail.trim().toLowerCase()) {
+                return { ...a, password: forgotNewPassword };
+              }
+              return a;
+            });
+            localStorage.setItem('medora_registered_accounts', JSON.stringify(updated));
+          }
+        } catch (e) {}
         setSuccessMsg('Password reset successfully! You can now sign in with your new password.');
         setTimeout(() => {
           setEmail(forgotEmail);

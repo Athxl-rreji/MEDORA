@@ -196,3 +196,39 @@ def delete_user(
         logger.error(f"Delete error for user {user_id}: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to delete user account: {str(e)}")
 
+
+
+class AdminChangePasswordPayload(BaseModel):
+    new_password: str
+
+@router.put("/users/{user_id}/password")
+def admin_change_user_password(
+    user_id: str,
+    payload: AdminChangePasswordPayload,
+    mock_db: PrototypeDataStore = Depends(get_datastore)
+):
+    """
+    Administrator override to directly change any user's password.
+    """
+    user = mock_db.find_user(user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User account not found.")
+
+    if not payload.new_password or len(payload.new_password.strip()) < 4:
+        raise HTTPException(status_code=400, detail="New password must be at least 4 characters long.")
+
+    try:
+        success = mock_db.update_password(user["id"], payload.new_password.strip(), is_admin=True)
+        if not success:
+            raise HTTPException(status_code=404, detail="Failed to update password for user.")
+        return {
+            "status": "success",
+            "message": f"Password for {user.get('email')} successfully updated by Administrator.",
+            "user_id": user.get("id"),
+            "email": user.get("email")
+        }
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
+    except Exception as e:
+        logger.error(f"Admin password change error for {user_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to change user password: {str(e)}")

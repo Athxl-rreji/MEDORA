@@ -25,10 +25,14 @@ services:
         value: sb_publishable_uoqbLCd0JokQJGizvo6PcA_4xj9rAQt
       - key: GEMINI_API_KEY
         value: AQ.Ab8RN6Js_Iap5zHDJQp1PFrwsCfP8gWoEogju4w41SRKg02_TQ
-      - key: RAZORPAY_KEY_ID
-        value: rzp_test_TGSG2Ef0As1aMa
-      - key: RAZORPAY_KEY_SECRET
-        value: X44IAL2HuzatQ8PmZKli9ZpX
+      - key: YOUPI_PG_API_URL
+        value: http://localhost:6100
+      - key: YOUPI_CHECKOUT_URL
+        value: http://localhost:7000
+      - key: YOUPI_MERCHANT_ID
+        value: 00000000-0000-0000-0000-000000000001
+      - key: YOUPI_WEBHOOK_SECRET
+        value: medora_youpi_secret
       - key: SMTP_SERVER
         value: smtp.gmail.com
       - key: SMTP_PORT

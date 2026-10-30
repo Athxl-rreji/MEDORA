@@ -8,6 +8,7 @@ import AdminView from '../components/AdminView';
 import SwiggyAddressDrawer from '../components/SwiggyAddressDrawer';
 import LivePerimeterRadar from '../components/LivePerimeterRadar';
 import CartoonBootup from '../components/CartoonBootup';
+import YouPiCheckoutModal from '../components/YouPiCheckoutModal';
 import { API } from '../utils/apiConfig';
 const DEFAULT_USER_ID = "usr_patient_1";
 
@@ -71,6 +72,7 @@ function TrackingBar({ status }) {
           );
         })}
       </div>
+
     </div>
   );
 }
@@ -128,15 +130,41 @@ export default function Home() {
     if (typeof window !== 'undefined') {
       localStorage.setItem('medora_active_user', JSON.stringify(userData));
 
-      // First-time address prompt for patients
+      // Auto-assign and store delivery address for patients without forcing manual setup
       const role = userData?.role || 'patient';
       if (role === 'patient') {
         const userKey = (userData?.email || userData?.id || 'patient').toLowerCase();
-        const hasConfigured = localStorage.getItem(`medora_address_configured_${userKey}`);
-        if (!hasConfigured) {
-          setIsFirstTimeAddressSetup(true);
-          setIsAddressDrawerOpen(true);
-          showToast("📍 Welcome to MEDORA! Please set your delivery address to start receiving 10-minute medicine deliveries.", "👋");
+        localStorage.setItem(`medora_address_configured_${userKey}`, 'true');
+
+        const existingAddr = localStorage.getItem('medora_selected_address');
+        if (!existingAddr || !JSON.parse(existingAddr)?.houseNo) {
+          const autoAddr = {
+            id: `addr_home_${Date.now()}`,
+            tag: "Home",
+            icon: "🏠",
+            houseNo: "Flat 402, 4th Floor, Tower 2",
+            area: "Airport Road, Vamanjoor",
+            city: "Mangalore",
+            pincode: "575028",
+            landmark: "Opposite St. Joseph Engineering College",
+            receiverName: userData.name || 'User',
+            receiverPhone: userData.phone || '+91 99999 99999',
+            latitude: 19.0760,
+            longitude: 72.8777,
+            isDefault: true
+          };
+          localStorage.setItem('medora_selected_address', JSON.stringify(autoAddr));
+          setSelectedAddress(autoAddr);
+        } else {
+          try {
+            const parsed = JSON.parse(existingAddr);
+            if (userData.name && parsed.receiverName === 'Adhwaith' && userData.name !== 'Adhwaith (Patient)') {
+              parsed.receiverName = userData.name;
+              if (userData.phone) parsed.receiverPhone = userData.phone;
+              localStorage.setItem('medora_selected_address', JSON.stringify(parsed));
+              setSelectedAddress(parsed);
+            }
+          } catch (e) {}
         }
       }
     }
@@ -315,6 +343,8 @@ export default function Home() {
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [paymentStatusMsg, setPaymentStatusMsg] = useState('');
   const [completedOrderInfo, setCompletedOrderInfo] = useState(null);
+  const [isYoupiModalOpen, setIsYoupiModalOpen] = useState(false);
+  const [youpiPaymentSession, setYoupiPaymentSession] = useState(null);
 
   // Live POS Machine & Shop UPI Terminal State
   const [liveTerminalData, setLiveTerminalData] = useState(null);
@@ -1502,12 +1532,36 @@ export default function Home() {
     setIsProcessingPayment(true);
     setPaymentStep('processing');
 
-    // 1. Cash on Delivery direct flow
+    // 1. Cash on Delivery (COD) Flow via YouPI-PG
     if (selectedPaymentMethod === 'cod') {
       try {
-        setPaymentStatusMsg('Confirming COD Request with Fulfilling Pharmacy & Dispatching Rider...');
-        await new Promise(r => setTimeout(r, 700));
-        await finalizeOrderPlacement(totalAmt, 'cod', `COD_${Math.random().toString(36).substring(2, 10).toUpperCase()}`);
+        setPaymentStatusMsg('Initializing COD Order via YouPI-PG Gateway & Dispatching Rider...');
+        await new Promise(r => setTimeout(r, 600));
+        const currentUserId = activeUser?.id || activeUser?.email || DEFAULT_USER_ID;
+        
+        let paymentId = `COD_${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
+        try {
+          const res = await fetch(`${API}/api/v1/payments/create-intent`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              user_id: currentUserId,
+              amount: totalAmt,
+              currency: 'INR',
+              payment_method: 'cod',
+              customer_name: activeUser?.name || accountEditName || 'Patient',
+              customer_email: activeUser?.email || 'patient@medora.com'
+            })
+          });
+          if (res.ok) {
+            const data = await res.json();
+            paymentId = data.payment_id || paymentId;
+          }
+        } catch (e) {
+          console.warn('Backend payment intent offline, continuing with local COD ID:', e);
+        }
+
+        await finalizeOrderPlacement(totalAmt, 'cod', paymentId);
       } catch (err) {
         showToast(`COD Error: ${err.message}`, '⚠️');
         setPaymentStep('payment');
@@ -1517,47 +1571,77 @@ export default function Home() {
       return;
     }
 
-    // 2. Direct Store UPI Payment Flow with Terminal Soundbox Sync
+    // 2. YouPI-PG Sovereign UPI Payment Flow (Direct Payout to Delivery Rider)
     if (selectedPaymentMethod === 'upi') {
       try {
-        setPaymentStatusMsg('Connecting to Store Terminal & Synchronizing UPI Soundbox...');
-        await new Promise(r => setTimeout(r, 900));
-        setPaymentStatusMsg('Verifying Payment with Store POS Soundbox & Authorizing...');
-        await new Promise(r => setTimeout(r, 800));
-        const upiTxnId = `UPI_${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
-        await finalizeOrderPlacement(totalAmt, 'upi', upiTxnId);
-      } catch (err) {
-        showToast(`UPI Payment Error: ${err.message}`, '⚠️');
-        setPaymentStep('payment');
-      } finally {
+        const currentUserId = activeUser?.id || activeUser?.email || DEFAULT_USER_ID;
+        const riderVpa = (typeof window !== 'undefined' ? (localStorage.getItem('medora_rider_vpa') || '') : '') || activeUser?.rider_upi_id || 'rider.agt-591@okhdfcbank';
+        const riderName = activeUser?.role === 'delivery' ? (activeUser.name || 'Arjun K') : 'Rider AGT-591';
+        const riderQr = (typeof window !== 'undefined' ? (localStorage.getItem('medora_rider_main_qr') || '') : '') || activeUser?.rider_upi_qr || '';
+
+        let orderRef = `ORD-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+        let paymentId = `YOUPI_${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
+
+        try {
+          const res = await fetch(`${API}/api/v1/payments/create-intent`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              user_id: currentUserId,
+              amount: totalAmt,
+              currency: 'INR',
+              payment_method: 'upi',
+              rider_upi_id: riderVpa,
+              rider_name: riderName,
+              customer_name: activeUser?.name || accountEditName || 'Patient',
+              customer_email: activeUser?.email || 'patient@medora.com'
+            })
+          });
+          if (res.ok) {
+            const data = await res.json();
+            if (data.payment_id) paymentId = data.payment_id;
+            if (data.order_id) orderRef = data.order_id;
+          }
+        } catch (e) {
+          console.warn('Backend payment intent offline, continuing with local YouPI session:', e);
+        }
+
+
+
+        // Launch YouPI-PG interactive checkout modal
+        setYoupiPaymentSession({
+          paymentId,
+          orderId: orderRef,
+          amount: totalAmt,
+          riderName,
+          riderVpa,
+          riderQr,
+          customerName: activeUser?.name || accountEditName || 'Patient',
+          customerEmail: activeUser?.email || 'patient@medora.com'
+        });
+        setIsYoupiModalOpen(true);
         setIsProcessingPayment(false);
+        setPaymentStep('payment');
+      } catch (err) {
+        showToast(`YouPI-PG UPI Error: ${err.message}`, '⚠️');
+        setIsProcessingPayment(false);
+        setPaymentStep('payment');
       }
       return;
     }
-
-    // 3. Direct Rider Payment Flow (Payment goes to Rider who settles at dark-stores/pharmacies)
-    if (selectedPaymentMethod === 'rider_upi') {
-      try {
-        setPaymentStatusMsg('Authorizing Direct Payment to Assigned Delivery Rider...');
-        await new Promise(r => setTimeout(r, 700));
-        setPaymentStatusMsg('Syncing Payment with Rider Terminal & Notifying Dark-store...');
-        await new Promise(r => setTimeout(r, 700));
-        const riderTxnId = `RIDER_${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
-        await finalizeOrderPlacement(totalAmt, 'rider_upi', riderTxnId);
-      } catch (err) {
-        showToast(`Rider Payment Error: ${err.message}`, '⚠️');
-        setPaymentStep('payment');
-      } finally {
-        setIsProcessingPayment(false);
-      }
-      return;
-    }
-
 
     // Fallback if unexpected method
     setSelectedPaymentMethod('upi');
     setIsProcessingPayment(false);
     setPaymentStep('payment');
+  };
+
+  const handleYoupiPaymentSuccess = async (result) => {
+    setIsYoupiModalOpen(false);
+    setIsProcessingPayment(true);
+    setPaymentStep('processing');
+    setPaymentStatusMsg('Payment Verified via YouPI Observer! Finalizing Order & Dispatching Rider...');
+    await finalizeOrderPlacement(parseFloat(result.amount), 'upi', result.paymentId);
   };
 
   const finalizeOrderPlacement = async (totalAmt, method, paymentId) => {
@@ -2376,30 +2460,7 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Direct Switch to Dedicated Radar Page / View */}
-          <button
-            className="hide-on-mobile"
-            onClick={() => setActiveMainView(prev => prev === 'radar' ? 'home' : 'radar')}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              background: activeMainView === 'radar' ? 'linear-gradient(135deg, #14b8a6, #0d9488)' : '#161b26',
-              color: activeMainView === 'radar' ? '#ffffff' : '#5eead4',
-              border: activeMainView === 'radar' ? '1px solid #14b8a6' : '1px solid rgba(255, 255, 255, 0.08)',
-              padding: '6px 14px',
-              borderRadius: '20px',
-              fontWeight: '700',
-              fontSize: '0.78rem',
-              cursor: 'pointer',
-              boxShadow: activeMainView === 'radar' ? '0 0 16px rgba(20, 184, 166, 0.45)' : 'var(--neo-shadow-raised-sm)',
-              transition: 'all 0.2s ease'
-            }}
-            title="Calibrate GPS & Radar Settings"
-          >
-            <span>🛰️</span>
-            <span>{activeMainView === 'radar' ? 'Home Shelf' : `Radar (${perimeterKm}km)`}</span>
-          </button>
+
 
           {/* Upload Rx button */}
           <button
@@ -2642,11 +2703,11 @@ export default function Home() {
             Instant clinical consultation with MEDORA AI Doctor, handwritten prescription digitization with Gemini Vision, and verified generic medicines from licensed neighborhood dark-stores.
           </p>
 
-          {/* 4 Premium Glassmorphic Quick-Action Command Cards Grid */}
+          {/* Premium Glassmorphic Quick-Action Command Cards Grid */}
           <div className="hero-command-grid" style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(215px, 1fr))',
-            gap: '14px',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+            gap: '16px',
             maxWidth: '960px',
             margin: '0 auto 2rem auto',
             textAlign: 'left'
@@ -2713,66 +2774,7 @@ export default function Home() {
               <p style={{ margin: '4px 0 0 0', fontSize: '0.74rem', color: '#94a3b8', lineHeight: 1.4 }}>Digitizes handwritten & printed prescriptions in seconds</p>
             </div>
 
-            {/* Card 3: Hyperlocal Radar */}
-            <div 
-              onClick={() => setActiveMainView('radar')}
-              style={{
-                background: '#151a24',
-                border: '1px solid rgba(168, 85, 247, 0.3)',
-                borderRadius: '16px',
-                padding: '1.2rem',
-                cursor: 'pointer',
-                transition: 'all 0.25s ease',
-                boxShadow: 'var(--neo-shadow-raised)',
-                minHeight: '142px',
-                display: 'flex',
-                flexDirection: 'column',
-                justifyContent: 'space-between'
-              }}
-              onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.borderColor = '#a855f7'; e.currentTarget.style.boxShadow = 'var(--neo-shadow-raised-lg), 0 0 16px rgba(168, 85, 247, 0.25)'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.borderColor = 'rgba(168, 85, 247, 0.3)'; e.currentTarget.style.boxShadow = 'var(--neo-shadow-raised)'; }}
-            >
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                  <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.25rem', boxShadow: '0 4px 10px rgba(124, 58, 237, 0.35)' }}>🛰️</div>
-                  <span style={{ fontSize: '0.66rem', fontWeight: '800', background: 'rgba(168, 85, 247, 0.16)', color: '#c084fc', border: '1px solid rgba(168, 85, 247, 0.3)', padding: '2px 8px', borderRadius: '99px' }}>{perimeterKm} km GPS</span>
-                </div>
-                <strong style={{ display: 'block', fontSize: '0.94rem', color: '#f1f5f9', fontWeight: '800' }}>Dark-Store Radar</strong>
-              </div>
-              <p style={{ margin: '4px 0 0 0', fontSize: '0.74rem', color: '#94a3b8', lineHeight: 1.4 }}>Live network map with guaranteed 10-15 min delivery perimeter</p>
-            </div>
 
-            {/* Card 4: Instamart Quick Shelf */}
-            <div 
-              onClick={() => {
-                const el = document.getElementById('instamart-shelf-section');
-                if (el) el.scrollIntoView({ behavior: 'smooth' });
-              }}
-              style={{
-                background: '#151a24',
-                border: '1px solid rgba(255, 119, 0, 0.3)',
-                borderRadius: '16px',
-                padding: '1.2rem',
-                cursor: 'pointer',
-                transition: 'all 0.25s ease',
-                boxShadow: 'var(--neo-shadow-raised)',
-                minHeight: '142px',
-                display: 'flex',
-                flexDirection: 'column',
-                justifyContent: 'space-between'
-              }}
-              onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.borderColor = '#ff7700'; e.currentTarget.style.boxShadow = 'var(--neo-shadow-raised-lg), 0 0 16px rgba(255, 119, 0, 0.25)'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.borderColor = 'rgba(255, 119, 0, 0.3)'; e.currentTarget.style.boxShadow = 'var(--neo-shadow-raised)'; }}
-            >
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                  <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'linear-gradient(135deg, #ea580c 0%, #c2410c 100%)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.25rem', boxShadow: '0 4px 10px rgba(234, 88, 12, 0.35)' }}>⚡</div>
-                  <span style={{ fontSize: '0.66rem', fontWeight: '800', background: 'rgba(255, 119, 0, 0.16)', color: '#fb923c', border: '1px solid rgba(255, 119, 0, 0.3)', padding: '2px 8px', borderRadius: '99px' }}>10-15 Mins</span>
-                </div>
-                <strong style={{ display: 'block', fontSize: '0.94rem', color: '#f1f5f9', fontWeight: '800' }}>Instamart Shelf</strong>
-              </div>
-              <p style={{ margin: '4px 0 0 0', fontSize: '0.74rem', color: '#94a3b8', lineHeight: 1.4 }}>Direct 1-click re-order from nearby stocked partner pharmacies</p>
-            </div>
           </div>
 
           {/* Pharmacy Search Bar Container */}
@@ -5050,81 +5052,7 @@ export default function Home() {
           {activeMainView === 'home' && searchResults.length === 0 && (
             <div style={{ marginTop: '2.5rem', marginBottom: '3.5rem', width: '100%', textAlign: 'left' }}>
               
-              {/* Sleek Hyperlocal Radar Quick-Bar (Clean, Modern & Uncluttered) */}
-              <div style={{
-                background: 'linear-gradient(135deg, rgba(13, 148, 136, 0.08) 0%, rgba(184, 247, 228, 0.18) 100%)',
-                border: '1px solid rgba(13, 148, 136, 0.25)',
-                borderRadius: '20px',
-                padding: '1rem 1.4rem',
-                marginBottom: '1.8rem',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                flexWrap: 'wrap',
-                gap: '1rem',
-                boxShadow: '0 4px 16px rgba(13, 148, 136, 0.05)'
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                  <div style={{
-                    width: '46px',
-                    height: '46px',
-                    borderRadius: '14px',
-                    background: 'linear-gradient(135deg, #0d9488 0%, #14b8a6 100%)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: '1.4rem',
-                    boxShadow: '0 6px 16px rgba(13, 148, 136, 0.22)',
-                    color: '#fff'
-                  }}>
-                    🛰️
-                  </div>
-                  <div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <strong style={{ fontSize: '0.98rem', color: 'var(--text-main)', fontWeight: '800' }}>
-                        Hyperlocal GPS Radar Active ({perimeterKm} km)
-                      </strong>
-                      <span style={{
-                        background: 'rgba(16, 185, 129, 0.15)',
-                        color: 'var(--green)',
-                        fontSize: '0.72rem',
-                        fontWeight: '800',
-                        padding: '2px 8px',
-                        borderRadius: '12px'
-                      }}>
-                        ● {pharmacyNetwork.length} Connected Dark-Stores
-                      </span>
-                    </div>
-                    <p style={{ margin: '3px 0 0 0', fontSize: '0.82rem', color: 'var(--text-muted)' }}>
-                      Serving <strong>{selectedAddress?.area || 'Vamanjoor'}</strong> with 10-15 min express delivery. GPS calibrated.
-                    </p>
-                  </div>
-                </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                  <button
-                    onClick={() => setActiveMainView('radar')}
-                    style={{
-                      background: 'linear-gradient(135deg, #0d9488 0%, #0f766e 100%)',
-                      color: '#ffffff',
-                      border: 'none',
-                      borderRadius: '12px',
-                      padding: '0.65rem 1.25rem',
-                      fontSize: '0.84rem',
-                      fontWeight: '800',
-                      cursor: 'pointer',
-                      boxShadow: '0 4px 14px rgba(13, 148, 136, 0.25)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '8px',
-                      transition: 'all 0.2s ease'
-                    }}
-                  >
-                    <span>🛰️ Open Radar & Calibrate GPS</span>
-                    <span>➔</span>
-                  </button>
-                </div>
-              </div>
 
               {/* Swiggy Instamart Delivery Header Banner */}
               <div id="instamart-shelf-section" style={{
@@ -6617,321 +6545,130 @@ export default function Home() {
                 </span>
               </div>
 
-              <span style={{ fontSize: '0.88rem', color: '#94a3b8', fontWeight: '600' }}>Select Payment Option:</span>
+              <span style={{ fontSize: '0.88rem', color: '#94a3b8', fontWeight: '600' }}>Select Payment Option (YouPI-PG & COD Only):</span>
 
-              {/* Payment Option Cards - Rider UPI, Store UPI & COD */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '0.75rem' }}>
+              {/* Payment Option Cards - Strictly YouPI-PG UPI & COD */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.85rem' }}>
                 
-                {/* Rider Direct UPI Card */}
-                <div 
-                  onClick={() => setSelectedPaymentMethod('rider_upi')}
-                  style={{
-                    padding: '1rem',
-                    borderRadius: '14px',
-                    border: selectedPaymentMethod === 'rider_upi' ? '2px solid #2dd4bf' : '1px solid rgba(255, 255, 255, 0.08)',
-                    background: selectedPaymentMethod === 'rider_upi' ? '#1c2436' : '#181e2b',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s ease',
-                    boxShadow: selectedPaymentMethod === 'rider_upi' ? '0 4px 16px rgba(45, 212, 191, 0.2)' : 'none'
-                  }}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                    <span style={{ fontSize: '0.98rem', color: '#f1f5f9', fontWeight: '800' }}>🛵 Pay Delivery Rider</span>
-                    {selectedPaymentMethod === 'rider_upi' && <span style={{ color: '#2dd4bf', fontWeight: 'bold' }}>✓</span>}
-                  </div>
-                  <div style={{ fontSize: '0.74rem', color: '#94a3b8' }}>Direct UPI to Rider • Uploaded QR PNG</div>
-                </div>
-
-                {/* Store UPI Card */}
+                {/* YouPI-PG Sovereign UPI Card */}
                 <div 
                   onClick={() => setSelectedPaymentMethod('upi')}
                   style={{
-                    padding: '1rem',
+                    padding: '1.1rem',
                     borderRadius: '14px',
                     border: selectedPaymentMethod === 'upi' ? '2px solid #2dd4bf' : '1px solid rgba(255, 255, 255, 0.08)',
                     background: selectedPaymentMethod === 'upi' ? '#1c2436' : '#181e2b',
                     cursor: 'pointer',
                     transition: 'all 0.2s ease',
-                    boxShadow: selectedPaymentMethod === 'upi' ? '0 4px 16px rgba(45, 212, 191, 0.2)' : 'none'
+                    boxShadow: selectedPaymentMethod === 'upi' ? '0 4px 18px rgba(45, 212, 191, 0.25)' : 'none'
                   }}
                 >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                    <span style={{ fontSize: '0.98rem', color: '#f1f5f9', fontWeight: '800' }}>⚡ Store POS Terminal</span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                    <span style={{ fontSize: '1rem', color: '#f1f5f9', fontWeight: '800' }}>⚡ UPI Instant Pay (YouPI-PG)</span>
                     {selectedPaymentMethod === 'upi' && <span style={{ color: '#2dd4bf', fontWeight: 'bold' }}>✓</span>}
                   </div>
-                  <div style={{ fontSize: '0.74rem', color: '#94a3b8' }}>Counter Soundbox Sync & Merchant QR</div>
+                  <div style={{ fontSize: '0.76rem', color: '#94a3b8' }}>Zero-fee direct payment to delivery rider • GPay, PhonePe, Paytm, BHIM & QR</div>
+                  <div style={{ marginTop: '6px' }}>
+                    <span style={{ background: 'rgba(45, 212, 191, 0.15)', color: '#2dd4bf', padding: '2px 8px', borderRadius: '6px', fontSize: '0.68rem', fontWeight: 'bold' }}>
+                      0% Fee • YouPI-PG
+                    </span>
+                  </div>
                 </div>
 
-                {/* Cash on Delivery */}
+                {/* Cash on Delivery Card */}
                 <div 
                   onClick={() => setSelectedPaymentMethod('cod')}
                   style={{
-                    padding: '1rem',
+                    padding: '1.1rem',
                     borderRadius: '14px',
                     border: selectedPaymentMethod === 'cod' ? '2px solid #2dd4bf' : '1px solid rgba(255, 255, 255, 0.08)',
                     background: selectedPaymentMethod === 'cod' ? '#1c2436' : '#181e2b',
                     cursor: 'pointer',
                     transition: 'all 0.2s ease',
-                    boxShadow: selectedPaymentMethod === 'cod' ? '0 4px 16px rgba(45, 212, 191, 0.2)' : 'none'
+                    boxShadow: selectedPaymentMethod === 'cod' ? '0 4px 18px rgba(45, 212, 191, 0.25)' : 'none'
                   }}
                 >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                    <span style={{ fontSize: '0.98rem', color: '#f1f5f9', fontWeight: '800' }}>💵 Cash on Delivery</span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                    <span style={{ fontSize: '1rem', color: '#f1f5f9', fontWeight: '800' }}>💵 Cash on Delivery (COD)</span>
                     {selectedPaymentMethod === 'cod' && <span style={{ color: '#2dd4bf', fontWeight: 'bold' }}>✓</span>}
                   </div>
-                  <div style={{ fontSize: '0.74rem', color: '#94a3b8' }}>Pay cash or UPI to rider at doorstep</div>
+                  <div style={{ fontSize: '0.76rem', color: '#94a3b8' }}>Pay cash or UPI scan directly to rider at doorstep upon delivery</div>
+                  <div style={{ marginTop: '6px' }}>
+                    <span style={{ background: 'rgba(245, 158, 11, 0.15)', color: '#fbbf24', padding: '2px 8px', borderRadius: '6px', fontSize: '0.68rem', fontWeight: 'bold' }}>
+                      Pay at Doorstep
+                    </span>
+                  </div>
                 </div>
 
               </div>
 
-              {/* Dynamic Payment Body */}
+              {/* Dynamic Payment Body: YouPI-PG UPI (Direct to Rider) */}
               {selectedPaymentMethod === 'upi' && (
                 <div style={{ background: '#181e2b', padding: '1.25rem', borderRadius: '14px', border: '1px solid rgba(255, 255, 255, 0.08)', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                   
-                  {/* Store Terminal Header with Live Sync Status */}
+                  {/* YouPI-PG Gateway & Rider Recipient Header */}
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255, 255, 255, 0.08)', paddingBottom: '0.75rem', flexWrap: 'wrap', gap: '8px' }}>
                     <div>
-                      <div style={{ fontSize: '0.72rem', color: '#94a3b8', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                        DISPATCHING PARTNER PHARMACY:
+                      <div style={{ fontSize: '0.72rem', color: '#2dd4bf', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span>⚡ YOUPI-PG SOVEREIGN PAYMENT GATEWAY</span>
+                        <span style={{ background: 'rgba(45, 212, 191, 0.15)', color: '#2dd4bf', padding: '1px 6px', borderRadius: '4px', fontSize: '0.65rem' }}>0% FEE</span>
                       </div>
-                      <div style={{ fontSize: '0.96rem', color: '#f1f5f9', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <span>🏥</span>
-                        <span>{liveTerminalData?.pharmacy_name || 'Vamanjoor Express Pharmacy'}</span>
+                      <div style={{ fontSize: '0.96rem', color: '#f1f5f9', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
+                        <span>🛵</span>
+                        <span>Payee: Delivery Rider #{activeUser?.role === 'delivery' ? (activeUser.name || 'Arjun K') : 'AGT-591 (Verified Partner)'}</span>
                       </div>
                       <div style={{ fontSize: '0.72rem', color: '#34d399', display: 'flex', alignItems: 'center', gap: '5px', marginTop: '2px', fontWeight: '600' }}>
                         <span style={{ display: 'inline-block', width: '7px', height: '7px', borderRadius: '50%', background: '#34d399', boxShadow: '0 0 6px #34d399' }} />
-                        <span>Live Terminal Synced {lastSyncTime ? `(${lastSyncTime})` : '• Auto-updating'}</span>
+                        <span>Direct Rider Settlement • Zero Intermediary Deductions</span>
                       </div>
                     </div>
 
                     <button
                       type="button"
-                      onClick={fetchPharmacyLiveTerminalQr}
-                      disabled={isRefreshingLiveQr}
+                      onClick={() => {
+                        const totalAmt = cart.reduce((s, i) => s + parseFloat(i.price_mrp || 0), 0);
+                        const riderVpa = (typeof window !== 'undefined' ? (localStorage.getItem('medora_rider_vpa') || '') : '') || activeUser?.rider_upi_id || 'rider.agt-591@okhdfcbank';
+                        const riderName = activeUser?.role === 'delivery' ? (activeUser.name || 'Arjun K') : 'Rider AGT-591';
+                        const riderQr = (typeof window !== 'undefined' ? (localStorage.getItem('medora_rider_main_qr') || '') : '') || activeUser?.rider_upi_qr || '';
+
+                        setYoupiPaymentSession({
+                          paymentId: `YOUPI_${Math.random().toString(36).substring(2, 10).toUpperCase()}`,
+                          orderId: `ORD-${Math.random().toString(36).substring(2, 8).toUpperCase()}`,
+                          amount: totalAmt,
+                          riderName,
+                          riderVpa,
+                          riderQr,
+                          customerName: activeUser?.name || accountEditName || 'Patient',
+                          customerEmail: activeUser?.email || 'patient@medora.com'
+                        });
+                        setIsYoupiModalOpen(true);
+                      }}
                       style={{
-                        background: 'rgba(56, 189, 248, 0.15)',
-                        border: '1px solid #38bdf8',
-                        color: '#38bdf8',
+                        background: 'rgba(45, 212, 191, 0.12)',
+                        border: '1px solid #2dd4bf',
+                        color: '#2dd4bf',
                         padding: '6px 12px',
                         borderRadius: '8px',
                         fontSize: '0.75rem',
                         fontWeight: 'bold',
-                        cursor: isRefreshingLiveQr ? 'not-allowed' : 'pointer',
+                        cursor: 'pointer',
                         display: 'flex',
                         alignItems: 'center',
                         gap: '4px'
                       }}
                     >
-                      <span>🔄</span>
-                      <span>{isRefreshingLiveQr ? 'Syncing...' : 'Sync Terminal'}</span>
+                      <span>🌐</span>
+                      <span>YouPI Checkout Portal</span>
                     </button>
                   </div>
 
-                  {/* QR Selector Toggle Pills */}
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
-                    <button
-                      type="button"
-                      onClick={() => setQrViewMode('live')}
-                      style={{
-                        padding: '8px 10px',
-                        borderRadius: '8px',
-                        border: (qrViewMode === 'live' || (qrViewMode === 'auto' && liveTerminalData?.has_live_scanner_qr)) ? '2px solid #2dd4bf' : '1px solid rgba(255, 255, 255, 0.1)',
-                        background: (qrViewMode === 'live' || (qrViewMode === 'auto' && liveTerminalData?.has_live_scanner_qr)) ? '#1c2436' : '#121620',
-                        color: (qrViewMode === 'live' || (qrViewMode === 'auto' && liveTerminalData?.has_live_scanner_qr)) ? '#2dd4bf' : '#94a3b8',
-                        fontSize: '0.78rem',
-                        fontWeight: 'bold',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '6px'
-                      }}
-                    >
-                      <span>📷</span>
-                      <span>Soundbox Display {liveTerminalData?.has_live_scanner_qr ? '● LIVE' : '(Idle)'}</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setQrViewMode('shop')}
-                      style={{
-                        padding: '8px 10px',
-                        borderRadius: '8px',
-                        border: qrViewMode === 'shop' || (!liveTerminalData?.has_live_scanner_qr && qrViewMode === 'auto') ? '2px solid #2dd4bf' : '1px solid rgba(255, 255, 255, 0.1)',
-                        background: qrViewMode === 'shop' || (!liveTerminalData?.has_live_scanner_qr && qrViewMode === 'auto') ? '#1c2436' : '#121620',
-                        color: qrViewMode === 'shop' || (!liveTerminalData?.has_live_scanner_qr && qrViewMode === 'auto') ? '#2dd4bf' : '#94a3b8',
-                        fontSize: '0.78rem',
-                        fontWeight: 'bold',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '6px'
-                      }}
-                    >
-                      <span>🏪</span>
-                      <span>Store Exact-Amount QR</span>
-                    </button>
-                  </div>
-
-                  {/* QR DISPLAY FRAME */}
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.75rem' }}>
-                    {(qrViewMode === 'live' || (qrViewMode === 'auto' && liveTerminalData?.has_live_scanner_qr)) && liveTerminalData?.live_upi_qr ? (
-                      /* LIVE MACHINE PHOTO STREAMED BY COUNTER CLERK */
-                      <div style={{ textAlign: 'center' }}>
-                        <div style={{
-                          background: '#fff',
-                          padding: '10px',
-                          borderRadius: '14px',
-                          boxShadow: '0 8px 24px rgba(16, 185, 129, 0.25)',
-                          border: '2px solid #10b981',
-                          display: 'inline-block'
-                        }}>
-                          <img 
-                            src={liveTerminalData.live_upi_qr} 
-                            alt="Live UPI POS Machine Screen"
-                            style={{ maxWidth: '210px', maxHeight: '190px', objectFit: 'contain', borderRadius: '8px', display: 'block' }}
-                          />
-                        </div>
-                        <div style={{ marginTop: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
-                          <span style={{ background: 'rgba(52, 211, 153, 0.15)', color: '#34d399', padding: '3px 10px', borderRadius: '99px', fontSize: '0.72rem', fontWeight: 'bold' }}>
-                            🟢 LIVE POS SOUNDBOX DISPLAY
-                          </span>
-                          <span style={{ fontSize: '0.72rem', color: '#94a3b8' }}>
-                            {liveTerminalData.terminal_label || 'Counter POS Terminal'}
-                          </span>
-                        </div>
-                      </div>
-                    ) : (
-                      /* STORE'S DYNAMIC AMOUNT-ENCODED QR CODE */
-                      <div style={{ textAlign: 'center' }}>
-                        <div style={{
-                          background: '#fff',
-                          padding: '12px',
-                          borderRadius: '14px',
-                          boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
-                          border: '2px solid #2dd4bf',
-                          display: 'inline-block'
-                        }}>
-                          <img 
-                            src={liveTerminalData?.dynamic_upi_qr || liveTerminalData?.shop_upi_qr || `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=upi://pay?pa=${encodeURIComponent(liveTerminalData?.shop_upi_id || 'vamanjoor.pharmacy@upi')}%26pn=${encodeURIComponent(liveTerminalData?.pharmacy_name || 'Vamanjoor Pharmacy')}%26am=${cart.reduce((s, i) => s + parseFloat(i.price_mrp || 0), 0).toFixed(2)}%26cu=INR`} 
-                            alt="Store Official UPI QR"
-                            style={{ width: '160px', height: '160px', objectFit: 'contain', display: 'block' }}
-                          />
-                        </div>
-                        <div style={{ marginTop: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
-                          <span style={{ background: 'rgba(45, 212, 191, 0.15)', color: '#2dd4bf', padding: '3px 10px', borderRadius: '99px', fontSize: '0.72rem', fontWeight: 'bold' }}>
-                            ₹{cart.reduce((s, i) => s + parseFloat(i.price_mrp || 0), 0).toFixed(2)} PRE-ENCODED
-                          </span>
-                          <span style={{ fontSize: '0.72rem', color: '#94a3b8' }}>
-                            Auto-fills amount in your UPI app
-                          </span>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* 1-Tap Mobile UPI Intent Launcher */}
-                    <a
-                      href={liveTerminalData?.upi_intent || `upi://pay?pa=${encodeURIComponent(liveTerminalData?.shop_upi_id || 'vamanjoor.pharmacy@upi')}&pn=${encodeURIComponent(liveTerminalData?.pharmacy_name || 'Vamanjoor Express Pharmacy')}&am=${cart.reduce((s, i) => s + parseFloat(i.price_mrp || 0), 0).toFixed(2)}&cu=INR&tn=MEDORA-Order`}
-                      style={{
-                        width: '100%',
-                        boxSizing: 'border-box',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '8px',
-                        background: 'linear-gradient(135deg, #14b8a6 0%, #0d9488 100%)',
-                        color: '#ffffff',
-                        padding: '10px 16px',
-                        borderRadius: '10px',
-                        textDecoration: 'none',
-                        fontWeight: '700',
-                        fontSize: '0.88rem',
-                        boxShadow: '0 4px 14px rgba(13, 148, 136, 0.25)',
-                        transition: 'transform 0.15s ease'
-                      }}
-                    >
-                      <span>📲</span>
-                      <span>Pay via UPI App (GPay / PhonePe / Paytm / BHIM)</span>
-                    </a>
-
-                    {/* Store Counter Soundbox Voice Confirmation Guarantee */}
-                    <div style={{ background: '#121620', border: '1px solid rgba(16, 185, 129, 0.3)', borderRadius: '10px', padding: '10px 14px', fontSize: '0.76rem', color: '#86efac', display: 'flex', alignItems: 'center', gap: '8px', width: '100%', boxSizing: 'border-box' }}>
-                      <span style={{ fontSize: '1.25rem' }}>🔊</span>
-                      <div>
-                        <strong>Soundbox Voice Confirmation:</strong> Counter POS speaker at {liveTerminalData?.pharmacy_name || 'Vamanjoor Express'} will announce <em>&quot;₹{cart.reduce((s, i) => s + parseFloat(i.price_mrp || 0), 0).toFixed(2)} received&quot;</em> instantly upon payment.
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Store Verified VPA with 1-Click Copy */}
-                  <div style={{ width: '100%' }}>
-                    <label style={{ display: 'block', fontSize: '0.75rem', color: '#94a3b8', marginBottom: '4px', fontWeight: 'bold' }}>
-                      Shop's Verified UPI VPA / ID:
-                    </label>
-                    <div style={{ display: 'flex', gap: '0.5rem' }}>
-                      <input 
-                        type="text" 
-                        readOnly
-                        value={liveTerminalData?.shop_upi_id || 'vamanjoor.pharmacy@upi'} 
-                        style={{ flex: 1, padding: '0.65rem 0.85rem', borderRadius: '8px', background: '#121620', border: '1px solid rgba(255, 255, 255, 0.12)', color: '#f1f5f9', fontSize: '0.88rem', fontFamily: 'monospace', fontWeight: 'bold' }}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const vpa = liveTerminalData?.shop_upi_id || 'vamanjoor.pharmacy@upi';
-                          if (navigator.clipboard) {
-                            navigator.clipboard.writeText(vpa);
-                          }
-                          setCopiedVpa(true);
-                          setTimeout(() => setCopiedVpa(false), 2000);
-                        }}
-                        style={{
-                          background: copiedVpa ? 'rgba(52, 211, 153, 0.2)' : 'rgba(45, 212, 191, 0.15)',
-                          border: '1px solid #2dd4bf',
-                          color: copiedVpa ? '#34d399' : '#2dd4bf',
-                          padding: '6px 14px',
-                          borderRadius: '8px',
-                          fontSize: '0.8rem',
-                          fontWeight: 'bold',
-                          cursor: 'pointer',
-                          whiteSpace: 'nowrap'
-                        }}
-                      >
-                        {copiedVpa ? '✓ Copied!' : '📋 Copy VPA'}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {selectedPaymentMethod === 'rider_upi' && (
-                <div style={{ background: '#181e2b', padding: '1.25rem', borderRadius: '14px', border: '1px solid rgba(255, 255, 255, 0.08)', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255, 255, 255, 0.08)', paddingBottom: '0.75rem', flexWrap: 'wrap', gap: '8px' }}>
-                    <div>
-                      <div style={{ fontSize: '0.72rem', color: '#94a3b8', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                        ASSIGNED DELIVERY PARTNER:
-                      </div>
-                      <div style={{ fontSize: '0.96rem', color: '#f1f5f9', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <span>🛵</span>
-                        <span>Rider Partner #{activeUser?.role === 'delivery' ? (activeUser.name || 'Arjun K') : 'AGT-591 (Verified)'}</span>
-                      </div>
-                      <div style={{ fontSize: '0.72rem', color: '#2dd4bf', display: 'flex', alignItems: 'center', gap: '5px', marginTop: '2px', fontWeight: '600' }}>
-                        <span style={{ display: 'inline-block', width: '7px', height: '7px', borderRadius: '50%', background: '#2dd4bf', boxShadow: '0 0 6px #2dd4bf' }} />
-                        <span>Rider Direct Settlement • Settle at Dark-store</span>
-                      </div>
-                    </div>
-                    <span style={{ background: 'rgba(52, 211, 153, 0.15)', color: '#34d399', fontSize: '0.72rem', fontWeight: '800', padding: '3px 10px', borderRadius: '99px' }}>
-                      ✓ REGISTERED UPI QR
-                    </span>
-                  </div>
-
-                  {/* RIDER ACTUAL UPLOADED PNG QR CODE */}
+                  {/* Rider Actual Uploaded or Dynamic YouPI QR Code */}
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.75rem' }}>
                     {(() => {
                       const storedRiderQr = (typeof window !== 'undefined' ? (localStorage.getItem('medora_rider_main_qr') || '') : '') || activeUser?.rider_upi_qr;
-                      const riderVpa = (typeof window !== 'undefined' ? (localStorage.getItem('medora_rider_vpa') || '') : '') || activeUser?.rider_upi_id || 'rider.express@okhdfcbank';
+                      const riderVpa = (typeof window !== 'undefined' ? (localStorage.getItem('medora_rider_vpa') || '') : '') || activeUser?.rider_upi_id || 'rider.agt-591@okhdfcbank';
                       const totalAmount = cart.reduce((s, i) => s + parseFloat(i.price_mrp || 0), 0).toFixed(2);
+                      const upiDeepLink = `upi://pay?pa=${encodeURIComponent(riderVpa)}&pn=MEDORA-Delivery-Rider&am=${totalAmount}&cu=INR&tn=MEDORA-Order`;
 
                       return (
                         <>
@@ -6947,13 +6684,13 @@ export default function Home() {
                             {storedRiderQr ? (
                               <img
                                 src={storedRiderQr}
-                                alt="Rider Uploaded Registration UPI QR (PNG)"
+                                alt="Rider Uploaded Registration UPI QR"
                                 style={{ width: '180px', height: '180px', objectFit: 'contain', display: 'block', borderRadius: '8px' }}
                               />
                             ) : (
                               <img
-                                src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=upi://pay?pa=${encodeURIComponent(riderVpa)}%26pn=MEDORA-Delivery-Rider%26am=${totalAmount}%26cu=INR`}
-                                alt="Rider Dynamic UPI QR"
+                                src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(upiDeepLink)}`}
+                                alt="YouPI-PG Authentic Dynamic QR Code"
                                 style={{ width: '180px', height: '180px', objectFit: 'contain', display: 'block' }}
                               />
                             )}
@@ -6961,16 +6698,16 @@ export default function Home() {
 
                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                             <span style={{ background: 'rgba(45, 212, 191, 0.15)', color: '#2dd4bf', padding: '3px 10px', borderRadius: '99px', fontSize: '0.72rem', fontWeight: 'bold' }}>
-                              ₹{totalAmount} DUE TO RIDER
+                              ₹{totalAmount} PRE-ENCODED • DUE TO RIDER
                             </span>
                             <span style={{ fontSize: '0.72rem', color: '#94a3b8' }}>
-                              {storedRiderQr ? "★ Verified Rider Registration PNG" : "Dynamic Rider Gateway"}
+                              {storedRiderQr ? "★ Verified Rider Profile QR" : "YouPI-PG Dynamic UPI Intent"}
                             </span>
                           </div>
 
                           {/* 1-Tap Mobile UPI Intent Launcher */}
                           <a
-                            href={`upi://pay?pa=${encodeURIComponent(riderVpa)}&pn=MEDORA-Rider&am=${totalAmount}&cu=INR&tn=Order-Delivery`}
+                            href={upiDeepLink}
                             style={{
                               width: '100%',
                               boxSizing: 'border-box',
@@ -6989,21 +6726,21 @@ export default function Home() {
                             }}
                           >
                             <span>📲</span>
-                            <span>Pay Rider via UPI App (GPay / PhonePe / Paytm)</span>
+                            <span>Pay Rider via UPI App (GPay / PhonePe / Paytm / BHIM)</span>
                           </a>
 
                           {/* Direct Settlement Explanation Banner */}
                           <div style={{ background: '#121620', border: '1px solid rgba(16, 185, 129, 0.3)', borderRadius: '10px', padding: '10px 14px', fontSize: '0.76rem', color: '#86efac', display: 'flex', alignItems: 'center', gap: '8px', width: '100%', boxSizing: 'border-box' }}>
                             <span style={{ fontSize: '1.25rem' }}>ℹ️</span>
                             <div>
-                              <strong>Dark-Store Settlement Guarantee:</strong> Your payment goes straight to the rider. The rider pays the pharmacy at pickup and delivers your medicine in 10-15 mins.
+                              <strong>Rider Settlement Flow Guarantee:</strong> Your payment goes 100% directly to your assigned delivery rider with zero platform cuts. The rider settles with the fulfilling pharmacy at pickup and delivers your medicine in 10-15 mins.
                             </div>
                           </div>
 
                           {/* Rider VPA display & copy */}
                           <div style={{ width: '100%' }}>
                             <label style={{ display: 'block', fontSize: '0.75rem', color: '#94a3b8', marginBottom: '4px', fontWeight: 'bold' }}>
-                              Rider's Registered UPI ID:
+                              Rider's Verified UPI VPA / ID:
                             </label>
                             <div style={{ display: 'flex', gap: '0.5rem' }}>
                               <input
@@ -7032,7 +6769,7 @@ export default function Home() {
                                   cursor: 'pointer'
                                 }}
                               >
-                                {copiedVpa ? '✓ Copied' : 'Copy'}
+                                {copiedVpa ? '✓ Copied' : 'Copy VPA'}
                               </button>
                             </div>
                           </div>
@@ -7043,6 +6780,7 @@ export default function Home() {
                 </div>
               )}
 
+              {/* Dynamic Payment Body: Cash on Delivery */}
               {selectedPaymentMethod === 'cod' && (
                 <div style={{ background: '#181e2b', padding: '1.25rem', borderRadius: '14px', border: '1px dashed #f59e0b', fontSize: '0.88rem', color: '#fbbf24', display: 'flex', alignItems: 'center', gap: '14px' }}>
                   <span style={{ fontSize: '2rem' }}>💵</span>
@@ -7059,10 +6797,8 @@ export default function Home() {
                 style={{ width: '100%', justifyContent: 'center', background: 'linear-gradient(135deg, #14b8a6 0%, #0d9488 100%)', padding: '0.95rem', fontSize: '1rem', fontWeight: 'bold', marginTop: '0.5rem' }}
               >
                 {selectedPaymentMethod === 'cod' 
-                  ? 'Confirm COD Order 🛵' 
-                  : selectedPaymentMethod === 'rider_upi'
-                    ? `Pay Rider ₹${cart.reduce((s, i) => s + parseFloat(i.price_mrp || 0), 0).toFixed(2)} via Direct UPI 🛵`
-                    : `Pay ₹${cart.reduce((s, i) => s + parseFloat(i.price_mrp || 0), 0).toFixed(2)} via Store POS & Place Order ⚡`}
+                  ? 'Confirm COD Order (Pay Rider at Doorstep) 🛵' 
+                  : `Pay ₹${cart.reduce((s, i) => s + parseFloat(i.price_mrp || 0), 0).toFixed(2)} via YouPI-PG (Direct to Rider) ⚡`}
               </button>
             </div>
           )}
@@ -8262,6 +7998,25 @@ export default function Home() {
         isFirstTimeSetup={isFirstTimeAddressSetup}
       />
 
+      {/* YOUPI PG V2 SOVEREIGN UPI CHECKOUT MODAL */}
+      <YouPiCheckoutModal
+        isOpen={isYoupiModalOpen}
+        onClose={() => {
+          setIsYoupiModalOpen(false);
+          setIsProcessingPayment(false);
+          setPaymentStep('payment');
+        }}
+        amount={youpiPaymentSession?.amount || cart.reduce((s, i) => s + parseFloat(i.price_mrp || 0), 0)}
+        orderId={youpiPaymentSession?.orderId || `ORD-${Date.now().toString(36).toUpperCase()}`}
+        customerName={activeUser?.name || accountEditName || 'Patient'}
+        customerEmail={activeUser?.email || 'patient@medora.com'}
+        riderName={youpiPaymentSession?.riderName || 'Rider AGT-591'}
+        riderVpa={youpiPaymentSession?.riderVpa || 'rider.agt-591@okhdfcbank'}
+        riderQr={youpiPaymentSession?.riderQr || ''}
+        paymentId={youpiPaymentSession?.paymentId || ''}
+        onPaymentSuccess={handleYoupiPaymentSuccess}
+      />
+
       {/* Mobile Sticky Bottom Navigation Bar */}
       <nav className="medora-mobile-nav">
         <button
@@ -8277,19 +8032,7 @@ export default function Home() {
           <span className="medora-nav-label">Home</span>
         </button>
 
-        <button
-          className="medora-nav-item"
-          onClick={() => {
-            setActiveMainView('home');
-            setIsChatOpen(false);
-            setIsOcrOpen(false);
-            const el = document.getElementById('instamart-shelf-section');
-            if (el) el.scrollIntoView({ behavior: 'smooth' });
-          }}
-        >
-          <span className="medora-nav-icon">⚡</span>
-          <span className="medora-nav-label">Instamart</span>
-        </button>
+
 
         <button
           className={`medora-nav-item ${isChatOpen ? 'active' : ''}`}

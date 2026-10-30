@@ -1,7 +1,13 @@
 id,full_name,role,email,phone,username,password,status,must_change_password,address,pharmacy_license,vehicle_type,driving_license,created_at
+usr_9723fa75,Dr. Rajesh Pai,pharmacy,rajesh.pai@medoralabs.in,+91 98450 12345,rajesh.pai,Pharmacy123,active,1,"City Light Circle, Kadri, Mangalore",KA-MAN-2024-99881,,,2026-10-01T11:11:08.619684Z
+usr_eb15aff2,Test Pharmacy,pharmacy,testpharm@medora.com,9876543210,testpharm,aaaaaaaa11,active,0,,,,,2026-10-01T11:11:15.515059Z
+usr_b3b14363,Athul Reji,patient,athulreji961@gmail.com,345546456,athulreji961,aaaaaaaa11,active,0,,,,,2026-10-03T19:04:48.454508Z
+usr_60ed7b9e,Athul Reji,pharmacy,athulreji962@gmail.com,8848661094,athulreji962,Pharmacy123,active,1,Hdhdhshhs,Kajajsjja,Electric Scooter,dladfndjd,2026-10-15T06:22:43.617855Z
+usr_fe957f5a,shahan,patient,mohdshahan33@gmail.com,7856576647,mohdshahan33,aaaaaaaa11,active,0,,,,,2026-10-15T07:13:23.623367Z
 usr_admin_1,MEDORA System Administrator,admin,admin@medora.com,+919000000000,admin,admin,active,0,,,,,2026-01-01T00:00:00Z
 usr_patient_1,Adhwaith (Patient),patient,patient@medora.com,+919999999999,patient,patient123,active,0,,,,,2026-01-01T00:00:00Z
 usr_pharmacy_1,Vamanjoor Pharmacy Admin,pharmacy,pharmacy@medora.com,+918888888888,pharmacy,pharmacy123,active,0,"Airport Road, Vamanjoor",KA-MN-2024-PH998,,,2026-01-01T00:00:00Z
 usr_rider_1,Rider AGT-591,delivery,rider@medora.com,+917777777777,rider,rider123,active,0,"Kodialbail, Mangalore",,Electric Scooter,DL-KA19-202300091,2026-01-01T00:00:00Z
 usr_a2ecb766,Raju,pharmacy,adhwaithkr2005@gmail.com,9809803257,adhwaithkr2005,password123,active,0,Vamanjoor Junction,KA 5481698,,,2026-10-01T00:25:45.707786Z
 usr_73a07761,Adhwaith K R,patient,23g02.adhwaith@sjec.ac.in,5424774854,23g02.adhwaith,medora123,active,0,,,,,2026-10-01T00:33:52.428667Z
+usr_694f9abb,Ben Elias,patient,benelias31@gmail.com,9544300683,benelias31,benelias123,active,0,"Flat 402, 4th Floor, Tower 2, Sunshine Heights, Airport Road, Vamanjoor, Mangalore - 575028",,,,2026-10-30T01:52:45.872530Z

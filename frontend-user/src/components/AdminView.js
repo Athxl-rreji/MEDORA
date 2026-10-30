@@ -31,6 +31,105 @@ export default function AdminView() {
   const [toastMsg, setToastMsg] = useState(null);
   const [processingId, setProcessingId] = useState(null);
 
+  // Secret Password Override Modal State
+  const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
+  const [pwdTargetUserId, setPwdTargetUserId] = useState('');
+  const [pwdNewPassword, setPwdNewPassword] = useState('');
+  const [pwdConfirmPassword, setPwdConfirmPassword] = useState('');
+  const [pwdShowText, setPwdShowText] = useState(false);
+  const [pwdSubmitting, setPwdSubmitting] = useState(false);
+  const [pwdError, setPwdError] = useState(null);
+  const [pwdSuccess, setPwdSuccess] = useState(null);
+  const [secretClickCount, setSecretClickCount] = useState(0);
+  const [lastSecretClickTime, setLastSecretClickTime] = useState(0);
+
+  // Hotkey listener: Alt + P triggers hidden password override modal
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.altKey && (e.key === 'p' || e.key === 'P')) {
+        e.preventDefault();
+        setIsPasswordModalOpen(prev => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  const handleSecretHeaderClick = () => {
+    const now = Date.now();
+    if (now - lastSecretClickTime < 1500) {
+      const nextCount = secretClickCount + 1;
+      setSecretClickCount(nextCount);
+      if (nextCount >= 3) {
+        setIsPasswordModalOpen(true);
+        setSecretClickCount(0);
+        showToast("🔐 Secret Access: User Password Override Console Activated!");
+      }
+    } else {
+      setSecretClickCount(1);
+    }
+    setLastSecretClickTime(now);
+  };
+
+  const handleGenerateRandomPassword = () => {
+    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%&*";
+    let gen = "Medora#";
+    for (let i = 0; i < 5; i++) {
+      gen += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    gen += "!";
+    setPwdNewPassword(gen);
+    setPwdConfirmPassword(gen);
+    setPwdShowText(true);
+  };
+
+  const handleAdminChangePassword = async (e) => {
+    if (e) e.preventDefault();
+    if (!pwdTargetUserId) {
+      setPwdError("Please select a target user.");
+      return;
+    }
+    if (!pwdNewPassword || pwdNewPassword.trim().length < 4) {
+      setPwdError("Password must be at least 4 characters in length.");
+      return;
+    }
+    if (pwdNewPassword !== pwdConfirmPassword) {
+      setPwdError("New password and confirmation do not match.");
+      return;
+    }
+
+    setPwdSubmitting(true);
+    setPwdError(null);
+    setPwdSuccess(null);
+
+    try {
+      const res = await fetch(`${API}/api/v1/admin/users/${encodeURIComponent(pwdTargetUserId)}/password`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ new_password: pwdNewPassword.trim() })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setPwdSuccess(data.message || "Password successfully updated!");
+        showToast(`🔑 Password for ${data.email || pwdTargetUserId} updated successfully!`);
+        setTimeout(() => {
+          setIsPasswordModalOpen(false);
+          setPwdNewPassword('');
+          setPwdConfirmPassword('');
+          setPwdError(null);
+          setPwdSuccess(null);
+          fetchUsers();
+        }, 1200);
+      } else {
+        setPwdError(data.detail || "Failed to update user password.");
+      }
+    } catch (err) {
+      setPwdError(`Server connection error: ${err.message}`);
+    } finally {
+      setPwdSubmitting(false);
+    }
+  };
+
   const fetchRequests = async () => {
     setLoading(true);
     try {
@@ -284,8 +383,12 @@ export default function AdminView() {
           gap: '1rem'
         }}>
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-              <span style={{ fontSize: '1.5rem' }}>🔑</span>
+            <div 
+              onClick={handleSecretHeaderClick} 
+              style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px', cursor: 'pointer', userSelect: 'none' }}
+              title="Tip: Triple-click to open Root Security Console (or press Alt+P)"
+            >
+              <span style={{ fontSize: '1.5rem', transition: 'transform 0.2s ease' }}>🔑</span>
               <h1 style={{ fontSize: '1.6rem', color: 'var(--primary, #B8F7E4)', margin: 0, fontFamily: 'Outfit, sans-serif' }}>
                 MEDORA Partner Onboarding Console
               </h1>
@@ -295,6 +398,26 @@ export default function AdminView() {
             </p>
           </div>
 
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            {/* Discreet Secret Keyhole Icon (Alt+P) */}
+            <button
+              onClick={() => setIsPasswordModalOpen(true)}
+              style={{
+                background: 'rgba(255, 255, 255, 0.05)',
+                color: '#64748b',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                padding: '8px 12px',
+                borderRadius: '8px',
+                fontSize: '0.9rem',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease'
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.color = '#38bdf8'; e.currentTarget.style.borderColor = '#38bdf8'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.color = '#64748b'; e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)'; }}
+              title="Root User Password Override (Alt+P)"
+            >
+              🔐
+            </button>
           <button
             onClick={fetchRequests}
             style={{
@@ -313,6 +436,7 @@ export default function AdminView() {
           >
             🔄 Refresh Applications
           </button>
+          </div>
         </div>
 
         {/* Console Navigation Tabs */}
@@ -962,6 +1086,37 @@ export default function AdminView() {
                         {/* Action buttons */}
                         {user.role !== 'admin' && (
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
+                            {/* Quick Direct Password Override Button */}
+                            <button
+                              id={`btn-change-pwd-${user.id || user.email}`}
+                              onClick={() => {
+                                setPwdTargetUserId(user.id || user.email);
+                                setPwdNewPassword('');
+                                setPwdConfirmPassword('');
+                                setPwdError(null);
+                                setPwdSuccess(null);
+                                setIsPasswordModalOpen(true);
+                              }}
+                              style={{
+                                background: 'rgba(184, 247, 228, 0.1)',
+                                color: 'var(--primary, #B8F7E4)',
+                                border: '1px solid rgba(184, 247, 228, 0.35)',
+                                padding: '7px 12px',
+                                borderRadius: '8px',
+                                fontSize: '0.8rem',
+                                fontWeight: '700',
+                                cursor: 'pointer',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '5px',
+                                transition: 'all 0.2s ease'
+                              }}
+                              title="Administrator Password Change"
+                            >
+                              <span>🔑</span>
+                              <span>Change Pass</span>
+                            </button>
+
                             {/* Deactivate / Reactivate Toggle Button */}
                             <button
                               id={`btn-toggle-status-${user.id || user.email}`}
@@ -1302,6 +1457,262 @@ export default function AdminView() {
         </div>
       )}
 
+
+      {/* 🔐 HIDDEN MODAL: ROOT USER PASSWORD OVERRIDE CONSOLE (Alt+P or Triple-click Header) */}
+      {isPasswordModalOpen && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(3, 7, 18, 0.82)',
+          backdropFilter: 'blur(10px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 10000,
+          padding: '1.5rem'
+        }}>
+          <div style={{
+            background: 'linear-gradient(135deg, #131722 0%, #0d1017 100%)',
+            border: '1px solid rgba(184, 247, 228, 0.3)',
+            boxShadow: '0 25px 60px rgba(0, 0, 0, 0.8), 0 0 30px rgba(184, 247, 228, 0.15)',
+            borderRadius: '20px',
+            maxWidth: '540px',
+            width: '100%',
+            padding: '2rem',
+            color: '#f8fafc',
+            fontFamily: 'Inter, sans-serif'
+          }}>
+            {/* Modal Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.25rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{
+                  width: '44px',
+                  height: '44px',
+                  borderRadius: '12px',
+                  background: 'rgba(184, 247, 228, 0.15)',
+                  border: '1px solid rgba(184, 247, 228, 0.35)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '1.4rem'
+                }}>
+                  🔐
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '1.2rem', color: 'var(--primary, #B8F7E4)', fontWeight: '800' }}>
+                    User Password Override
+                  </h3>
+                  <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
+                    Master Admin Credential Management &bull; Shortcut: <code style={{ color: '#38bdf8' }}>Alt+P</code>
+                  </span>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsPasswordModalOpen(false)}
+                style={{
+                  background: 'rgba(255, 255, 255, 0.08)',
+                  border: 'none',
+                  color: '#94a3b8',
+                  borderRadius: '8px',
+                  width: '32px',
+                  height: '32px',
+                  fontSize: '1rem',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Error / Success Alerts */}
+            {pwdError && (
+              <div style={{
+                background: 'rgba(239, 68, 68, 0.15)',
+                border: '1px solid rgba(239, 68, 68, 0.35)',
+                color: '#fca5a5',
+                padding: '10px 14px',
+                borderRadius: '10px',
+                marginBottom: '1.2rem',
+                fontSize: '0.85rem'
+              }}>
+                ⚠️ {pwdError}
+              </div>
+            )}
+            {pwdSuccess && (
+              <div style={{
+                background: 'rgba(16, 185, 129, 0.15)',
+                border: '1px solid rgba(16, 185, 129, 0.35)',
+                color: '#6ee7b7',
+                padding: '10px 14px',
+                borderRadius: '10px',
+                marginBottom: '1.2rem',
+                fontSize: '0.85rem'
+              }}>
+                ✅ {pwdSuccess}
+              </div>
+            )}
+
+            <form onSubmit={handleAdminChangePassword}>
+              {/* Target User Selector */}
+              <div style={{ marginBottom: '1.25rem' }}>
+                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 'bold', color: '#cbd5e1', marginBottom: '6px' }}>
+                  Select Target Account
+                </label>
+                <select
+                  value={pwdTargetUserId}
+                  onChange={(e) => setPwdTargetUserId(e.target.value)}
+                  style={{
+                    width: '100%',
+                    background: '#0a0d14',
+                    border: '1px solid rgba(255, 255, 255, 0.15)',
+                    borderRadius: '10px',
+                    padding: '10px 14px',
+                    color: '#fff',
+                    fontSize: '0.9rem',
+                    outline: 'none'
+                  }}
+                >
+                  <option value="">-- Choose User / Partner to Override --</option>
+                  {users.map(u => (
+                    <option key={u.id || u.email} value={u.id || u.email}>
+                      [{u.role ? u.role.toUpperCase() : 'USER'}] {u.full_name || 'User'} &lt;{u.email}&gt;
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* New Password Input with Generator */}
+              <div style={{ marginBottom: '1.25rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                  <label style={{ fontSize: '0.82rem', fontWeight: 'bold', color: '#cbd5e1' }}>
+                    New Password
+                  </label>
+                  <button
+                    type="button"
+                    onClick={handleGenerateRandomPassword}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: 'var(--primary, #B8F7E4)',
+                      fontSize: '0.78rem',
+                      fontWeight: 'bold',
+                      cursor: 'pointer',
+                      textDecoration: 'underline'
+                    }}
+                  >
+                    ⚡ Auto-Generate Strong Pass
+                  </button>
+                </div>
+                <div style={{ position: 'relative' }}>
+                  <input
+                    type={pwdShowText ? "text" : "password"}
+                    placeholder="Enter new password (min 4 characters)"
+                    value={pwdNewPassword}
+                    onChange={(e) => setPwdNewPassword(e.target.value)}
+                    style={{
+                      width: '100%',
+                      background: '#0a0d14',
+                      border: '1px solid rgba(255, 255, 255, 0.15)',
+                      borderRadius: '10px',
+                      padding: '10px 45px 10px 14px',
+                      color: '#fff',
+                      fontSize: '0.9rem',
+                      outline: 'none'
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setPwdShowText(prev => !prev)}
+                    style={{
+                      position: 'absolute',
+                      right: '10px',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      background: 'none',
+                      border: 'none',
+                      color: '#94a3b8',
+                      cursor: 'pointer',
+                      fontSize: '0.9rem'
+                    }}
+                  >
+                    {pwdShowText ? "🙈" : "👁️"}
+                  </button>
+                </div>
+              </div>
+
+              {/* Confirm Password Input */}
+              <div style={{ marginBottom: '1.75rem' }}>
+                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 'bold', color: '#cbd5e1', marginBottom: '6px' }}>
+                  Confirm New Password
+                </label>
+                <input
+                  type={pwdShowText ? "text" : "password"}
+                  placeholder="Repeat new password"
+                  value={pwdConfirmPassword}
+                  onChange={(e) => setPwdConfirmPassword(e.target.value)}
+                  style={{
+                    width: '100%',
+                    background: '#0a0d14',
+                    border: '1px solid rgba(255, 255, 255, 0.15)',
+                    borderRadius: '10px',
+                    padding: '10px 14px',
+                    color: '#fff',
+                    fontSize: '0.9rem',
+                    outline: 'none'
+                  }}
+                />
+              </div>
+
+              {/* Action Buttons */}
+              <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
+                <button
+                  type="button"
+                  onClick={() => setIsPasswordModalOpen(false)}
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.08)',
+                    color: '#94a3b8',
+                    border: '1px solid rgba(255, 255, 255, 0.15)',
+                    padding: '10px 18px',
+                    borderRadius: '10px',
+                    fontSize: '0.88rem',
+                    fontWeight: 'bold',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={pwdSubmitting}
+                  style={{
+                    background: 'linear-gradient(135deg, #0d9488 0%, #14b8a6 100%)',
+                    color: '#fff',
+                    border: '1px solid #14b8a6',
+                    boxShadow: '0 4px 16px rgba(20, 184, 166, 0.35)',
+                    padding: '10px 22px',
+                    borderRadius: '10px',
+                    fontSize: '0.88rem',
+                    fontWeight: '800',
+                    cursor: pwdSubmitting ? 'not-allowed' : 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    opacity: pwdSubmitting ? 0.7 : 1
+                  }}
+                >
+                  {pwdSubmitting ? "Updating..." : "🛡️ Update User Password"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

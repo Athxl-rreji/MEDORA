@@ -664,13 +664,38 @@ class PrototypeDataStore:
                 logger.error(f"Failed to mirror deleted users to {path}: {e}")
 
     def load_users(self):
-        """Loads registered user credentials directly from registered_users.csv and syncs to SQLite."""
+        """Loads registered user credentials with SQLite as authoritative master, merges missing CSV/defaults, and mirrors."""
         self.load_deleted_users()
         loaded = []
         seen_emails = set()
         seen_ids = set()
 
-        # Primary load from registered_users.csv across dataset dirs
+        # 1. Primary load from SQLite users table (authoritative state)
+        try:
+            with self.get_db() as conn:
+                cur = conn.cursor()
+                cur.execute("SELECT * FROM users")
+                for row in cur.fetchall():
+                    u = dict(row)
+                    uid = str(u.get("id", "")).strip().lower()
+                    uemail = str(u.get("email", "")).strip().lower()
+                    uname = str(u.get("username", "")).strip().lower()
+                    if not uemail:
+                        continue
+                    if uid in self.deleted_users or uemail in self.deleted_users or uname in self.deleted_users:
+                        continue
+                    if uemail in seen_emails or uid in seen_ids:
+                        continue
+
+                    must_val = u.get("must_change_password", 0)
+                    u["must_change_password"] = bool(int(must_val)) if str(must_val).isdigit() else bool(must_val)
+                    loaded.append(u)
+                    seen_emails.add(uemail)
+                    seen_ids.add(uid)
+        except Exception as e:
+            logger.error(f"Error reading users from SQLite: {e}")
+
+        # 2. Check registered_users.csv across dataset dirs for any unmigrated records
         for d in self.get_all_dataset_dirs():
             path = os.path.join(d, 'registered_users.csv')
             if os.path.exists(path):
@@ -697,10 +722,10 @@ class PrototypeDataStore:
                 except Exception as e:
                     logger.error(f"Error reading users from CSV {path}: {e}")
 
-        # Ensure default accounts are present
+        # 3. Ensure default accounts are present
         default_users = [
             {"id": "usr_admin_1", "full_name": "MEDORA System Administrator", "role": "admin", "email": "admin@medora.com", "phone": "+919000000000", "username": "admin", "password": "admin", "status": "active", "must_change_password": False, "address": "", "pharmacy_license": "", "vehicle_type": "", "driving_license": "", "created_at": "2026-01-01T00:00:00Z"},
-            {"id": "usr_patient_1", "full_name": "Adhwaith (Patient)", "role": "patient", "email": "patient@medora.com", "phone": "+919999999999", "username": "patient", "password": "patient123", "status": "active", "must_change_password": False, "address": "", "pharmacy_license": "", "vehicle_type": "", "driving_license": "", "created_at": "2026-01-01T00:00:00Z"},
+            {"id": "usr_patient_1", "full_name": "Adhwaith (Patient)", "role": "patient", "email": "patient@medora.com", "phone": "+919999999999", "username": "patient", "password": "patient123", "status": "active", "must_change_password": False, "address": "Flat 402, 4th Floor, Tower 2, Sunshine Heights, Airport Road, Vamanjoor, Mangalore - 575028", "pharmacy_license": "", "vehicle_type": "", "driving_license": "", "created_at": "2026-01-01T00:00:00Z"},
             {"id": "usr_pharmacy_1", "full_name": "Vamanjoor Pharmacy Admin", "role": "pharmacy", "email": "pharmacy@medora.com", "phone": "+918888888888", "username": "pharmacy", "password": "pharmacy123", "status": "active", "must_change_password": False, "address": "Airport Road, Vamanjoor", "pharmacy_license": "KA-MN-2024-PH998", "vehicle_type": "", "driving_license": "", "created_at": "2026-01-01T00:00:00Z"},
             {"id": "usr_rider_1", "full_name": "Rider AGT-591", "role": "delivery", "email": "rider@medora.com", "phone": "+917777777777", "username": "rider", "password": "rider123", "status": "active", "must_change_password": False, "address": "Kodialbail, Mangalore", "pharmacy_license": "", "vehicle_type": "Electric Scooter", "driving_license": "DL-KA19-202300091", "created_at": "2026-01-01T00:00:00Z"}
         ]
@@ -714,7 +739,7 @@ class PrototypeDataStore:
         self.users = loaded
         self.save_users_to_csv()
         self.sync_users_to_sqlite()
-        logger.info(f"Loaded {len(self.users)} active credentials from registered_users.csv.")
+        logger.info(f"Loaded {len(self.users)} active credentials (authoritative SQLite + CSV mirror).")
 
     def sync_users_to_sqlite(self):
         """Synchronizes in-memory and CSV users into SQLite table."""
@@ -727,15 +752,20 @@ class PrototypeDataStore:
                         INSERT OR REPLACE INTO users (
                             id, full_name, role, email, phone, username, password, status,
                             must_change_password, address, pharmacy_license, vehicle_type,
-                            driving_license, created_at
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                            driving_license, allergies, chronic_conditions, rider_upi_id,
+                            rider_upi_qr, shop_upi_id, shop_upi_qr, created_at, updated_at
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """, (
                         u.get("id"), u.get("full_name", "User"), u.get("role", "patient"),
                         u.get("email").strip(), u.get("phone", ""), u.get("username", ""),
                         u.get("password", ""), u.get("status", "active"),
                         must_val, u.get("address", ""), u.get("pharmacy_license", ""),
                         u.get("vehicle_type", ""), u.get("driving_license", ""),
-                        u.get("created_at", datetime.now().isoformat())
+                        u.get("allergies", ""), u.get("chronic_conditions", ""),
+                        u.get("rider_upi_id", ""), u.get("rider_upi_qr", ""),
+                        u.get("shop_upi_id", ""), u.get("shop_upi_qr", ""),
+                        u.get("created_at", datetime.now().isoformat()),
+                        u.get("updated_at")
                     ))
                 conn.commit()
         except Exception as e:
@@ -1182,6 +1212,8 @@ class PrototypeDataStore:
                 return u
         return None
 
+    DEFAULT_USER_ADDRESS = "Flat 402, 4th Floor, Tower 2, Sunshine Heights, Airport Road, Vamanjoor, Mangalore - 575028"
+
     def register_user(self, full_name: str, role: str, email: str, phone: str, username: str, password: str,
                       address: str = None, pharmacy_license: str = None, vehicle_type: str = None, 
                       driving_license: str = None, must_change_password: bool = False) -> dict:
@@ -1195,6 +1227,11 @@ class PrototypeDataStore:
         user_id = f"usr_{uuid.uuid4().hex[:8]}"
         created_at = datetime.now().isoformat() + "Z"
         must_change_val = 1 if must_change_password else 0
+
+        # Auto-store default address for newly created users if not explicitly provided
+        user_address = (address or "").strip()
+        if not user_address:
+            user_address = self.DEFAULT_USER_ADDRESS
 
         with self.get_db() as conn:
             cur = conn.cursor()
@@ -1211,7 +1248,7 @@ class PrototypeDataStore:
             """, (
                 user_id, full_name.strip(), role.strip(), email.strip(),
                 phone.strip() if phone else "", clean_uname, password,
-                must_change_val, address or "", pharmacy_license or "",
+                must_change_val, user_address, pharmacy_license or "",
                 vehicle_type or "", driving_license or "", created_at
             ))
             conn.commit()
@@ -1220,7 +1257,7 @@ class PrototypeDataStore:
         self.load_users()
         self.sync_to_cloud()
         new_user = self.find_user(user_id)
-        logger.info(f"Registered user in SQLite: {clean_email} (Role: {role}, must_change_password: {must_change_password})")
+        logger.info(f"Registered user in SQLite: {clean_email} (Role: {role}, address: {user_address[:30]}...)")
         return new_user
 
     def validate_password_strength(self, password: str):
@@ -1244,6 +1281,11 @@ class PrototypeDataStore:
         otp_code = f"{random.randint(100000, 999999)}"
         username = email.split("@")[0]
 
+        # Auto-store default address for newly created registrations if not explicitly provided
+        user_address = (address or "").strip()
+        if not user_address:
+            user_address = self.DEFAULT_USER_ADDRESS
+
         self.pending_registrations[key] = {
             "full_name": full_name,
             "role": role,
@@ -1251,12 +1293,12 @@ class PrototypeDataStore:
             "phone": phone,
             "username": username,
             "password": password,
-            "address": address or "",
+            "address": user_address,
             "otp": otp_code,
             "expires_at": time.time() + 300,
             "attempts": 0
         }
-        logger.info(f"Created pending registration for {key} with 6-digit OTP (Expires in 300s)")
+        logger.info(f"Created pending registration for {key} with auto-assigned address and 6-digit OTP")
         return otp_code
 
     def confirm_pending_registration(self, email: str, otp_code: str) -> dict:
@@ -1286,18 +1328,25 @@ class PrototypeDataStore:
             phone=pending["phone"],
             username=pending["username"],
             password=pending["password"],
-            address=pending.get("address", ""),
+            address=pending.get("address", self.DEFAULT_USER_ADDRESS),
             must_change_password=False
         )
         del self.pending_registrations[key]
         logger.info(f"Confirmed registration & saved user to SQLite: {new_user['full_name']} ({new_user['email']})")
         return new_user
 
-    def update_password(self, identifier: str, new_password: str) -> bool:
+    def update_password(self, identifier: str, new_password: str, is_admin: bool = False) -> bool:
         user = self.find_user(identifier)
         if not user:
             return False
-        self.validate_password_strength(new_password)
+        
+        if not is_admin:
+            self.validate_password_strength(new_password)
+        else:
+            if not new_password or len(str(new_password).strip()) < 4:
+                raise ValueError("Password must be at least 4 characters long.")
+
+        pwd_clean = str(new_password).strip()
         now_iso = datetime.now().isoformat() + "Z"
         with self.get_db() as conn:
             cur = conn.cursor()
@@ -1305,11 +1354,20 @@ class PrototypeDataStore:
                 UPDATE users 
                 SET password = ?, updated_at = ?
                 WHERE id = ?
-            """, (new_password, now_iso, user["id"]))
+            """, (pwd_clean, now_iso, user["id"]))
             conn.commit()
-        self.load_users()
+
+        # Update in-memory user objects directly
+        user["password"] = pwd_clean
+        user["updated_at"] = now_iso
+        for u in self.users:
+            if u.get("id") == user["id"] or str(u.get("email", "")).strip().lower() == str(user.get("email", "")).strip().lower():
+                u["password"] = pwd_clean
+                u["updated_at"] = now_iso
+
+        self.save_users_to_csv()
         self.sync_to_cloud()
-        logger.info(f"Updated password in SQLite for user {user['email']}")
+        logger.info(f"Updated password in SQLite and CSV mirror for user {user.get('email')}")
         return True
 
     def update_user_profile(self, identifier: str, data: dict) -> dict:
@@ -1350,10 +1408,26 @@ class PrototypeDataStore:
             ))
             conn.commit()
 
-        self.load_users()
+        # Update in-memory user objects directly
+        user["full_name"] = full_name
+        user["phone"] = phone
+        user["address"] = address
+        user["allergies"] = allergies
+        user["chronic_conditions"] = chronic_conditions
+        user["rider_upi_id"] = rider_upi_id
+        user["rider_upi_qr"] = rider_upi_qr
+        user["shop_upi_id"] = shop_upi_id
+        user["shop_upi_qr"] = shop_upi_qr
+        user["password"] = pwd_to_save
+        user["updated_at"] = now_iso
+        for u in self.users:
+            if u.get("id") == user["id"] or str(u.get("email", "")).strip().lower() == str(user.get("email", "")).strip().lower():
+                u.update(user)
+
+        self.save_users_to_csv()
         self.sync_to_cloud()
         updated = self.find_user(user["id"])
-        logger.info(f"Updated profile details in SQLite for user {user['email']}")
+        logger.info(f"Updated profile details in SQLite and CSV for user {user.get('email')}")
         return updated
 
     def set_first_time_password(self, identifier: str, temp_password: str, new_password: str) -> dict:
@@ -1379,7 +1453,16 @@ class PrototypeDataStore:
             """, (new_password.strip(), now_iso, user["id"]))
             conn.commit()
 
-        self.load_users()
+        user["password"] = new_password.strip()
+        user["must_change_password"] = False
+        user["updated_at"] = now_iso
+        for u in self.users:
+            if u.get("id") == user["id"] or str(u.get("email", "")).strip().lower() == str(user.get("email", "")).strip().lower():
+                u["password"] = new_password.strip()
+                u["must_change_password"] = False
+                u["updated_at"] = now_iso
+
+        self.save_users_to_csv()
         self.sync_to_cloud()
         updated_user = self.find_user(user["id"])
         logger.info(f"First-time password set for {updated_user['email']}! Temporary flag cleared.")

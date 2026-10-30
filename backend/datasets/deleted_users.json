@@ -1,1 +1,26 @@
-{}
+{
+  "usr_28256f73": {
+    "identifier": "usr_28256f73",
+    "id": "usr_28256f73",
+    "email": "autotest_patient@medora.com",
+    "username": "autotest_patient",
+    "role": "patient",
+    "deleted_at": "2026-10-30T01:47:51.373735Z"
+  },
+  "autotest_patient@medora.com": {
+    "identifier": "autotest_patient@medora.com",
+    "id": "usr_28256f73",
+    "email": "autotest_patient@medora.com",
+    "username": "autotest_patient",
+    "role": "patient",
+    "deleted_at": "2026-10-30T01:47:51.373735Z"
+  },
+  "autotest_patient": {
+    "identifier": "autotest_patient",
+    "id": "usr_28256f73",
+    "email": "autotest_patient@medora.com",
+    "username": "autotest_patient",
+    "role": "patient",
+    "deleted_at": "2026-10-30T01:47:51.373735Z"
+  }
+}

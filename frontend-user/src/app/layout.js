@@ -10,7 +10,12 @@ export default function RootLayout({ children }) {
   return (
     <html lang="en">
       <head>
-        <Script src="https://checkout.razorpay.com/v1/checkout.js" strategy="lazyOnload" />
+        <Script 
+          src="/youpi-checkout.js" 
+          strategy="lazyOnload" 
+          data-name="MEDORA Sovereign Healthcare" 
+          data-theme-color="#14b8a6" 
+        />
       </head>
       <body>
         {children}
